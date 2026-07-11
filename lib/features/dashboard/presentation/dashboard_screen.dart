@@ -46,6 +46,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         r.contains('professeur');
   }
 
+  /// Returns true if the current user has super admin / management rights
+  bool get _isSuperAdmin {
+    final r = _userRole.toLowerCase().trim();
+    return r == 'super_admin' ||
+        r == 'owner' ||
+        r == 'admin' ||
+        r.contains('super') ||
+        r.contains('admin') ||
+        r.contains('owner') ||
+        r.contains('director') ||
+        r.contains('directeur');
+  }
+
   /// Returns true if the user can manage finances (admin, director, accountant, secretary, super_admin, finance)
   // ignore: unused_element
   bool get _canManageFinance {
@@ -676,7 +689,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _handleAcademicsAction(isDevoirs: true);
                   },
                 ),
-                if (_isTeacher)
+                if (_isTeacher || _isSuperAdmin)
                   ListTile(
                     leading: const Icon(
                       Icons.menu_book,
@@ -688,7 +701,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context.push('/pedagogie/cahier-textes');
                     },
                   ),
-                if (_isTeacher)
+                if (_isTeacher || _isSuperAdmin)
                   ListTile(
                     leading: const Icon(
                       Icons.event_note,
@@ -700,7 +713,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context.push('/pedagogie/planification');
                     },
                   ),
-                if (_isTeacher)
+                if (_isTeacher || _isSuperAdmin)
                   ListTile(
                     leading: const Icon(
                       Icons.insert_chart,
@@ -1166,7 +1179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: const Color(0xFF2563EB),
         onTap: () => _handleAcademicsAction(isDevoirs: true),
       ),
-      if (_isTeacher)
+      if (_isTeacher || _isSuperAdmin)
         _buildQuickActionCard(
           title: 'Cahier de textes',
           description: 'Séances & leçons',
@@ -1174,7 +1187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: const Color(0xFF0D9488),
           onTap: () => context.push('/pedagogie/cahier-textes'),
         ),
-      if (_isTeacher)
+      if (_isTeacher || _isSuperAdmin)
         _buildQuickActionCard(
           title: 'Planification',
           description: 'Plans pédagogiques',
@@ -1182,7 +1195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: const Color(0xFF0D9488),
           onTap: () => context.push('/pedagogie/planification'),
         ),
-      if (_isTeacher)
+      if (_isTeacher || _isSuperAdmin)
         _buildQuickActionCard(
           title: 'Progression',
           description: 'Suivi & avancement',
