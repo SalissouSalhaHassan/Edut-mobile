@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SessionManager {
@@ -12,6 +14,7 @@ class SessionManager {
   static const String _keyStudentId = 'auth_student_id';
   static const String _keyStudentName = 'auth_student_name';
   static const String _keyStudentClass = 'auth_student_class';
+  static const String _keyPermissions = 'auth_permissions';
 
   Future<void> saveSession({
     required String token,
@@ -23,6 +26,7 @@ class SessionManager {
     String? studentId,
     String? studentName,
     String? studentClass,
+    List<String>? permissions,
   }) async {
     await _storage.write(key: _keyToken, value: token);
     await _storage.write(key: _keyEmail, value: email);
@@ -43,17 +47,40 @@ class SessionManager {
     if (studentClass != null) {
       await _storage.write(key: _keyStudentClass, value: studentClass);
     }
+    if (permissions != null) {
+      await _storage.write(
+        key: _keyPermissions,
+        value: jsonEncode(permissions),
+      );
+    }
   }
 
   Future<String?> getToken() async => await _storage.read(key: _keyToken);
   Future<String?> getEmail() async => await _storage.read(key: _keyEmail);
   Future<String?> getRole() async => await _storage.read(key: _keyRole);
-  Future<String?> getEmployeeId() async => await _storage.read(key: _keyEmployeeId);
+  Future<String?> getEmployeeId() async =>
+      await _storage.read(key: _keyEmployeeId);
   Future<String?> getUserId() async => await _storage.read(key: _keyUserId);
   Future<String?> getSchoolId() async => await _storage.read(key: _keySchoolId);
-  Future<String?> getStudentId() async => await _storage.read(key: _keyStudentId);
-  Future<String?> getStudentName() async => await _storage.read(key: _keyStudentName);
-  Future<String?> getStudentClass() async => await _storage.read(key: _keyStudentClass);
+  Future<String?> getStudentId() async =>
+      await _storage.read(key: _keyStudentId);
+  Future<String?> getStudentName() async =>
+      await _storage.read(key: _keyStudentName);
+  Future<String?> getStudentClass() async =>
+      await _storage.read(key: _keyStudentClass);
+  Future<List<String>> getPermissions() async {
+    final rawValue = await _storage.read(key: _keyPermissions);
+    if (rawValue == null || rawValue.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(rawValue);
+      if (decoded is List) {
+        return decoded.map((item) => item.toString()).toList();
+      }
+    } catch (_) {}
+
+    return const [];
+  }
 
   Future<bool> isLoggedIn() async {
     final token = await getToken();
@@ -70,5 +97,6 @@ class SessionManager {
     await _storage.delete(key: _keyStudentId);
     await _storage.delete(key: _keyStudentName);
     await _storage.delete(key: _keyStudentClass);
+    await _storage.delete(key: _keyPermissions);
   }
 }

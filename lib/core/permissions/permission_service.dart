@@ -26,10 +26,7 @@ class AppPermissions {
 }
 
 class UserAccessProfile {
-  const UserAccessProfile({
-    required this.role,
-    required this.permissions,
-  });
+  const UserAccessProfile({required this.role, required this.permissions});
 
   final String role;
   final Set<String> permissions;
@@ -37,7 +34,7 @@ class UserAccessProfile {
 
 class PermissionService {
   PermissionService({required SessionManager sessionManager})
-      : _sessionManager = sessionManager;
+    : _sessionManager = sessionManager;
 
   final SessionManager _sessionManager;
   final _client = SupabaseClientManager().client;
@@ -45,13 +42,27 @@ class PermissionService {
   String? _cachedCacheKey;
 
   Future<UserAccessProfile> getCurrentProfile() async {
-    final role = ((await _sessionManager.getRole()) ?? 'staff').toLowerCase().trim();
+    final role = ((await _sessionManager.getRole()) ?? 'staff')
+        .toLowerCase()
+        .trim();
     final userId = await _sessionManager.getUserId();
-    final email = (await _sessionManager.getEmail())?.toLowerCase().trim() ?? '';
+    final email =
+        (await _sessionManager.getEmail())?.toLowerCase().trim() ?? '';
     final cacheKey = '$userId|$email|$role';
 
     if (_cachedProfile != null && _cachedCacheKey == cacheKey) {
       return _cachedProfile!;
+    }
+
+    final sessionPermissions = await _sessionManager.getPermissions();
+    if (sessionPermissions.isNotEmpty) {
+      final profile = UserAccessProfile(
+        role: role,
+        permissions: sessionPermissions.toSet(),
+      );
+      _cachedProfile = profile;
+      _cachedCacheKey = cacheKey;
+      return profile;
     }
 
     try {
@@ -138,10 +149,7 @@ class PermissionService {
       }
     }
 
-    return UserAccessProfile(
-      role: dbRole,
-      permissions: permissions,
-    );
+    return UserAccessProfile(role: dbRole, permissions: permissions);
   }
 
   Future<Map<String, dynamic>?> _fetchCurrentUserRecord({
@@ -260,19 +268,35 @@ class PermissionService {
       if (canEdit) permissions.add(AppPermissions.financeCollect);
     }
 
-    if (_matchesModule(moduleName, const ['hr', 'human resources', 'ressources humaines'])) {
+    if (_matchesModule(moduleName, const [
+      'hr',
+      'human resources',
+      'ressources humaines',
+    ])) {
       if (canView) permissions.add(AppPermissions.hrView);
       if (canEdit || canDelete) permissions.add(AppPermissions.hrManage);
     }
 
-    if (_matchesModule(moduleName, const ['hostel', 'internat', 'dortoirs', 'dormitory'])) {
+    if (_matchesModule(moduleName, const [
+      'hostel',
+      'internat',
+      'dortoirs',
+      'dormitory',
+    ])) {
       if (canView) permissions.add(AppPermissions.hostelView);
       if (canEdit || canDelete) permissions.add(AppPermissions.hostelManage);
     }
 
-    if (_matchesModule(moduleName, const ['owner', 'platform', 'schools', 'security'])) {
+    if (_matchesModule(moduleName, const [
+      'owner',
+      'platform',
+      'schools',
+      'security',
+    ])) {
       if (canView) permissions.add(AppPermissions.ownerPlatformView);
-      if (canEdit || canDelete) permissions.add(AppPermissions.ownerSchoolsManage);
+      if (canEdit || canDelete) {
+        permissions.add(AppPermissions.ownerSchoolsManage);
+      }
     }
 
     if (_matchesModule(moduleName, const ['exam', 'exams', 'resultats'])) {
@@ -282,10 +306,17 @@ class PermissionService {
 
     if (_matchesModule(moduleName, const ['attendance', 'appel', 'presence'])) {
       if (canView) permissions.add(AppPermissions.attendanceView);
-      if (canEdit || canDelete) permissions.add(AppPermissions.attendanceManage);
+      if (canEdit || canDelete) {
+        permissions.add(AppPermissions.attendanceManage);
+      }
     }
 
-    if (_matchesModule(moduleName, const ['academics', 'notes', 'devoirs', 'homework'])) {
+    if (_matchesModule(moduleName, const [
+      'academics',
+      'notes',
+      'devoirs',
+      'homework',
+    ])) {
       if (canView) permissions.add(AppPermissions.academicsView);
       if (canEdit || canDelete) permissions.add(AppPermissions.academicsManage);
     }
@@ -351,9 +382,7 @@ class PermissionService {
       };
     }
 
-    if (role == 'accountant' ||
-        role == 'comptable' ||
-        role == 'finance') {
+    if (role == 'accountant' || role == 'comptable' || role == 'finance') {
       return {
         AppPermissions.financeView,
         AppPermissions.financeCollect,
@@ -362,15 +391,10 @@ class PermissionService {
     }
 
     if (role == 'hr' || role == 'personnel') {
-      return {
-        AppPermissions.hrView,
-        AppPermissions.hrManage,
-      };
+      return {AppPermissions.hrView, AppPermissions.hrManage};
     }
 
-    if (role == 'teacher' ||
-        role == 'enseignant' ||
-        role == 'professeur') {
+    if (role == 'teacher' || role == 'enseignant' || role == 'professeur') {
       return {
         AppPermissions.studentsView,
         AppPermissions.examsView,

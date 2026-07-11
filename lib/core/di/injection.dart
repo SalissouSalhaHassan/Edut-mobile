@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import '../api/supabase_client.dart';
+import '../api/mobile_api_client.dart';
 import '../api/offline_store_manager.dart';
 import '../api/offline_queue_manager.dart';
 import '../api/sync_engine.dart';
@@ -24,6 +25,10 @@ Future<void> setupLocator() async {
   final supabaseManager = SupabaseClientManager();
   await supabaseManager.init();
   locator.registerSingleton<SupabaseClientManager>(supabaseManager);
+
+  locator.registerLazySingleton<MobileApiClient>(
+    () => MobileApiClient(supabaseClient: supabaseManager.client),
+  );
 
   // Register OfflineStoreManager
   final offlineStore = OfflineStoreManager();
@@ -55,10 +60,13 @@ Future<void> setupLocator() async {
   );
 
   // Register AuthRepository
-  locator.registerLazySingleton<AuthRepository>(() => AuthRepository(
-        client: supabaseManager.client,
-        sessionManager: locator<SessionManager>(),
-      ));
+  locator.registerLazySingleton<AuthRepository>(
+    () => AuthRepository(
+      client: supabaseManager.client,
+      sessionManager: locator<SessionManager>(),
+      mobileApiClient: locator<MobileApiClient>(),
+    ),
+  );
 
   // Register AttendanceRepository
   locator.registerLazySingleton<AttendanceRepository>(() => AttendanceRepository(

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
 
@@ -7,26 +8,26 @@ class LoginResult {
   final bool success;
   final String? message;
 
-  const LoginResult._({
-    required this.success,
-    this.message,
-  });
+  const LoginResult._({required this.success, this.message});
 
   const LoginResult.success() : this._(success: true);
 
   const LoginResult.failure(String message)
-      : this._(success: false, message: message);
+    : this._(success: false, message: message);
 }
 
 class AuthRepository {
   final SupabaseClient _client;
   final SessionManager _sessionManager;
+  final MobileApiClient _mobileApiClient;
 
   AuthRepository({
     SupabaseClient? client,
     SessionManager? sessionManager,
-  })  : _client = client ?? SupabaseClientManager().client,
-        _sessionManager = sessionManager ?? SessionManager();
+    MobileApiClient? mobileApiClient,
+  }) : _client = client ?? SupabaseClientManager().client,
+       _sessionManager = sessionManager ?? SessionManager(),
+       _mobileApiClient = mobileApiClient ?? MobileApiClient();
 
   Future<Map<String, dynamic>?> _resolveStudentProfile({
     required String role,
@@ -49,7 +50,9 @@ class AuthRepository {
       try {
         var query = _client
             .from('students')
-            .select('id, school_id, nom_etudiant, classe, num_admission, nom_pere, mobile, whatsapp, educational_level')
+            .select(
+              'id, school_id, nom_etudiant, classe, num_admission, nom_pere, mobile, whatsapp, educational_level',
+            )
             .eq(field, value);
         if (schoolId != null) {
           query = query.eq('school_id', schoolId);
@@ -89,7 +92,9 @@ class AuthRepository {
         try {
           var query = _client
               .from('students')
-              .select('id, school_id, nom_etudiant, classe, num_admission, nom_pere, mobile, whatsapp, educational_level')
+              .select(
+                'id, school_id, nom_etudiant, classe, num_admission, nom_pere, mobile, whatsapp, educational_level',
+              )
               .ilike('nom_pere', parentName);
           if (schoolId != null) {
             query = query.eq('school_id', schoolId);
@@ -145,16 +150,28 @@ class AuthRepository {
     if (r == 'admin' || r == 'super_admin' || r.contains('admin')) {
       return 'admin';
     }
-    if (r == 'student' || r == 'eleve' || r == 'élève' || r.contains('student') || r.contains('eleve') || r.contains('élève')) {
+    if (r == 'student' ||
+        r == 'eleve' ||
+        r == 'élève' ||
+        r.contains('student') ||
+        r.contains('eleve') ||
+        r.contains('élève')) {
       return 'student';
     }
     if (r == 'parent' || r.contains('parent')) {
       return 'parent';
     }
-    if (r == 'accountant' || r == 'comptable' || r.contains('comptable') || r.contains('accountant')) {
+    if (r == 'accountant' ||
+        r == 'comptable' ||
+        r.contains('comptable') ||
+        r.contains('accountant')) {
       return 'accountant';
     }
-    if (r == 'secretary' || r == 'secretaire' || r.contains('secrétaire') || r.contains('secretaire') || r.contains('secretary')) {
+    if (r == 'secretary' ||
+        r == 'secretaire' ||
+        r.contains('secrétaire') ||
+        r.contains('secretaire') ||
+        r.contains('secretary')) {
       return 'secretary';
     }
     if (r == 'personnel' || r.contains('personnel')) {
@@ -187,10 +204,42 @@ class AuthRepository {
 
       if (response.session == null) {
         debugPrint("DEBUG LOGIN: Session was null");
-        return const LoginResult.failure('Session non créée. Veuillez réessayer.');
+        return const LoginResult.failure(
+          'Session non créée. Veuillez réessayer.',
+        );
       }
 
       debugPrint("DEBUG LOGIN: Auth success. User ID: ${response.user?.id}");
+
+      try {
+        final canonicalProfile = await _mobileApiClient.getCurrentProfile(
+          accessToken: response.session!.accessToken,
+        );
+
+        await _sessionManager.saveSession(
+          token: response.session!.accessToken,
+          email: canonicalProfile.email.isNotEmpty
+              ? canonicalProfile.email
+              : loginEmail,
+          role: canonicalProfile.role,
+          employeeId: canonicalProfile.employeeId ?? '',
+          userId: canonicalProfile.userId,
+          schoolId: canonicalProfile.schoolId,
+          studentId: canonicalProfile.studentId,
+          studentName: canonicalProfile.studentName,
+          studentClass: canonicalProfile.studentClass,
+          permissions: canonicalProfile.permissions,
+        );
+
+        debugPrint(
+          "DEBUG LOGIN: Session resolved through Edut web API -> Role: ${canonicalProfile.role}, SchoolId: ${canonicalProfile.schoolId}",
+        );
+        return const LoginResult.success();
+      } catch (e, stack) {
+        debugPrint(
+          "DEBUG LOGIN: Edut web API profile unavailable, using legacy Supabase fallback: $e\n$stack",
+        );
+      }
 
       String role = 'staff';
       String? schoolIdStr;
@@ -201,7 +250,8 @@ class AuthRepository {
         userData = await _fetchUserProfile(
           userId: response.session!.user.id,
           email: loginEmail,
-          select: 'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, roles(role_name)',
+          select:
+              'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, roles(role_name)',
         );
 
         debugPrint("DEBUG LOGIN: Profile data fetched: $userData");
@@ -216,7 +266,10 @@ class AuthRepository {
           debugPrint("DEBUG LOGIN: Normalized role from profile: $role");
 
           // If role still unresolved and role_id exists, fetch separately
-          if (role == 'staff' && userData['role_id'] != null && !isAdmin && !isSuperAdmin) {
+          if (role == 'staff' &&
+              userData['role_id'] != null &&
+              !isAdmin &&
+              !isSuperAdmin) {
             try {
               final roleData = await _client
                   .from('roles')
@@ -225,7 +278,11 @@ class AuthRepository {
                   .maybeSingle();
               debugPrint("DEBUG LOGIN: Separate role fetch result: $roleData");
               if (roleData != null) {
-                role = _normalizeRole(roleData['role_name'] as String?, false, false);
+                role = _normalizeRole(
+                  roleData['role_name'] as String?,
+                  false,
+                  false,
+                );
                 debugPrint("DEBUG LOGIN: Normalized separate role: $role");
               }
             } catch (e) {
@@ -234,13 +291,16 @@ class AuthRepository {
           }
         }
       } catch (e, stack) {
-        debugPrint("DEBUG LOGIN: Error fetching user profile with join: $e\n$stack");
+        debugPrint(
+          "DEBUG LOGIN: Error fetching user profile with join: $e\n$stack",
+        );
         // Fallback: query without roles join
         try {
           userData = await _fetchUserProfile(
             userId: response.session!.user.id,
             email: loginEmail,
-            select: 'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id',
+            select:
+                'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id',
           );
 
           debugPrint("DEBUG LOGIN: Fallback profile data: $userData");
@@ -263,9 +323,15 @@ class AuthRepository {
                       .select('role_name')
                       .eq('id', roleId)
                       .maybeSingle();
-                  debugPrint("DEBUG LOGIN: Fallback separate role data: $roleData");
+                  debugPrint(
+                    "DEBUG LOGIN: Fallback separate role data: $roleData",
+                  );
                   if (roleData != null) {
-                    role = _normalizeRole(roleData['role_name'] as String?, false, false);
+                    role = _normalizeRole(
+                      roleData['role_name'] as String?,
+                      false,
+                      false,
+                    );
                   }
                 } catch (_) {}
               }
@@ -295,7 +361,9 @@ class AuthRepository {
           // If role is still generic 'staff' and we found in employees → teacher
           if (role == 'staff') {
             role = 'teacher';
-            debugPrint("DEBUG LOGIN: Role set to teacher since employee record exists");
+            debugPrint(
+              "DEBUG LOGIN: Role set to teacher since employee record exists",
+            );
           }
         }
       } catch (e, stack) {
@@ -310,7 +378,9 @@ class AuthRepository {
       );
 
       if ((role == 'student' || role == 'parent') && studentProfile == null) {
-        debugPrint("WARNING: $role account logged in but no linked student record was found.");
+        debugPrint(
+          "WARNING: $role account logged in but no linked student record was found.",
+        );
       }
 
       if (studentProfile != null && schoolIdStr == null) {
@@ -318,13 +388,19 @@ class AuthRepository {
       }
 
       if (role == 'staff') {
-        debugPrint("WARNING: User logged in but no specific role was found (defaults to 'staff').");
+        debugPrint(
+          "WARNING: User logged in but no specific role was found (defaults to 'staff').",
+        );
         debugPrint("Full Auth Response - User ID: ${response.user?.id}");
         debugPrint("Full Auth Response - User Email: ${response.user?.email}");
-        debugPrint("Full Auth Response - User Metadata: ${response.user?.userMetadata}");
+        debugPrint(
+          "Full Auth Response - User Metadata: ${response.user?.userMetadata}",
+        );
       }
 
-      debugPrint("DEBUG LOGIN: Final resolved values for SessionManager -> Email: $loginEmail, Role: $role, EmployeeId: $employeeId, SchoolId: $schoolIdStr");
+      debugPrint(
+        "DEBUG LOGIN: Final resolved values for SessionManager -> Email: $loginEmail, Role: $role, EmployeeId: $employeeId, SchoolId: $schoolIdStr",
+      );
 
       await _sessionManager.saveSession(
         token: response.session!.accessToken,
