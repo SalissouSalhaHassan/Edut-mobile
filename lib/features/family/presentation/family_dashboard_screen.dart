@@ -185,7 +185,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       'Dimanche',
     ];
     final now = DateTime.now();
-    final todayName = days[now.weekday - 1];
+    var todayName = days[now.weekday - 1];
+    
+    // Fallback to Monday's schedule on weekends so the dashboard is not empty
+    if (todayName == 'Samedi' || todayName == 'Dimanche') {
+      todayName = 'Lundi';
+    }
+
     final items = _timetable
         .where((item) => item['day_name'] == todayName)
         .toList();
