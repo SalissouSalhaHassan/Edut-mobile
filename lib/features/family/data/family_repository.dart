@@ -66,9 +66,10 @@ class FamilyRepository {
           .select('id, day_name, period_number, class_id, subject_id, employee_id, school_subjects(subject_name), employees(nom, poste)')
           .eq('class_id', classRes['id']);
 
-      if (sessionId != null) {
-        query = query.eq('session_id', sessionId);
-      }
+      // Note: timetable_entries does not contain a session_id column in database schema
+      // if (sessionId != null) {
+      //   query = query.eq('session_id', sessionId);
+      // }
 
       final rows = await query.order('day_name').order('period_number');
       return List<Map<String, dynamic>>.from(rows);
