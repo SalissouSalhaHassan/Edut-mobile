@@ -9,7 +9,9 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../attendance/data/attendance_repository.dart';
+import '../data/dashboard_stats_repository.dart';
 import '../../../core/api/supabase_client.dart';
+import '../../messaging/data/messaging_repository.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -30,6 +32,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _hasStudentPromotionAccess = false;
   bool _hasHostelAccess = false;
   bool _hasHrAccess = false;
+  Map<String, dynamic> _dashboardStats = {};
+  int _unreadNotificationsCount = 0;
 
   /// Returns true if the current user is a teacher
   bool get _isTeacher {
@@ -110,16 +114,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
         r.contains('professeur')) {
       return 'Professeur';
     }
-    if (r == 'student' || r == 'eleve' || r == 'élève' || r.contains('student') || r.contains('eleve') || r.contains('élève')) {
+    if (r == 'student' ||
+        r == 'eleve' ||
+        r == 'élève' ||
+        r.contains('student') ||
+        r.contains('eleve') ||
+        r.contains('élève')) {
       return 'Élève';
     }
     if (r == 'parent' || r.contains('parent')) {
       return 'Parent';
     }
-    if (r == 'accountant' || r == 'comptable' || r == 'finance' || r.contains('comptable') || r.contains('accountant') || r.contains('finance')) {
+    if (r == 'accountant' ||
+        r == 'comptable' ||
+        r == 'finance' ||
+        r.contains('comptable') ||
+        r.contains('accountant') ||
+        r.contains('finance')) {
       return 'Comptable';
     }
-    if (r == 'secretary' || r == 'secretaire' || r == 'secrétaire' || r.contains('secretaire') || r.contains('secretary')) {
+    if (r == 'secretary' ||
+        r == 'secretaire' ||
+        r == 'secrétaire' ||
+        r.contains('secretaire') ||
+        r.contains('secretary')) {
       return 'Secrétaire';
     }
     if (r == 'personnel' || r.contains('personnel')) {
@@ -143,6 +161,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final email = await session.getEmail();
     final role = await session.getRole();
     final profile = await permissionService.getCurrentProfile();
+    Map<String, dynamic> dashboardStats = {};
+    int unreadNotificationsCount = 0;
+
+    try {
+      dashboardStats = await locator<DashboardStatsRepository>().getSummary();
+    } catch (e) {
+      debugPrint('Dashboard stats unavailable: $e');
+    }
+
+    try {
+      final notifs = await locator<MessagingRepository>().getNotifications();
+      unreadNotificationsCount = (notifs['unreadCount'] as num?)?.toInt() ?? 0;
+    } catch (e) {
+      debugPrint('Failed to load notifications count: $e');
+    }
 
     if (mounted) {
       if (email == null || email.isEmpty) {
@@ -161,12 +194,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _userRole = profile.role;
         final permissions = profile.permissions;
         _hasFinanceAccess = permissions.contains(AppPermissions.financeView);
-        _hasOwnerAccess = permissions.contains(AppPermissions.ownerPlatformView);
+        _hasOwnerAccess = permissions.contains(
+          AppPermissions.ownerPlatformView,
+        );
         _hasStudentsAccess = permissions.contains(AppPermissions.studentsView);
-        _hasStudentPromotionAccess =
-            permissions.contains(AppPermissions.studentsPromote);
+        _hasStudentPromotionAccess = permissions.contains(
+          AppPermissions.studentsPromote,
+        );
         _hasHostelAccess = permissions.contains(AppPermissions.hostelView);
         _hasHrAccess = permissions.contains(AppPermissions.hrView);
+        _dashboardStats = dashboardStats;
+        _unreadNotificationsCount = unreadNotificationsCount;
         _isLoading = false;
       });
     }
@@ -192,8 +230,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final role = await session.getRole() ?? 'staff';
 
     final roleStr = role.toLowerCase().trim();
-    final isTeacher = roleStr == 'teacher' || roleStr == 'enseignant' || roleStr == 'professeur' ||
-        roleStr.contains('teacher') || roleStr.contains('enseignant') || roleStr.contains('professeur');
+    final isTeacher =
+        roleStr == 'teacher' ||
+        roleStr == 'enseignant' ||
+        roleStr == 'professeur' ||
+        roleStr.contains('teacher') ||
+        roleStr.contains('enseignant') ||
+        roleStr.contains('professeur');
 
     List<Map<String, dynamic>> classes = [];
     final client = SupabaseClientManager().client;
@@ -201,19 +244,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       if (isTeacher) {
         if (employeeId != null) {
-          classes = await locator<AttendanceRepository>().getTeacherClassesAndSubjects(employeeId);
+          classes = await locator<AttendanceRepository>()
+              .getTeacherClassesAndSubjects(employeeId);
         }
       } else {
         final List<dynamic> allClassList = await client
             .from('school_classes')
             .select('id, class_name');
-        
-        classes = allClassList.map((c) => {
-          'class_id': c['id'],
-          'subject_id': null,
-          'school_classes': {'class_name': c['class_name']},
-          'school_subjects': null,
-        }).toList();
+
+        classes = allClassList
+            .map(
+              (c) => {
+                'class_id': c['id'],
+                'subject_id': null,
+                'school_classes': {'class_name': c['class_name']},
+                'school_subjects': null,
+              },
+            )
+            .toList();
       }
     } catch (e) {
       debugPrint("Error loading classes for roll: $e");
@@ -226,9 +274,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final errorMsg = isTeacher
             ? 'Aucune classe ou matière n’est assignée à ce compte enseignant.'
             : 'Aucune classe disponible';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMsg)));
         return;
       }
 
@@ -275,17 +323,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       itemBuilder: (context, index) {
                         final item = classes[index];
                         final classId = item['class_id'] as int;
-                        final className = item['school_classes']?['class_name'] ?? 'Classe';
+                        final className =
+                            item['school_classes']?['class_name'] ?? 'Classe';
                         final subjectId = item['subject_id'] as int?;
-                        final subjectName = item['school_subjects']?['subject_name'] as String?;
+                        final subjectName =
+                            item['school_subjects']?['subject_name'] as String?;
 
                         return ListTile(
                           leading: const CircleAvatar(
                             backgroundColor: AppColors.primaryLight,
-                            child: Icon(Icons.class_, color: AppColors.primary, size: 20),
+                            child: Icon(
+                              Icons.class_,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ),
                           title: Text(className, style: AppTextStyles.bodyBold),
-                          subtitle: subjectName != null ? Text(subjectName) : const Text("Appel Général Journée"),
+                          subtitle: subjectName != null
+                              ? Text(subjectName)
+                              : const Text("Appel Général Journée"),
                           onTap: () {
                             Navigator.pop(context);
                             context.push(
@@ -324,22 +380,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final role = await session.getRole() ?? 'staff';
 
     final roleStr2 = role.toLowerCase().trim();
-    final isTeacher = roleStr2 == 'teacher' || roleStr2 == 'enseignant' || roleStr2 == 'professeur' ||
-        roleStr2.contains('teacher') || roleStr2.contains('enseignant') || roleStr2.contains('professeur');
-    
+    final isTeacher =
+        roleStr2 == 'teacher' ||
+        roleStr2 == 'enseignant' ||
+        roleStr2 == 'professeur' ||
+        roleStr2.contains('teacher') ||
+        roleStr2.contains('enseignant') ||
+        roleStr2.contains('professeur');
+
     List<Map<String, dynamic>> classes = [];
     final client = SupabaseClientManager().client;
 
     try {
       if (isTeacher) {
         if (employeeId != null) {
-          classes = await locator<AttendanceRepository>().getTeacherClassesAndSubjects(employeeId);
+          classes = await locator<AttendanceRepository>()
+              .getTeacherClassesAndSubjects(employeeId);
         }
       } else {
         final List<dynamic> allClassSubjects = await client
             .from('class_subjects')
-            .select('class_id, subject_id, school_classes(class_name), school_subjects(subject_name)');
-        
+            .select(
+              'class_id, subject_id, school_classes(class_name), school_subjects(subject_name)',
+            );
+
         classes = List<Map<String, dynamic>>.from(allClassSubjects);
       }
     } catch (e) {
@@ -349,15 +413,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) {
       Navigator.pop(context); // Close loading dialog
 
-      final validClasses = classes.where((c) => c['subject_id'] != null).toList();
+      final validClasses = classes
+          .where((c) => c['subject_id'] != null)
+          .toList();
 
       if (validClasses.isEmpty) {
         final errorMsg = isTeacher
             ? 'Aucune classe ou matière n’est assignée à ce compte enseignant.'
             : 'Aucune classe/matière disponible';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMsg)));
         return;
       }
 
@@ -404,20 +470,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       itemBuilder: (context, index) {
                         final item = validClasses[index];
                         final classId = item['class_id'] as int;
-                        final className = item['school_classes']?['class_name'] ?? 'Classe';
+                        final className =
+                            item['school_classes']?['class_name'] ?? 'Classe';
                         final subjectId = item['subject_id'] as int;
-                        final subjectName = item['school_subjects']?['subject_name'] as String? ?? 'Matière';
+                        final subjectName =
+                            item['school_subjects']?['subject_name']
+                                as String? ??
+                            'Matière';
 
                         return ListTile(
                           leading: const CircleAvatar(
                             backgroundColor: AppColors.primaryLight,
-                            child: Icon(Icons.class_, color: AppColors.primary, size: 20),
+                            child: Icon(
+                              Icons.class_,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ),
                           title: Text(className, style: AppTextStyles.bodyBold),
                           subtitle: Text(subjectName),
                           onTap: () {
                             Navigator.pop(context);
-                            final path = isDevoirs ? '/academics/gestion-devoirs' : '/academics/saisie-notes';
+                            final path = isDevoirs
+                                ? '/academics/gestion-devoirs'
+                                : '/academics/saisie-notes';
                             context.push(
                               path,
                               extra: {
@@ -469,7 +545,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: EdgeInsets.zero,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.dashboard, color: Color(0xFF6D28D9)),
+                  leading: const Icon(
+                    Icons.dashboard,
+                    color: Color(0xFF6D28D9),
+                  ),
                   title: const Text('Tableau de bord'),
                   onTap: () {
                     Navigator.pop(context);
@@ -478,7 +557,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 if (_hasOwnerAccess)
                   ListTile(
-                    leading: const Icon(Icons.workspace_premium, color: Color(0xFF7C3AED)),
+                    leading: const Icon(
+                      Icons.workspace_premium,
+                      color: Color(0xFF7C3AED),
+                    ),
                     title: const Text('PROPRIÉTAIRE'),
                     onTap: () {
                       Navigator.pop(context);
@@ -487,7 +569,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 if (_hasOwnerAccess)
                   ListTile(
-                    leading: const Icon(Icons.admin_panel_settings, color: Color(0xFF4F46E5)),
+                    leading: const Icon(
+                      Icons.admin_panel_settings,
+                      color: Color(0xFF4F46E5),
+                    ),
                     title: const Text('Permissions'),
                     onTap: () {
                       Navigator.pop(context);
@@ -505,7 +590,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 if (_hasStudentPromotionAccess)
                   ListTile(
-                    leading: const Icon(Icons.arrow_upward, color: Color(0xFF059669)),
+                    leading: const Icon(
+                      Icons.arrow_upward,
+                      color: Color(0xFF059669),
+                    ),
                     title: const Text('Promotion des etudiants'),
                     onTap: () {
                       Navigator.pop(context);
@@ -513,7 +601,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                 ListTile(
-                  leading: const Icon(Icons.assignment_turned_in, color: Color(0xFFF59E0B)),
+                  leading: const Icon(
+                    Icons.assignment_turned_in,
+                    color: Color(0xFFF59E0B),
+                  ),
                   title: const Text("Faire l'appel"),
                   onTap: () {
                     Navigator.pop(context);
@@ -521,7 +612,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.qr_code_scanner, color: Color(0xFF4F46E5)),
+                  leading: const Icon(
+                    Icons.qr_code_scanner,
+                    color: Color(0xFF4F46E5),
+                  ),
                   title: const Text('Scanner QR Code'),
                   onTap: () {
                     Navigator.pop(context);
@@ -537,7 +631,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.fact_check, color: Color(0xFF4338CA)),
+                  leading: const Icon(
+                    Icons.fact_check,
+                    color: Color(0xFF4338CA),
+                  ),
                   title: const Text('Examens & Resultats'),
                   onTap: () {
                     Navigator.pop(context);
@@ -546,7 +643,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 if (_hasHostelAccess)
                   ListTile(
-                    leading: const Icon(Icons.home_work_outlined, color: Color(0xFF0D9488)),
+                    leading: const Icon(
+                      Icons.home_work_outlined,
+                      color: Color(0xFF0D9488),
+                    ),
                     title: const Text('Internat & Dortoirs'),
                     onTap: () {
                       Navigator.pop(context);
@@ -555,7 +655,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 if (_hasHrAccess)
                   ListTile(
-                    leading: const Icon(Icons.badge_outlined, color: Color(0xFF7C3AED)),
+                    leading: const Icon(
+                      Icons.badge_outlined,
+                      color: Color(0xFF7C3AED),
+                    ),
                     title: const Text('Ressources Humaines'),
                     onTap: () {
                       Navigator.pop(context);
@@ -563,16 +666,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                 ListTile(
-                  leading: const Icon(Icons.assignment, color: Color(0xFF2563EB)),
+                  leading: const Icon(
+                    Icons.assignment,
+                    color: Color(0xFF2563EB),
+                  ),
                   title: const Text('Devoirs & DS'),
                   onTap: () {
                     Navigator.pop(context);
                     _handleAcademicsAction(isDevoirs: true);
                   },
                 ),
+                if (_isTeacher)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.menu_book,
+                      color: Color(0xFF0D9488),
+                    ),
+                    title: const Text('Cahier de textes'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/pedagogie/cahier-textes');
+                    },
+                  ),
+                if (_isTeacher)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.event_note,
+                      color: Color(0xFF0D9488),
+                    ),
+                    title: const Text('Planification'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/pedagogie/planification');
+                    },
+                  ),
+                if (_isTeacher)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.insert_chart,
+                      color: Color(0xFF7C3AED),
+                    ),
+                    title: const Text('Progression'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/pedagogie/progression');
+                    },
+                  ),
                 if (_hasFinanceAccess)
                   ListTile(
-                    leading: const Icon(Icons.account_balance_wallet, color: Color(0xFF10B981)),
+                    leading: const Icon(
+                      Icons.account_balance_wallet,
+                      color: Color(0xFF10B981),
+                    ),
                     title: const Text('Gestion Financière'),
                     onTap: () {
                       Navigator.pop(context);
@@ -580,7 +725,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                 ListTile(
-                  leading: const Icon(Icons.insert_chart, color: Color(0xFF0D9488)),
+                  leading: const Icon(
+                    Icons.insert_chart,
+                    color: Color(0xFF0D9488),
+                  ),
                   title: const Text('Rapports HR'),
                   onTap: () {
                     Navigator.pop(context);
@@ -605,13 +753,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'Edut Mobile v1.0.0',
               style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
   // Welcome card inside dashboard
+  num _statNumber(String key) {
+    final value = _dashboardStats[key];
+    if (value is num) return value;
+    return num.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool _statBool(String key) => _dashboardStats[key] == true;
+
+  String _statCount(String key) => _statNumber(key).round().toString();
+
+  String _statPercent(String key, {String? hasDataKey}) {
+    if (hasDataKey != null && !_statBool(hasDataKey)) return '0%';
+    return '${_statNumber(key).toStringAsFixed(1)}%';
+  }
+
+  String _statHours(String key) => '${_statNumber(key).round()}h';
+
+  String _statAverage(String key) {
+    if (!_statBool('hasGradeData')) return '0 / 20';
+    return '${_statNumber(key).toStringAsFixed(1)} / 20';
+  }
+
+  double _progressFromPercent(String key, {String? hasDataKey}) {
+    if (hasDataKey != null && !_statBool(hasDataKey)) return 0;
+    final value = _statNumber(key).toDouble() / 100;
+    return value.clamp(0, 1);
+  }
+
   Widget _buildWelcomeCard() {
     final isTeacher = _isTeacher;
     return Container(
@@ -642,16 +818,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   const Text(
                     'Bienvenue,',
-                    style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w300),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _userEmail.split('@')[0].toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                   Text(
                     _getRoleLabel(_userRole),
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w400),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ],
               ),
@@ -669,16 +858,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: isTeacher
                 ? [
-                    _buildStatItem(Icons.check_circle_outline, '94%', 'Présences'),
-                    _buildStatItem(Icons.timer_outlined, '36h', 'Planifiées'),
-                    _buildStatItem(Icons.class_, '8', 'Classes Actives'),
-                    _buildStatItem(Icons.assignment, '5', 'Examens'),
+                    _buildStatItem(
+                      Icons.check_circle_outline,
+                      _statPercent(
+                        'studentAttendanceRate',
+                        hasDataKey: 'hasStudentAttendanceData',
+                      ),
+                      'Présences',
+                    ),
+                    _buildStatItem(
+                      Icons.timer_outlined,
+                      _statHours('plannedHours'),
+                      'Planifiées',
+                    ),
+                    _buildStatItem(
+                      Icons.class_,
+                      _statCount('classesCount'),
+                      'Classes Actives',
+                    ),
+                    _buildStatItem(
+                      Icons.assignment,
+                      _statCount('examsCount'),
+                      'Examens',
+                    ),
                   ]
                 : [
-                    _buildStatItem(Icons.people_outline, '342', 'Élèves Actifs'),
-                    _buildStatItem(Icons.analytics_outlined, '91%', 'Présence Ens.'),
-                    _buildStatItem(Icons.class_, '28', 'Classes Actives'),
-                    _buildStatItem(Icons.assignment, '15', 'Examens'),
+                    _buildStatItem(
+                      Icons.people_outline,
+                      _statCount('activeStudents'),
+                      'Élèves Actifs',
+                    ),
+                    _buildStatItem(
+                      Icons.analytics_outlined,
+                      _statPercent(
+                        'teacherAttendanceRate',
+                        hasDataKey: 'hasTeacherAttendanceData',
+                      ),
+                      'Présence Ens.',
+                    ),
+                    _buildStatItem(
+                      Icons.class_,
+                      _statCount('classesCount'),
+                      'Classes Actives',
+                    ),
+                    _buildStatItem(
+                      Icons.assignment,
+                      _statCount('examsCount'),
+                      'Examens',
+                    ),
                   ],
           ),
         ],
@@ -694,12 +921,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 10,
+            ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -765,12 +999,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               description,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 10,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -785,7 +1026,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: const BoxDecoration(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2)),
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
         ],
       ),
       child: ClipRRect(
@@ -797,13 +1042,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           selectedItemColor: const Color(0xFF8B5CF6),
           unselectedItemColor: Colors.white38,
           showUnselectedLabels: true,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 11),
           items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Accueil',
-            ),
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
             BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart),
               label: 'Analyses',
@@ -921,6 +1166,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: const Color(0xFF2563EB),
         onTap: () => _handleAcademicsAction(isDevoirs: true),
       ),
+      if (_isTeacher)
+        _buildQuickActionCard(
+          title: 'Cahier de textes',
+          description: 'Séances & leçons',
+          icon: Icons.menu_book_outlined,
+          color: const Color(0xFF0D9488),
+          onTap: () => context.push('/pedagogie/cahier-textes'),
+        ),
+      if (_isTeacher)
+        _buildQuickActionCard(
+          title: 'Planification',
+          description: 'Plans pédagogiques',
+          icon: Icons.event_note_outlined,
+          color: const Color(0xFF0D9488),
+          onTap: () => context.push('/pedagogie/planification'),
+        ),
+      if (_isTeacher)
+        _buildQuickActionCard(
+          title: 'Progression',
+          description: 'Suivi & avancement',
+          icon: Icons.insert_chart_outlined,
+          color: const Color(0xFF7C3AED),
+          onTap: () => context.push('/pedagogie/progression'),
+        ),
     ];
 
     if (_hasFinanceAccess) {
@@ -964,11 +1233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         description: 'Communications internes',
         icon: Icons.chat_bubble_outline,
         color: const Color(0xFFF43F5E),
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Module de messagerie disponible bientôt')),
-          );
-        },
+        onTap: () => context.push('/messaging'),
       ),
     );
 
@@ -992,10 +1257,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mainAxisSpacing: 16,
       childAspectRatio: 1.5,
       children: [
-        _buildMiniOverviewCard(Icons.check_circle_outline, '94%', 'Présence', const Color(0xFF10B981)),
-        _buildMiniOverviewCard(Icons.timer_outlined, '36h', 'Planifiées', const Color(0xFF3B82F6)),
-        _buildMiniOverviewCard(Icons.class_, '8', 'Classes', const Color(0xFF8B5CF6)),
-        _buildMiniOverviewCard(Icons.assignment, '5', 'Examens', const Color(0xFFEF4444)),
+        _buildMiniOverviewCard(
+          Icons.check_circle_outline,
+          _statPercent(
+            'studentAttendanceRate',
+            hasDataKey: 'hasStudentAttendanceData',
+          ),
+          'Présence',
+          const Color(0xFF10B981),
+        ),
+        _buildMiniOverviewCard(
+          Icons.timer_outlined,
+          _statHours('plannedHours'),
+          'Planifiées',
+          const Color(0xFF3B82F6),
+        ),
+        _buildMiniOverviewCard(
+          Icons.class_,
+          _statCount('classesCount'),
+          'Classes',
+          const Color(0xFF8B5CF6),
+        ),
+        _buildMiniOverviewCard(
+          Icons.assignment,
+          _statCount('examsCount'),
+          'Examens',
+          const Color(0xFFEF4444),
+        ),
       ],
     );
   }
@@ -1009,15 +1297,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mainAxisSpacing: 16,
       childAspectRatio: 1.5,
       children: [
-        _buildMiniOverviewCard(Icons.people_outline, '342', 'Élèves Actifs', const Color(0xFF4F46E5)),
-        _buildMiniOverviewCard(Icons.analytics_outlined, '91%', 'Présence Ens.', const Color(0xFFF59E0B)),
-        _buildMiniOverviewCard(Icons.class_, '28', 'Classes Actives', const Color(0xFF10B981)),
-        _buildMiniOverviewCard(Icons.assignment, '15', 'Examens En cours', const Color(0xFFEF4444)),
+        _buildMiniOverviewCard(
+          Icons.people_outline,
+          _statCount('activeStudents'),
+          'Élèves Actifs',
+          const Color(0xFF4F46E5),
+        ),
+        _buildMiniOverviewCard(
+          Icons.analytics_outlined,
+          _statPercent(
+            'teacherAttendanceRate',
+            hasDataKey: 'hasTeacherAttendanceData',
+          ),
+          'Présence Ens.',
+          const Color(0xFFF59E0B),
+        ),
+        _buildMiniOverviewCard(
+          Icons.class_,
+          _statCount('classesCount'),
+          'Classes Actives',
+          const Color(0xFF10B981),
+        ),
+        _buildMiniOverviewCard(
+          Icons.assignment,
+          _statCount('examsCount'),
+          'Examens En cours',
+          const Color(0xFFEF4444),
+        ),
       ],
     );
   }
 
-  Widget _buildMiniOverviewCard(IconData icon, String value, String title, Color color) {
+  Widget _buildMiniOverviewCard(
+    IconData icon,
+    String value,
+    String title,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1025,7 +1341,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.slate100),
         boxShadow: [
-          BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 6, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withAlpha(5),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -1039,7 +1359,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1049,7 +1373,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
           ),
         ],
       ),
@@ -1065,7 +1393,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           const Text(
             "Analyses de l'établissement",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -1073,10 +1405,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
           const SizedBox(height: 24),
-          _buildAnalyticCard("Taux de présence global", "95.4%", 0.954, Colors.green),
-          _buildAnalyticCard("Moyenne des évaluations", "14.2 / 20", 0.71, Colors.blue),
-          _buildAnalyticCard("Devoirs rendus à temps", "88%", 0.88, Colors.amber),
-          _buildAnalyticCard("Utilisation de l'application mobile", "92%", 0.92, Colors.purple),
+          _buildAnalyticCard(
+            "Taux de présence global",
+            _statPercent(
+              'studentAttendanceRate',
+              hasDataKey: 'hasStudentAttendanceData',
+            ),
+            _progressFromPercent(
+              'studentAttendanceRate',
+              hasDataKey: 'hasStudentAttendanceData',
+            ),
+            Colors.green,
+          ),
+          _buildAnalyticCard(
+            "Moyenne des évaluations",
+            _statAverage('averageGrade'),
+            (_statNumber('averageGrade').toDouble() / 20).clamp(0, 1),
+            Colors.blue,
+          ),
+          _buildAnalyticCard(
+            "Devoirs suivis",
+            _statCount('homeworkCount'),
+            _progressFromPercent('homeworkOnTimeRate'),
+            Colors.amber,
+          ),
+          _buildAnalyticCard(
+            "Alertes absence / retard",
+            '${_statCount('absenceAlerts')} / ${_statCount('lateAlerts')}',
+            0,
+            Colors.purple,
+          ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(20),
@@ -1088,7 +1446,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Activités Extrascolaires", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  "Activités Extrascolaires",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1102,18 +1463,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text("Événements planifiés"),
-                    Text("4 ce mois-ci", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      "4 ce mois-ci",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAnalyticCard(String title, String value, double percent, Color progressColor) {
+  Widget _buildAnalyticCard(
+    String title,
+    String value,
+    double percent,
+    Color progressColor,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
@@ -1122,7 +1491,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.slate100),
         boxShadow: [
-          BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 8, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withAlpha(5),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -1131,8 +1504,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
-              Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: progressColor)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: progressColor,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1144,7 +1531,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(progressColor),
               minHeight: 8,
             ),
-          )
+          ),
         ],
       ),
     );
@@ -1242,16 +1629,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(
-                    Icons.language,
-                    color: Color(0xFF6D28D9),
-                  ),
+                  leading: const Icon(Icons.language, color: Color(0xFF6D28D9)),
                   title: const Text("Langue"),
                   trailing: const Text(
                     "Francais",
                     style: TextStyle(color: Colors.grey),
                   ),
-                  onTap: () {},
+                  onTap: () => context.push('/notifications'),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -1289,10 +1673,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Center(
             child: Text(
               "Edut Mobile - Version 1.0.0",
-              style: TextStyle(
-                color: Colors.grey.shade400,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
             ),
           ),
         ],
@@ -1303,9 +1684,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
       appBar: AppBar(
@@ -1331,6 +1710,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         ),
         actions: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications, color: Colors.white),
+                onPressed: () async {
+                  await context.push('/notifications');
+                  _loadUserInfo();
+                },
+                tooltip: 'Notifications',
+              ),
+              if (_unreadNotificationsCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$_unreadNotificationsCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.exit_to_app, color: Colors.white),
             onPressed: _handleLogout,

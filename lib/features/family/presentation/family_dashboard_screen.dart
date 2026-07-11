@@ -8,6 +8,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
+import '../../messaging/data/messaging_repository.dart';
 
 class FamilyDashboardScreen extends StatefulWidget {
   const FamilyDashboardScreen({super.key});
@@ -22,6 +23,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   int _currentIndex = 0;
+  int _unreadNotificationsCount = 0;
 
   String _role = 'student';
   int? _studentId;
@@ -85,6 +87,14 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         }
       }
 
+      int unreadNotificationsCount = 0;
+      try {
+        final notifs = await locator<MessagingRepository>().getNotifications();
+        unreadNotificationsCount = (notifs['unreadCount'] as num?)?.toInt() ?? 0;
+      } catch (e) {
+        debugPrint('Failed to load notifications count in family: $e');
+      }
+
       await Future.wait([
         _loadTimetable(),
         _loadGrades(),
@@ -94,6 +104,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
       if (mounted) {
         setState(() {
+          _unreadNotificationsCount = unreadNotificationsCount;
           _isLoading = false;
         });
       }
@@ -175,10 +186,14 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     ];
     final now = DateTime.now();
     final todayName = days[now.weekday - 1];
-    final items = _timetable.where((item) => item['day_name'] == todayName).toList();
-    items.sort((a, b) =>
-        ((a['period_number'] as num?)?.toInt() ?? 0).compareTo(
-            (b['period_number'] as num?)?.toInt() ?? 0));
+    final items = _timetable
+        .where((item) => item['day_name'] == todayName)
+        .toList();
+    items.sort(
+      (a, b) => ((a['period_number'] as num?)?.toInt() ?? 0).compareTo(
+        (b['period_number'] as num?)?.toInt() ?? 0,
+      ),
+    );
     return items;
   }
 
@@ -219,11 +234,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         }
       }
     }
-    return {
-      'justified': justified,
-      'unjustified': unjustified,
-      'late': late,
-    };
+    return {'justified': justified, 'unjustified': unjustified, 'late': late};
   }
 
   @override
@@ -239,6 +250,44 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         actions: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () async {
+                  await context.push('/notifications');
+                  _loadData();
+                },
+                tooltip: 'Notifications',
+              ),
+              if (_unreadNotificationsCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$_unreadNotificationsCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           if (_sessions.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -247,13 +296,15 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   value: _selectedSessionId,
                   borderRadius: BorderRadius.circular(16),
                   items: _sessions
-                      .map((s) => DropdownMenuItem<int>(
-                            value: s['id'] as int,
-                            child: Text(
-                              s['session_name'] as String? ?? 'Session',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ))
+                      .map(
+                        (s) => DropdownMenuItem<int>(
+                          value: s['id'] as int,
+                          child: Text(
+                            s['session_name'] as String? ?? 'Session',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: _changeSession,
                 ),
@@ -273,26 +324,27 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _errorMessage != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.bodyBold
-                                .copyWith(color: AppColors.danger),
-                          ),
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyBold.copyWith(
+                          color: AppColors.danger,
                         ),
-                      )
-                    : IndexedStack(
-                        index: _currentIndex,
-                        children: [
-                          _buildOverviewTab(),
-                          _buildGradesTab(),
-                          _buildAttendanceTab(),
-                          _buildHomeworkTab(),
-                        ],
                       ),
+                    ),
+                  )
+                : IndexedStack(
+                    index: _currentIndex,
+                    children: [
+                      _buildOverviewTab(),
+                      _buildGradesTab(),
+                      _buildAttendanceTab(),
+                      _buildHomeworkTab(),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -305,8 +357,14 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Emploi'),
           BottomNavigationBarItem(icon: Icon(Icons.auto_graph), label: 'Notes'),
-          BottomNavigationBarItem(icon: Icon(Icons.fact_check), label: 'Absences'),
-          BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'Devoirs'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.fact_check),
+            label: 'Absences',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment),
+            label: 'Devoirs',
+          ),
         ],
       ),
     );
@@ -381,6 +439,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 color: const Color(0xFF7C3AED),
                 onTap: () => context.push('/family/library'),
               ),
+              _buildServiceCard(
+                title: 'Notifications',
+                subtitle: 'Messages de l ecole',
+                icon: Icons.notifications_active_rounded,
+                color: const Color(0xFFF43F5E),
+                onTap: () => context.push('/notifications'),
+              ),
             ],
           ),
         ],
@@ -399,14 +464,28 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildMiniStat('Moyenne générale', avg.toStringAsFixed(2), AppColors.success)),
+            Expanded(
+              child: _buildMiniStat(
+                'Moyenne générale',
+                avg.toStringAsFixed(2),
+                AppColors.success,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildMiniStat('Meilleure note', (_gradeSummary['best'] ?? 0).toStringAsFixed(1), AppColors.primary)),
+            Expanded(
+              child: _buildMiniStat(
+                'Meilleure note',
+                (_gradeSummary['best'] ?? 0).toStringAsFixed(1),
+                AppColors.primary,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
         if (_grades.isEmpty)
-          _buildEmptyCard('Aucune note disponible pour la session sélectionnée.')
+          _buildEmptyCard(
+            'Aucune note disponible pour la session sélectionnée.',
+          )
         else
           ..._grades.map(_buildGradeCard),
       ],
@@ -417,7 +496,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildSectionTitle('Suivi des absences et retards', Icons.stacked_bar_chart),
+        _buildSectionTitle(
+          'Suivi des absences et retards',
+          Icons.stacked_bar_chart,
+        ),
         const SizedBox(height: 12),
         _buildAttendanceChartCard(),
         const SizedBox(height: 16),
@@ -471,7 +553,9 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
-              _role == 'parent' ? 'Vue parent connectée' : 'Vue élève connectée',
+              _role == 'parent'
+                  ? 'Vue parent connectée'
+                  : 'Vue élève connectée',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 11,
@@ -532,15 +616,17 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                         show: true,
                         drawVerticalLine: false,
                         horizontalInterval: 5,
-                        getDrawingHorizontalLine: (_) => FlLine(
-                          color: AppColors.slate100,
-                          strokeWidth: 1,
-                        ),
+                        getDrawingHorizontalLine: (_) =>
+                            FlLine(color: AppColors.slate100, strokeWidth: 1),
                       ),
                       borderData: FlBorderData(show: false),
                       titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -548,7 +634,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                             interval: 5,
                             getTitlesWidget: (value, meta) => Text(
                               value.toInt().toString(),
-                              style: const TextStyle(fontSize: 10, color: AppColors.slate500),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.slate500,
+                              ),
                             ),
                           ),
                         ),
@@ -561,16 +650,22 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                               if (index < 0 || index >= _grades.length) {
                                 return const SizedBox.shrink();
                               }
-                              final subject = _grades[index]['school_subjects']
-                                      ?['subject_code'] as String? ??
-                                  (_grades[index]['school_subjects']
-                                          ?['subject_name'] as String? ??
+                              final subject =
+                                  _grades[index]['school_subjects']?['subject_code']
+                                      as String? ??
+                                  (_grades[index]['school_subjects']?['subject_name']
+                                          as String? ??
                                       'M');
                               return Padding(
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Text(
-                                  subject.length > 4 ? subject.substring(0, 4) : subject,
-                                  style: const TextStyle(fontSize: 10, color: AppColors.slate500),
+                                  subject.length > 4
+                                      ? subject.substring(0, 4)
+                                      : subject,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.slate500,
+                                  ),
                                 ),
                               );
                             },
@@ -615,21 +710,33 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         title: 'Abs. just.',
         color: AppColors.info,
         radius: 58,
-        titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       PieChartSectionData(
         value: summary['unjustified']!.toDouble(),
         title: 'Abs. non just.',
         color: AppColors.danger,
         radius: 62,
-        titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       PieChartSectionData(
         value: summary['late']!.toDouble(),
         title: 'Retards',
         color: AppColors.warning,
         radius: 54,
-        titleStyle: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     ];
 
@@ -660,11 +767,23 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLegendItem('Absences justifiées', summary['justified']!, AppColors.info),
+                      _buildLegendItem(
+                        'Absences justifiées',
+                        summary['justified']!,
+                        AppColors.info,
+                      ),
                       const SizedBox(height: 10),
-                      _buildLegendItem('Absences non justifiées', summary['unjustified']!, AppColors.danger),
+                      _buildLegendItem(
+                        'Absences non justifiées',
+                        summary['unjustified']!,
+                        AppColors.danger,
+                      ),
                       const SizedBox(height: 10),
-                      _buildLegendItem('Retards', summary['late']!, AppColors.warning),
+                      _buildLegendItem(
+                        'Retards',
+                        summary['late']!,
+                        AppColors.warning,
+                      ),
                     ],
                   ),
                 ),
@@ -682,7 +801,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -758,9 +880,14 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             children: [
               Expanded(child: Text(subject, style: AppTextStyles.bodyBold)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: total >= 10 ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
+                  color: total >= 10
+                      ? const Color(0xFFD1FAE5)
+                      : const Color(0xFFFEE2E2),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -776,9 +903,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildMetricBlock('Devoirs', devoir.toStringAsFixed(1))),
-              Expanded(child: _buildMetricBlock('Examen', exam.toStringAsFixed(1))),
-              Expanded(child: _buildMetricBlock('Appréciation', appreciation.toString())),
+              Expanded(
+                child: _buildMetricBlock('Devoirs', devoir.toStringAsFixed(1)),
+              ),
+              Expanded(
+                child: _buildMetricBlock('Examen', exam.toStringAsFixed(1)),
+              ),
+              Expanded(
+                child: _buildMetricBlock(
+                  'Appréciation',
+                  appreciation.toString(),
+                ),
+              ),
             ],
           ),
         ],
@@ -794,8 +930,8 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     final color = status.toLowerCase().contains('retard')
         ? AppColors.warning
         : status.toLowerCase().contains('abs')
-            ? AppColors.danger
-            : AppColors.success;
+        ? AppColors.danger
+        : AppColors.success;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -849,9 +985,14 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: isDelivered ? const Color(0xFFDBEAFE) : const Color(0xFFFEF3C7),
+                  color: isDelivered
+                      ? const Color(0xFFDBEAFE)
+                      : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -875,8 +1016,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildMetricBlock('Publié', assignedDate.isEmpty ? '-' : assignedDate.split('T').first)),
-              Expanded(child: _buildMetricBlock('Échéance', dueDate.isEmpty ? '-' : dueDate.split('T').first)),
+              Expanded(
+                child: _buildMetricBlock(
+                  'Publié',
+                  assignedDate.isEmpty ? '-' : assignedDate.split('T').first,
+                ),
+              ),
+              Expanded(
+                child: _buildMetricBlock(
+                  'Échéance',
+                  dueDate.isEmpty ? '-' : dueDate.split('T').first,
+                ),
+              ),
               Expanded(child: _buildMetricBlock('Suivi', 'En attente')),
             ],
           ),
@@ -967,7 +1118,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.slate400)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.slate400),
+        ),
         const SizedBox(height: 4),
         Text(
           value,

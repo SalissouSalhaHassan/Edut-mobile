@@ -32,8 +32,13 @@ import '../../features/owner/presentation/owner_subscription_screen.dart';
 import '../../features/owner/presentation/owner_legacy_console_screen.dart';
 import '../../features/owner/presentation/owner_register_school_screen.dart';
 import '../../features/owner/presentation/owner_permissions_screen.dart';
+import '../../features/messaging/presentation/messaging_screen.dart';
+import '../../features/messaging/presentation/notifications_screen.dart';
 import '../di/injection.dart';
 import '../auth/session_manager.dart';
+import '../../features/pedagogie/presentation/cahier_textes_screen.dart';
+import '../../features/pedagogie/presentation/planification_screen.dart';
+import '../../features/pedagogie/presentation/progression_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -45,10 +50,7 @@ class AppRouter {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/dashboard',
         builder: (context, state) => const DashboardScreen(),
@@ -175,7 +177,7 @@ class AppRouter {
           final subjectId = extra['subjectId'] as int?;
           final subjectName = extra['subjectName'] as String?;
           final initialDateStr = extra['initialDateStr'] as String?;
-          
+
           return GuardedScreen(
             permission: AppPermissions.attendanceView,
             child: StudentAttendanceScreen(
@@ -196,7 +198,7 @@ class AppRouter {
           final className = extra['className'] as String;
           final subjectId = extra['subjectId'] as int;
           final subjectName = extra['subjectName'] as String;
-          
+
           return GuardedScreen(
             permission: AppPermissions.academicsManage,
             child: SaisieNotesScreen(
@@ -216,7 +218,7 @@ class AppRouter {
           final className = extra['className'] as String;
           final subjectId = extra['subjectId'] as int;
           final subjectName = extra['subjectName'] as String;
-          
+
           return GuardedScreen(
             permission: AppPermissions.academicsManage,
             child: GestionDevoirsScreen(
@@ -295,6 +297,32 @@ class AppRouter {
             child: RecordPaymentScreen(feeData: fee),
           );
         },
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const GuardedScreen(
+          permission: AppPermissions.messagingView,
+          child: NotificationsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/messaging',
+        builder: (context, state) => const GuardedScreen(
+          permission: AppPermissions.messagingView,
+          child: MessagingScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/pedagogie/cahier-textes',
+        builder: (context, state) => const CahierTextesScreen(),
+      ),
+      GoRoute(
+        path: '/pedagogie/planification',
+        builder: (context, state) => const PlanificationScreen(),
+      ),
+      GoRoute(
+        path: '/pedagogie/progression',
+        builder: (context, state) => const ProgressionScreen(),
       ),
     ],
   );
