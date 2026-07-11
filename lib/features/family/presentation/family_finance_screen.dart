@@ -24,6 +24,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
   int? _studentId;
   int? _schoolId;
   String _studentName = '';
+  String _role = 'student';
 
   List<Map<String, dynamic>> _fees = [];
   List<Map<String, dynamic>> _payments = [];
@@ -48,6 +49,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
 
     try {
       final session = locator<SessionManager>();
+      _role = await session.getRole() ?? 'student';
       _studentId = int.tryParse(await session.getStudentId() ?? '');
       _schoolId = int.tryParse(await session.getSchoolId() ?? '');
       _studentName = await session.getStudentName() ?? 'Eleve';
@@ -141,8 +143,10 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
                     padding: const EdgeInsets.all(20),
                     children: [
                       _buildSummaryCard(),
-                      const SizedBox(height: 16),
-                      _buildGatewayCard(),
+                      if (_role == 'parent') ...[
+                        const SizedBox(height: 16),
+                        _buildGatewayCard(),
+                      ],
                       const SizedBox(height: 20),
                       Text('Frais scolaires', style: AppTextStyles.heading3),
                       const SizedBox(height: 12),
