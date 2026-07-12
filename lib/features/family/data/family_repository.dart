@@ -75,7 +75,7 @@ class FamilyRepository {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint("Error fetching timetable: $e");
-      return [];
+      rethrow;
     }
   }
 
@@ -98,7 +98,7 @@ class FamilyRepository {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint("Error fetching grades: $e");
-      return [];
+      rethrow;
     }
   }
 
@@ -114,7 +114,7 @@ class FamilyRepository {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint("Error fetching attendance: $e");
-      return [];
+      rethrow;
     }
   }
 
@@ -137,7 +137,7 @@ class FamilyRepository {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint("Error fetching homework: $e");
-      return [];
+      rethrow;
     }
   }
 
@@ -227,7 +227,7 @@ class FamilyRepository {
       return row == null ? null : Map<String, dynamic>.from(row);
     } catch (e) {
       debugPrint("Error fetching transport subscription: $e");
-      return null;
+      rethrow;
     }
   }
 

@@ -22,6 +22,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   bool _isLoading = true;
   String? _errorMessage;
+  String? _debugError;
   int _currentIndex = 0;
   int _unreadNotificationsCount = 0;
 
@@ -47,10 +48,17 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     _loadData();
   }
 
+  void _appendError(String component, dynamic error) {
+    setState(() {
+      _debugError = "${_debugError ?? ''}\n• $component: $error".trim();
+    });
+  }
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _debugError = null;
     });
 
     try {
@@ -70,20 +78,28 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         return;
       }
 
-      _student = await _repository.getStudentSnapshot(studentId: _studentId!);
-      _studentName = (_student['nom_etudiant'] as String?) ?? _studentName;
-      _studentClass = (_student['classe'] as String?) ?? _studentClass;
-      _schoolId ??= (_student['school_id'] as num?)?.toInt();
+      try {
+        _student = await _repository.getStudentSnapshot(studentId: _studentId!);
+        _studentName = (_student['nom_etudiant'] as String?) ?? _studentName;
+        _studentClass = (_student['classe'] as String?) ?? _studentClass;
+        _schoolId ??= (_student['school_id'] as num?)?.toInt();
+      } catch (e) {
+        _appendError("StudentSnapshot", e);
+      }
 
       if (_schoolId != null) {
-        _sessions = await _repository.getSessions(_schoolId!);
-        if (_sessions.isNotEmpty) {
-          final active = _sessions.firstWhere(
-            (s) => s['is_active'] == true,
-            orElse: () => _sessions.first,
-          );
-          _selectedSessionId = active['id'] as int;
-          _selectedSessionName = active['session_name'] as String? ?? '';
+        try {
+          _sessions = await _repository.getSessions(_schoolId!);
+          if (_sessions.isNotEmpty) {
+            final active = _sessions.firstWhere(
+              (s) => s['is_active'] == true,
+              orElse: () => _sessions.first,
+            );
+            _selectedSessionId = active['id'] as int;
+            _selectedSessionName = active['session_name'] as String? ?? '';
+          }
+        } catch (e) {
+          _appendError("Sessions", e);
         }
       }
 
@@ -96,10 +112,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       }
 
       await Future.wait([
-        _loadTimetable(),
-        _loadGrades(),
-        _loadAttendance(),
-        _loadHomework(),
+        _loadTimetable().catchError((e) => _appendError("Timetable", e)),
+        _loadGrades().catchError((e) => _appendError("Grades", e)),
+        _loadAttendance().catchError((e) => _appendError("Attendance", e)),
+        _loadHomework().catchError((e) => _appendError("Homework", e)),
       ]);
 
       if (mounted) {
@@ -384,6 +400,31 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           _buildHeroCard(),
+          if (_debugError != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '⚙️ Erreurs de chargement (Debug) :',
+                    style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _debugError!,
+                    style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           _buildSectionTitle('Programme du jour', Icons.today),
           const SizedBox(height: 12),
