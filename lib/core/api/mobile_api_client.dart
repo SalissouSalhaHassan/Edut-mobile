@@ -107,4 +107,94 @@ class MobileApiClient {
       Map<String, dynamic>.from(body['profile'] as Map),
     );
   }
+
+  Future<void> register({
+    required String role,
+    required String schoolSlug,
+    required String matriculeOrEmail,
+    required String username,
+    required String fullName,
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/mobile/register',
+        data: {
+          'role': role,
+          'schoolSlug': schoolSlug,
+          'matriculeOrEmail': matriculeOrEmail,
+          'username': username,
+          'fullName': fullName,
+          'password': password,
+        },
+      );
+      final body = response.data;
+      if (body == null || body['success'] != true) {
+        throw MobileApiException(body?['error']?.toString() ?? 'Erreur lors de l\'inscription.');
+      }
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data?['error']?.toString() ?? 'Erreur lors de l\'inscription.';
+      throw MobileApiException(errorMsg);
+    }
+  }
+
+  Future<Map<String, dynamic>> getJson(String path) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      path,
+      options: await _authOptions(),
+    );
+    return _parseBody(response.data);
+  }
+
+  Future<Map<String, dynamic>> postJson(
+    String path,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      path,
+      data: data,
+      options: await _authOptions(),
+    );
+    return _parseBody(response.data);
+  }
+
+  Future<Map<String, dynamic>> patchJson(
+    String path, [
+    Map<String, dynamic>? data,
+  ]) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      path,
+      data: data,
+      options: await _authOptions(),
+    );
+    return _parseBody(response.data);
+  }
+
+  Future<Map<String, dynamic>> deleteJson(String path) async {
+    final response = await _dio.delete<Map<String, dynamic>>(
+      path,
+      options: await _authOptions(),
+    );
+    return _parseBody(response.data);
+  }
+
+  Future<Options> _authOptions() async {
+    final token = _supabaseClient.auth.currentSession?.accessToken;
+    if (token == null || token.isEmpty) {
+      throw const MobileApiException('Session mobile absente.');
+    }
+    return Options(headers: {'Authorization': 'Bearer $token'});
+  }
+
+  Map<String, dynamic> _parseBody(Map<String, dynamic>? body) {
+    if (body == null) {
+      throw const MobileApiException('Reponse Edut mobile vide.');
+    }
+    if (body['success'] == false) {
+      throw MobileApiException(
+        body['error']?.toString() ?? 'Erreur API Edut mobile.',
+      );
+    }
+    return body;
+  }
 }

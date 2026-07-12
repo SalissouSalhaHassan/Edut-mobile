@@ -215,6 +215,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.push('/register'),
+                      child: const Text(
+                        'Créer un compte (Élève / Enseignant)',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],

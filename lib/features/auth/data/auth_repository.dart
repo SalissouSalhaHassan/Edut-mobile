@@ -463,6 +463,31 @@ class AuthRepository {
         .maybeSingle();
   }
 
+  Future<LoginResult> register({
+    required String role,
+    required String schoolSlug,
+    required String matriculeOrEmail,
+    required String username,
+    required String fullName,
+    required String password,
+  }) async {
+    try {
+      await _mobileApiClient.register(
+        role: role,
+        schoolSlug: schoolSlug,
+        matriculeOrEmail: matriculeOrEmail,
+        username: username,
+        fullName: fullName,
+        password: password,
+      );
+      return const LoginResult.success();
+    } on MobileApiException catch (e) {
+      return LoginResult.failure(e.message);
+    } catch (e) {
+      return LoginResult.failure(e.toString());
+    }
+  }
+
   Future<void> logout() async {
     await _client.auth.signOut();
     await _sessionManager.clearSession();
