@@ -115,6 +115,7 @@ class MobileApiClient {
     required String username,
     required String fullName,
     required String password,
+    required String activationPin,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -126,6 +127,7 @@ class MobileApiClient {
           'username': username,
           'fullName': fullName,
           'password': password,
+          'activationPin': activationPin,
         },
       );
       final body = response.data;

@@ -470,6 +470,7 @@ class AuthRepository {
     required String username,
     required String fullName,
     required String password,
+    required String activationPin,
   }) async {
     try {
       await _mobileApiClient.register(
@@ -479,6 +480,7 @@ class AuthRepository {
         username: username,
         fullName: fullName,
         password: password,
+        activationPin: activationPin,
       );
       return const LoginResult.success();
     } on MobileApiException catch (e) {

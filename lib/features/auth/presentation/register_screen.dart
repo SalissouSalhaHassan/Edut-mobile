@@ -18,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   
   final _schoolCodeController = TextEditingController();
   final _matriculeController = TextEditingController();
+  final _activationPinController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -32,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _schoolCodeController.dispose();
     _matriculeController.dispose();
+    _activationPinController.dispose();
     _fullNameController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -61,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       username: _usernameController.text.trim(),
       fullName: _fullNameController.text.trim(),
       password: _passwordController.text,
+      activationPin: _activationPinController.text.trim(),
     );
 
     if (mounted) {
@@ -284,6 +287,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.slate400),
                             ),
                             validator: (val) => val == null || val.trim().isEmpty ? 'Saisir votre matricule ou email' : null,
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Code d'activation (PIN) Input
+                          TextFormField(
+                            controller: _activationPinController,
+                            decoration: const InputDecoration(
+                              labelText: "Code d'activation (PIN)",
+                              hintText: 'Code secret à 6 chiffres',
+                              prefixIcon: Icon(Icons.shield_outlined, color: AppColors.slate400),
+                            ),
+                            validator: (val) => val == null || val.trim().isEmpty ? "Saisir le code d'activation" : null,
                           ),
                           const SizedBox(height: 14),
 
