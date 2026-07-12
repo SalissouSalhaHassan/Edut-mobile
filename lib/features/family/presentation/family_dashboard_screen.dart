@@ -586,8 +586,8 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           if (_selectedSessionName.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              'Session: $_selectedSessionName',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              'Session: $_selectedSessionName | Student: $_studentId | School: $_schoolId | Grades: ${_grades.length} | Timetable: ${_timetable.length}',
+              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ],
         ],
