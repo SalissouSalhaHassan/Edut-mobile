@@ -132,7 +132,7 @@ class _FamilyHostelScreenState extends State<FamilyHostelScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.between,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
                                   'INTERNAT ACTIF',
@@ -175,8 +175,8 @@ class _FamilyHostelScreenState extends State<FamilyHostelScreen> {
                             const SizedBox(height: 6),
                             Text(
                               'Chambre N° ${room?['room_number']?.toString() ?? '-'}',
-                              style: const TextStyle(
-                                color: Colors.white80,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
                               ),
