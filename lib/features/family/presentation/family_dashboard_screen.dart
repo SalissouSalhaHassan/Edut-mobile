@@ -400,31 +400,6 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           _buildHeroCard(),
-          if (_debugError != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '⚙️ Erreurs de chargement (Debug) :',
-                    style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _debugError!,
-                    style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 24),
           _buildSectionTitle('Programme du jour', Icons.today),
           const SizedBox(height: 12),
@@ -627,8 +602,8 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           if (_selectedSessionName.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              'Session: $_selectedSessionName | Student: $_studentId | School: $_schoolId | Grades: ${_grades.length} | Timetable: ${_timetable.length}',
-              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              'Session: $_selectedSessionName',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
             ),
           ],
         ],
