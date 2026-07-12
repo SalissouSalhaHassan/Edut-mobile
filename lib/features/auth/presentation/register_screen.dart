@@ -60,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       role: _role,
       schoolSlug: _schoolCodeController.text.trim(),
       matriculeOrEmail: _matriculeController.text.trim(),
-      username: _usernameController.text.trim(),
+      username: _usernameController.text.replaceAll(' ', ''),
       fullName: _fullNameController.text.trim(),
       password: _passwordController.text,
       activationPin: _activationPinController.text.trim(),
