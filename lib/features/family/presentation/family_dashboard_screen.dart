@@ -39,6 +39,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   Map<String, dynamic> _student = {};
   List<Map<String, dynamic>> _timetable = [];
   List<Map<String, dynamic>> _grades = [];
+  String? _selectedPeriod;
   List<Map<String, dynamic>> _attendance = [];
   List<Map<String, dynamic>> _homework = [];
 
@@ -145,11 +146,23 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   Future<void> _loadGrades() async {
     if (_studentId == null || _schoolId == null) return;
-    _grades = await _repository.getGrades(
+    final res = await _repository.getGrades(
       studentId: _studentId!,
       schoolId: _schoolId!,
       sessionId: _selectedSessionId,
     );
+    setState(() {
+      _grades = res;
+      final periods = _grades.map((g) => g['term']?.toString() ?? '').where((t) => t.isNotEmpty).toSet().toList();
+      periods.sort();
+      if (periods.isNotEmpty) {
+        if (_selectedPeriod == null || !periods.contains(_selectedPeriod)) {
+          _selectedPeriod = periods.last;
+        }
+      } else {
+        _selectedPeriod = null;
+      }
+    });
   }
 
   Future<void> _loadAttendance() async {
@@ -220,20 +233,23 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   }
 
   Map<String, double> get _gradeSummary {
-    if (_grades.isEmpty) {
+    final list = _selectedPeriod == null 
+        ? _grades 
+        : _grades.where((g) => g['term']?.toString() == _selectedPeriod).toList();
+    if (list.isEmpty) {
       return {'average': 0, 'best': 0, 'risk': 0};
     }
     double total = 0;
     double best = 0;
     int risk = 0;
-    for (final row in _grades) {
+    for (final row in list) {
       final score = (row['total_score'] as num?)?.toDouble() ?? 0;
       total += score;
       if (score > best) best = score;
       if (score < 10) risk++;
     }
     return {
-      'average': total / _grades.length,
+      'average': total / list.length,
       'best': best,
       'risk': risk.toDouble(),
     };
@@ -484,12 +500,26 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   Widget _buildGradesTab() {
     final avg = _gradeSummary['average'] ?? 0;
+    
+    // Unique periods from grades
+    final periods = _grades
+        .map((g) => g['term']?.toString() ?? '')
+        .where((t) => t.isNotEmpty)
+        .toSet()
+        .toList();
+    periods.sort();
+
+    final filteredGrades = _grades
+        .where((g) => g['term']?.toString() == _selectedPeriod)
+        .toList();
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _buildSectionTitle('Résultats & bulletins', Icons.bar_chart_rounded),
         const SizedBox(height: 12),
-        _buildLineChartCard(),
+        if (periods.length > 1) _buildPeriodSelector(periods),
+        _buildLineChartCard(filteredGrades),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -511,14 +541,77 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        if (_grades.isEmpty)
+        if (filteredGrades.isEmpty)
           _buildEmptyCard(
-            'Aucune note disponible pour la session sélectionnée.',
+            'Aucune note disponible pour la période sélectionnée.',
           )
         else
-          ..._grades.map(_buildGradeCard),
+          ...filteredGrades.map(_buildGradeCard),
       ],
     );
+  }
+
+  Widget _buildPeriodSelector(List<String> periods) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9), // slate 100
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: periods.map((period) {
+          final isSelected = _selectedPeriod == period;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedPeriod = period;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    formatTerm(period),
+                    style: TextStyle(
+                      color: isSelected ? AppColors.slate900 : AppColors.slate500,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  String formatTerm(String term) {
+    if (term == 'S1') return 'Semestre 1';
+    if (term == 'S2') return 'Semestre 2';
+    if (term == 'T1') return 'Trimestre 1';
+    if (term == 'T2') return 'Trimestre 2';
+    if (term == 'T3') return 'Trimestre 3';
+    if (term == '1') return 'Période 1';
+    if (term == '2') return 'Période 2';
+    if (term == '3') return 'Période 3';
+    return term;
   }
 
   Widget _buildAttendanceTab() {
@@ -618,10 +711,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     );
   }
 
-  Widget _buildLineChartCard() {
+  Widget _buildLineChartCard(List<Map<String, dynamic>> filteredGrades) {
     final bars = <FlSpot>[];
-    for (var i = 0; i < _grades.length; i++) {
-      final score = (_grades[i]['total_score'] as num?)?.toDouble() ?? 0;
+    for (var i = 0; i < filteredGrades.length; i++) {
+      final score = (filteredGrades[i]['total_score'] as num?)?.toDouble() ?? 0;
       bars.add(FlSpot(i.toDouble(), score));
     }
 
@@ -635,7 +728,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           const SizedBox(height: 16),
           SizedBox(
             height: 220,
-            child: _grades.isEmpty
+            child: filteredGrades.isEmpty
                 ? const Center(child: Text('Pas encore de notes'))
                 : LineChart(
                     LineChartData(
@@ -676,13 +769,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                             interval: 1,
                             getTitlesWidget: (value, meta) {
                               final index = value.toInt();
-                              if (index < 0 || index >= _grades.length) {
+                              if (index < 0 || index >= filteredGrades.length) {
                                 return const SizedBox.shrink();
                               }
                               final subject =
-                                  _grades[index]['school_subjects']?['subject_code']
+                                  filteredGrades[index]['school_subjects']?['subject_code']
                                       as String? ??
-                                  (_grades[index]['school_subjects']?['subject_name']
+                                  (filteredGrades[index]['school_subjects']?['subject_name']
                                           as String? ??
                                       'M');
                               return Padding(
