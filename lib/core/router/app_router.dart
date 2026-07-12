@@ -8,6 +8,7 @@ import '../../features/family/presentation/family_dashboard_screen.dart';
 import '../../features/family/presentation/family_finance_screen.dart';
 import '../../features/family/presentation/family_library_screen.dart';
 import '../../features/family/presentation/family_transport_screen.dart';
+import '../../features/family/presentation/family_hostel_screen.dart';
 import '../../features/students/presentation/students_management_screen.dart';
 import '../../features/students/presentation/student_details_screen.dart';
 import '../../features/students/presentation/student_form_screen.dart';
@@ -119,6 +120,10 @@ class AppRouter {
       GoRoute(
         path: '/family/library',
         builder: (context, state) => const FamilyLibraryScreen(),
+      ),
+      GoRoute(
+        path: '/family/hostel',
+        builder: (context, state) => const FamilyHostelScreen(),
       ),
       GoRoute(
         path: '/students',

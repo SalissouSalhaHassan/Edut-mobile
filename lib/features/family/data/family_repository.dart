@@ -279,4 +279,24 @@ class FamilyRepository {
       return {'success': false, 'error': '$e'};
     }
   }
+
+  Future<Map<String, dynamic>?> getHostelAllocation({
+    required int studentId,
+  }) async {
+    try {
+      final rows = await _client
+          .from('hostel_allocations')
+          .select('id, room_id, student_id, join_date, leave_date, status, remarks, hostel_rooms(*)')
+          .eq('student_id', studentId)
+          .eq('status', 'Occupé')
+          .order('id', ascending: false);
+      if (rows == null || (rows as List).isEmpty) {
+        return null;
+      }
+      return Map<String, dynamic>.from(rows.first);
+    } catch (e) {
+      debugPrint("Error fetching hostel allocation: $e");
+      rethrow;
+    }
+  }
 }

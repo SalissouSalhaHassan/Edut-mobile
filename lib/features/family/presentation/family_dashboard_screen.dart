@@ -462,6 +462,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 onTap: () => context.push('/family/library'),
               ),
               _buildServiceCard(
+                title: 'Internat',
+                subtitle: 'Chambre, batiment et dortoir',
+                icon: Icons.hotel_rounded,
+                color: const Color(0xFFD97706),
+                onTap: () => context.push('/family/hostel'),
+              ),
+              _buildServiceCard(
                 title: 'Notifications',
                 subtitle: 'Messages de l ecole',
                 icon: Icons.notifications_active_rounded,
