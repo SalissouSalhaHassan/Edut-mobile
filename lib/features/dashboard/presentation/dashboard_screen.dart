@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/sync_status_banner.dart';
 import '../../../core/widgets/connectivity_widgets.dart';
+import '../../../core/api/sync_engine.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../academics/data/academics_repository.dart';

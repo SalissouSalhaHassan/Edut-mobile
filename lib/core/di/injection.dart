@@ -90,7 +90,7 @@ Future<void> setupLocator() async {
   );
 
   locator.registerLazySingleton<ExamsRepository>(
-    () => ExamsRepository(client: supabaseManager.client),
+    () => ExamsRepository(apiClient: locator<MobileApiClient>()),
   );
 
   locator.registerLazySingleton<HostelRepository>(
