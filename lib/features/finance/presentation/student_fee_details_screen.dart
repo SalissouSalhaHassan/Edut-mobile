@@ -96,6 +96,7 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     final student = _currentFee['students'] as Map<String, dynamic>? ?? {};
     final expected = (_currentFee['total_expected'] as num?)?.toDouble() ?? 0.0;
     final balance = (_currentFee['balance'] as num?)?.toDouble() ?? 0.0;
+    final schoolId = _currentFee['school_id'] as int?;
 
     showDialog(
       context: context,
@@ -104,11 +105,20 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     );
 
     try {
+      Map<String, dynamic>? headerConfig;
+      if (schoolId != null) {
+        final res = await _repository.getDocumentHeader(schoolId);
+        if (res['success'] == true) {
+          headerConfig = res['data'] as Map<String, dynamic>?;
+        }
+      }
+
       await ReceiptGenerator.generateAndPrint(
         student: student,
         payment: payment,
         totalExpected: expected,
         remainingBalance: balance,
+        headerConfig: headerConfig,
       );
     } catch (e) {
       if (mounted) {

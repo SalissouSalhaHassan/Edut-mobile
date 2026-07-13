@@ -440,6 +440,52 @@ class FinanceRepository {
     }
   }
 
+  /// Fetch the official school document header config
+  Future<Map<String, dynamic>> getDocumentHeader(int schoolId) async {
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = "document_header_$schoolId";
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("Offline Mode: Fetching document header from local cache.");
+      final cachedList = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentFees,
+        key: cacheKey,
+      );
+      if (cachedList.isNotEmpty) {
+        return {'success': true, 'data': Map<String, dynamic>.from(cachedList.first)};
+      }
+      return {'success': false, 'error': 'Aucune configuration d\'en-tête en cache.'};
+    }
+
+    try {
+      final response = await _apiClient.getJson(
+        '/api/mobile/document-header',
+      );
+      
+      final data = Map<String, dynamic>.from(response['data'] ?? {});
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentFees,
+        key: cacheKey,
+        data: [data],
+      );
+      return {'success': true, 'data': data};
+    } catch (e) {
+      debugPrint("Error fetching document header: $e");
+      final cachedList = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentFees,
+        key: cacheKey,
+      );
+      if (cachedList.isNotEmpty) {
+        return {'success': true, 'data': Map<String, dynamic>.from(cachedList.first)};
+      }
+      return {
+        'success': false,
+        'error': 'Erreur lors du chargement de l\'en-tête: $e',
+      };
+    }
+  }
+
   /// Synchronize student fees school-wide (matching web sync logic)
   Future<Map<String, dynamic>> syncStudentFees({
     required int schoolId,

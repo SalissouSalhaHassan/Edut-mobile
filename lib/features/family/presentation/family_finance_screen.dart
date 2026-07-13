@@ -5,6 +5,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../finance/utils/receipt_generator.dart';
+import '../../finance/data/finance_repository.dart';
 import '../data/family_repository.dart';
 import '../data/payment_gateway_service.dart';
 
@@ -17,6 +18,7 @@ class FamilyFinanceScreen extends StatefulWidget {
 
 class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
   final FamilyRepository _repository = locator<FamilyRepository>();
+  final FinanceRepository _financeRepository = locator<FinanceRepository>();
   final PaymentGatewayService _gatewayService = PaymentGatewayService();
 
   bool _isLoading = true;
@@ -95,6 +97,19 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
       (item) => item['id'] == payment['fee_id'],
       orElse: () => <String, dynamic>{},
     );
+
+    Map<String, dynamic>? headerConfig;
+    if (_schoolId != null) {
+      try {
+        final res = await _financeRepository.getDocumentHeader(_schoolId!);
+        if (res['success'] == true) {
+          headerConfig = res['data'] as Map<String, dynamic>?;
+        }
+      } catch (e) {
+        debugPrint("Error fetching document header in family: $e");
+      }
+    }
+
     await ReceiptGenerator.generateAndShare(
       student: {
         'nom_etudiant': _studentName,
@@ -102,6 +117,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
       payment: payment,
       totalExpected: (fee['total_expected'] as num?)?.toDouble() ?? 0,
       remainingBalance: (fee['balance'] as num?)?.toDouble() ?? 0,
+      headerConfig: headerConfig,
     );
   }
 
