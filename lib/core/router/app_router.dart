@@ -36,6 +36,7 @@ import '../../features/owner/presentation/owner_register_school_screen.dart';
 import '../../features/owner/presentation/owner_permissions_screen.dart';
 import '../../features/messaging/presentation/messaging_screen.dart';
 import '../../features/messaging/presentation/notifications_screen.dart';
+import '../../features/ministry/presentation/ministry_dashboard_screen.dart';
 import '../di/injection.dart';
 import '../auth/session_manager.dart';
 import '../../features/pedagogie/presentation/cahier_textes_screen.dart';
@@ -57,6 +58,10 @@ class AppRouter {
       GoRoute(
         path: '/dashboard',
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: '/ministry/dashboard',
+        builder: (context, state) => const MinistryDashboardScreen(),
       ),
       GoRoute(
         path: '/owner/dashboard',

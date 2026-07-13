@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import '../api/sync_engine.dart';
 import '../di/injection.dart';
 
-/// A beautiful animated banner that shows connectivity and sync status.
-/// - Shows an amber banner when offline with a message.
-/// - Shows a blue banner when syncing pending operations.
-/// - Smoothly animates in and out.
+/// A smart banner that shows connectivity and sync status.
+/// States:
+///   - Offline: amber/orange — shows last sync + retry button
+///   - Syncing: blue — progress indicator + count of pending ops
+///   - Connected (default): transparent, hides automatically
 class SyncStatusBanner extends StatefulWidget {
-  const SyncStatusBanner({super.key});
+  final VoidCallback? onRefresh;
+  const SyncStatusBanner({super.key, this.onRefresh});
 
   @override
   State<SyncStatusBanner> createState() => _SyncStatusBannerState();
@@ -21,6 +23,7 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
 
   bool _isOnline = true;
   bool _isSyncing = false;
+  DateTime? _lastSync;
 
   @override
   void initState() {
@@ -38,9 +41,11 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
 
     _isOnline = _syncEngine.isOnlineNotifier.value;
     _isSyncing = _syncEngine.isSyncingNotifier.value;
+    _lastSync = _syncEngine.lastSyncNotifier.value;
 
     _syncEngine.isOnlineNotifier.addListener(_onStatusChanged);
     _syncEngine.isSyncingNotifier.addListener(_onStatusChanged);
+    _syncEngine.lastSyncNotifier.addListener(_onLastSyncChanged);
 
     _updateBannerVisibility();
   }
@@ -52,6 +57,13 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
       _isSyncing = _syncEngine.isSyncingNotifier.value;
     });
     _updateBannerVisibility();
+  }
+
+  void _onLastSyncChanged() {
+    if (!mounted) return;
+    setState(() {
+      _lastSync = _syncEngine.lastSyncNotifier.value;
+    });
   }
 
   void _updateBannerVisibility() {
@@ -67,8 +79,27 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
   void dispose() {
     _syncEngine.isOnlineNotifier.removeListener(_onStatusChanged);
     _syncEngine.isSyncingNotifier.removeListener(_onStatusChanged);
+    _syncEngine.lastSyncNotifier.removeListener(_onLastSyncChanged);
     _animController.dispose();
     super.dispose();
+  }
+
+  String _formatLastSync(DateTime? dt) {
+    if (dt == null) return 'jamais synchronisé';
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds < 60) return 'à l\'instant';
+    if (diff.inMinutes < 60) return 'il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'il y a ${diff.inHours}h';
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _handleRetry() async {
+    if (widget.onRefresh != null) {
+      widget.onRefresh!();
+    } else {
+      await _syncEngine.triggerSync();
+    }
   }
 
   @override
@@ -76,7 +107,6 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
     return AnimatedBuilder(
       animation: _animController,
       builder: (context, child) {
-        // Hide completely when animation is done and banner not needed
         if (_animController.value == 0.0 && _isOnline && !_isSyncing) {
           return const SizedBox.shrink();
         }
@@ -99,12 +129,8 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
   }
 
   Widget _buildBannerContent() {
-    if (_isSyncing) {
-      return _buildSyncingBanner();
-    }
-    if (!_isOnline) {
-      return _buildOfflineBanner();
-    }
+    if (_isSyncing) return _buildSyncingBanner();
+    if (!_isOnline) return _buildOfflineBanner();
     return const SizedBox.shrink();
   }
 
@@ -113,11 +139,8 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFFB45309),
-            const Color(0xFFD97706),
-          ],
+        gradient: const LinearGradient(
+          colors: [Color(0xFFB45309), Color(0xFFD97706)],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
@@ -152,15 +175,15 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Mode hors-ligne actif',
+                    'Mode hors-ligne — données en cache',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                   Text(
-                    'Les modifications seront synchronisées automatiquement.',
+                    'Dernière sync : ${_formatLastSync(_lastSync)}',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.85),
                       fontSize: 11,
@@ -171,19 +194,29 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'HORS-LIGNE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _handleRetry,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.refresh_rounded, color: Colors.white, size: 14),
+                    SizedBox(width: 4),
+                    Text(
+                      'Réessayer',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -216,8 +249,8 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
         child: Row(
           children: [
             const SizedBox(
-              width: 28,
-              height: 28,
+              width: 24,
+              height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -234,7 +267,7 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                   Text(
@@ -245,6 +278,22 @@ class _SyncStatusBannerState extends State<SyncStatusBanner>
                     ),
                   ),
                 ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'EN COURS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ],

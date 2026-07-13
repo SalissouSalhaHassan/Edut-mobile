@@ -7,10 +7,12 @@ import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/sync_status_banner.dart';
+import '../../../core/widgets/connectivity_widgets.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../attendance/data/attendance_repository.dart';
+import '../../academics/data/academics_repository.dart';
+import '../../exams/data/exams_repository.dart';
 import '../data/dashboard_stats_repository.dart';
-import '../../../core/api/supabase_client.dart';
 import '../../messaging/data/messaging_repository.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -179,6 +181,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       dashboardStats = await locator<DashboardStatsRepository>().getSummary();
+      await locator<SyncEngine>().updateLastSyncTime();
     } catch (e) {
       debugPrint('Dashboard stats unavailable: $e');
     }
@@ -250,9 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         roleStr.contains('teacher') ||
         roleStr.contains('enseignant') ||
         roleStr.contains('professeur');
-
     List<Map<String, dynamic>> classes = [];
-    final client = SupabaseClientManager().client;
 
     try {
       if (isTeacher) {
@@ -261,11 +262,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               .getTeacherClassesAndSubjects(employeeId);
         }
       } else {
-        final List<dynamic> allClassList = await client
-            .from('school_classes')
-            .select('id, class_name');
-
-        classes = allClassList
+        final formOpts = await locator<ExamsRepository>().getExamFormOptions();
+        final classList = formOpts['classes'] ?? [];
+        classes = classList
             .map(
               (c) => {
                 'class_id': c['id'],
@@ -400,9 +399,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         roleStr2.contains('teacher') ||
         roleStr2.contains('enseignant') ||
         roleStr2.contains('professeur');
-
     List<Map<String, dynamic>> classes = [];
-    final client = SupabaseClientManager().client;
+    final schoolId = int.tryParse(await session.getSchoolId() ?? '');
 
     try {
       if (isTeacher) {
@@ -411,18 +409,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               .getTeacherClassesAndSubjects(employeeId);
         }
       } else {
-        final List<dynamic> allClassSubjects = await client
-            .from('class_subjects')
-            .select(
-              'class_id, subject_id, school_classes(class_name), school_subjects(subject_name)',
-            );
-
-        classes = List<Map<String, dynamic>>.from(allClassSubjects);
+        if (schoolId != null) {
+          classes = await locator<AcademicsRepository>()
+              .getAllClassesAndSubjects(schoolId);
+        }
       }
     } catch (e) {
       debugPrint("Error loading classes for academics: $e");
     }
-
     if (mounted) {
       Navigator.pop(context); // Close loading dialog
 
@@ -1084,6 +1078,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const CacheStatusChip(),
+          const SizedBox(height: 12),
           _buildWelcomeCard(),
           const SizedBox(height: 28),
 
@@ -1456,29 +1452,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.slate100),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   "Activités Extrascolaires",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Clubs actifs"),
-                    Text("12", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text("Clubs actifs"),
+                    Text(
+                      _statNumber('clubsCount') > 0
+                          ? _statCount('clubsCount')
+                          : 'Aucune donnée',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
-                Divider(),
+                const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Événements planifiés"),
+                    const Text("Événements planifiés"),
                     Text(
-                      "4 ce mois-ci",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      _statNumber('eventsCount') > 0
+                          ? '${_statNumber('eventsCount').round()} ce mois-ci'
+                          : 'Aucune donnée',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -1771,7 +1774,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       drawer: _buildDrawer(),
       body: Column(
         children: [
-          const SyncStatusBanner(),
+          SyncStatusBanner(onRefresh: _loadUserInfo),
           Expanded(
             child: SafeArea(
               top: false,

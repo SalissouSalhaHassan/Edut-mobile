@@ -1,16 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/supabase_client.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/api/offline_store_manager.dart';
 import '../../../core/api/offline_queue_manager.dart';
 import '../../../core/api/sync_engine.dart';
 
 class AcademicsRepository {
+  final MobileApiClient _apiClient;
   final SupabaseClient _client;
 
-  AcademicsRepository({SupabaseClient? client})
-      : _client = client ?? SupabaseClientManager().client;
+  AcademicsRepository({MobileApiClient? apiClient, SupabaseClient? client})
+      : _apiClient = apiClient ?? MobileApiClient(),
+        _client = client ?? SupabaseClientManager().client;
 
   // Fetch classes and subjects taught by a specific teacher
   Future<List<Map<String, dynamic>>> getTeacherClassesAndSubjects(int employeeId) async {
@@ -27,12 +30,10 @@ class AcademicsRepository {
     }
 
     try {
-      final List<dynamic> response = await _client
-          .from('class_subjects')
-          .select('class_id, subject_id, school_classes(class_name, section_id, school_sections(educational_level)), school_subjects(subject_name)')
-          .eq('employee_id', employeeId);
-      
-      final list = List<Map<String, dynamic>>.from(response);
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getTeacherClassesAndSubjects&employeeId=$employeeId',
+      );
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxClassSubjects,
         key: cacheKey,
@@ -63,12 +64,10 @@ class AcademicsRepository {
     }
 
     try {
-      final List<dynamic> response = await _client
-          .from('class_subjects')
-          .select('class_id, subject_id, school_classes(class_name, section_id, school_sections(educational_level)), school_subjects(subject_name)')
-          .eq('school_id', schoolId);
-      
-      final list = List<Map<String, dynamic>>.from(response);
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getAllClassesAndSubjects&schoolId=$schoolId',
+      );
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxClassSubjects,
         key: cacheKey,
@@ -99,24 +98,10 @@ class AcademicsRepository {
     }
 
     try {
-      // First try with school_id filter
-      List<dynamic> response = await _client
-          .from('school_sessions')
-          .select('id, session_name, is_active, status, school_id')
-          .eq('school_id', schoolId)
-          .order('id', ascending: false);
-
-      // Fallback: no school filter (handles old records)
-      if (response.isEmpty) {
-        debugPrint("⚠️ No sessions for school_id=$schoolId, fetching all sessions...");
-        response = await _client
-            .from('school_sessions')
-            .select('id, session_name, is_active, status, school_id')
-            .order('id', ascending: false);
-      }
-
-      debugPrint("✅ Fetched ${response.length} sessions");
-      final list = List<Map<String, dynamic>>.from(response);
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getSessions&schoolId=$schoolId',
+      );
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxSchoolSessions,
         key: cacheKey,
@@ -147,35 +132,10 @@ class AcademicsRepository {
     }
 
     try {
-      // First try with both school_id and session_id
-      List<dynamic> response = await _client
-          .from('academic_periods')
-          .select('id, name, period_type, is_active, session_id, school_id')
-          .eq('school_id', schoolId)
-          .eq('session_id', sessionId)
-          .order('id');
-
-      // Fallback 1: session_id only (school_id may be null in old records)
-      if (response.isEmpty) {
-        debugPrint("⚠️ No periods for school_id=$schoolId & session_id=$sessionId, trying session only...");
-        response = await _client
-            .from('academic_periods')
-            .select('id, name, period_type, is_active, session_id, school_id')
-            .eq('session_id', sessionId)
-            .order('id');
-      }
-
-      // Fallback 2: any active period for this school
-      if (response.isEmpty) {
-        debugPrint("⚠️ No periods for session_id=$sessionId, fetching any active periods...");
-        response = await _client
-            .from('academic_periods')
-            .select('id, name, period_type, is_active, session_id, school_id')
-            .order('id');
-      }
-
-      debugPrint("✅ Fetched ${response.length} periods");
-      final list = List<Map<String, dynamic>>.from(response);
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getPeriods&schoolId=$schoolId&sessionId=$sessionId',
+      );
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxAcademicPeriods,
         key: cacheKey,
@@ -194,11 +154,10 @@ class AcademicsRepository {
   // Get grading scales/appreciations
   Future<List<Map<String, dynamic>>> getGradingScale() async {
     try {
-      final List<dynamic> response = await _client
-          .from('grading_appreciations')
-          .select('name, base_score, display_order')
-          .order('display_order');
-      return List<Map<String, dynamic>>.from(response);
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getGradingScale',
+      );
+      return List<Map<String, dynamic>>.from(response['data'] ?? []);
     } catch (e) {
       debugPrint("Error fetching grading scale: $e");
       return [];
@@ -233,85 +192,28 @@ class AcademicsRepository {
     }
 
     try {
-      // 1. Fetch class details to get class name and level
-      final classRes = await _client
-          .from('school_classes')
-          .select('class_name, section_id, school_sections(educational_level)')
-          .eq('id', classId)
-          .single();
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getGradingGrid&classId=$classId&subjectId=$subjectId&sessionId=$sessionId&term=${Uri.encodeComponent(term)}&schoolId=$schoolId',
+      );
       
-      final className = classRes['class_name'] as String;
-      final level = classRes['school_sections']?['educational_level'] as String? ?? 'Lycée';
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      final level = response['level']?.toString() ?? 'Lycée';
+      final coeff = (response['coefficient'] as num?)?.toDouble() ?? 1.0;
 
-      // 2. Fetch subject coefficient from class_subjects
-      final subLinkRes = await _client
-          .from('class_subjects')
-          .select('coefficient')
-          .eq('class_id', classId)
-          .eq('subject_id', subjectId)
-          .maybeSingle();
-      
-      final num coeff = subLinkRes != null ? (subLinkRes['coefficient'] as num? ?? 1) : 1;
-
-      // 3. Fetch active students in class
-      final List<dynamic> studentsList = await _client
-          .from('students')
-          .select('id, num_admission, nom_etudiant, photo_path')
-          .eq('classe', className)
-          .eq('statut', 'Actif')
-          .eq('school_id', schoolId)
-          .order('nom_etudiant');
-
-      // 4. Fetch existing grades/results
-      final List<dynamic> resultsList = await _client
-          .from('student_results')
-          .select('id, student_id, class_work_score, exam_score, total_score, weighted_score, absences, observation, appreciation, rank')
-          .eq('class_id', classId)
-          .eq('subject_id', subjectId)
-          .eq('session_id', sessionId)
-          .eq('term', term);
-
-      // 5. Map student results
-      final Map<int, Map<String, dynamic>> resultsMap = {
-        for (var r in resultsList)
-          (r['student_id'] as num).toInt(): Map<String, dynamic>.from(r)
-      };
-
-      final List<Map<String, dynamic>> gridData = [];
-      for (var student in studentsList) {
-        final studentId = (student['id'] as num).toInt();
-        final res = resultsMap[studentId];
-
-        gridData.add({
-          'student_id': studentId,
-          'num_admission': student['num_admission'] ?? 'N/A',
-          'nom_etudiant': student['nom_etudiant'] ?? 'Sans Nom',
-          'photo_path': student['photo_path'],
-          'class_work_score': res?['class_work_score'],
-          'exam_score': res?['exam_score'],
-          'total_score': res?['total_score'],
-          'weighted_score': res?['weighted_score'],
-          'absences': res?['absences'] ?? 0,
-          'observation': res?['observation'] ?? '',
-          'appreciation': res?['appreciation'] ?? '-',
-          'rank': res?['rank'] ?? '-',
-        });
-      }
-
-      final res = {
+      final result = {
         'success': true,
-        'data': gridData,
+        'data': list,
         'level': level,
-        'coefficient': coeff.toDouble(),
+        'coefficient': coeff,
       };
 
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxStudentResults,
         key: cacheKey,
-        data: [res],
+        data: [result],
       );
 
-      return res;
+      return result;
     } catch (e) {
       debugPrint("Error loading grading grid: $e");
       return {
@@ -389,54 +291,15 @@ class AcademicsRepository {
     }
 
     try {
-      // Fetch existing results mapping
-      final List<dynamic> existingList = await _client
-          .from('student_results')
-          .select('id, student_id')
-          .eq('class_id', classId)
-          .eq('subject_id', subjectId)
-          .eq('session_id', sessionId)
-          .eq('term', term);
-
-      final Map<int, int> existingMap = {
-        for (var item in existingList)
-          (item['student_id'] as num).toInt(): (item['id'] as num).toInt()
-      };
-
-      final List<Future> operations = [];
-      for (var grade in grades) {
-        final studentId = grade['student_id'] as int;
-        final existingId = existingMap[studentId];
-
-        final dbValues = {
-          'student_id': studentId,
-          'subject_id': subjectId,
-          'class_id': classId,
-          'session_id': sessionId,
-          'term': term,
-          'class_work_score': grade['class_work_score'],
-          'exam_score': grade['exam_score'],
-          'total_score': grade['total_score'],
-          'coefficient': grade['coefficient'],
-          'weighted_score': grade['weighted_score'],
-          'absences': grade['absences'] ?? 0,
-          'observation': grade['observation'],
-          'appreciation': grade['appreciation'],
-          'rank': grade['rank'],
-        };
-
-        if (existingId != null) {
-          operations.add(
-            _client.from('student_results').update(dbValues).eq('id', existingId)
-          );
-        } else {
-          operations.add(
-            _client.from('student_results').insert(dbValues)
-          );
-        }
-      }
-
-      await Future.wait(operations);
+      final response = await _apiClient.postJson(
+        '/api/mobile/academics',
+        {
+          'action': 'saveStudentGrades',
+          'payload': {
+            'grades': grades,
+          },
+        },
+      );
 
       // Re-cache online data
       final Map<String, dynamic> gridRes = {
@@ -465,7 +328,7 @@ class AcademicsRepository {
         data: [gridRes],
       );
 
-      return {'success': true};
+      return response;
     } catch (e) {
       debugPrint("Error saving student grades: $e");
       return {
@@ -502,72 +365,23 @@ class AcademicsRepository {
     }
 
     try {
-      // 1. Fetch class details to get class name
-      final classRes = await _client
-          .from('school_classes')
-          .select('class_name')
-          .eq('id', classId)
-          .single();
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getDevoirGrid&classId=$classId&subjectId=$subjectId&sessionId=$sessionId&term=${Uri.encodeComponent(term)}&schoolId=$schoolId',
+      );
       
-      final className = classRes['class_name'] as String;
-
-      // 2. Fetch active students in class
-      final List<dynamic> studentsList = await _client
-          .from('students')
-          .select('id, num_admission, nom_etudiant, photo_path')
-          .eq('classe', className)
-          .eq('statut', 'Actif')
-          .eq('school_id', schoolId)
-          .order('nom_etudiant');
-
-      // 3. Fetch existing devoir grades
-      final List<dynamic> resultsList = await _client
-          .from('student_results')
-          .select('id, student_id, devoir1, devoir2, devoir3, devoir4, devoir5, moyenne_devoirs')
-          .eq('class_id', classId)
-          .eq('subject_id', subjectId)
-          .eq('session_id', sessionId)
-          .eq('term', term);
-
-      // 4. Map student results
-      final Map<int, Map<String, dynamic>> resultsMap = {
-        for (var r in resultsList)
-          (r['student_id'] as num).toInt(): Map<String, dynamic>.from(r)
-      };
-
-      final List<Map<String, dynamic>> gridData = [];
-      for (var student in studentsList) {
-        final studentId = (student['id'] as num).toInt();
-        final res = resultsMap[studentId];
-
-        gridData.add({
-          'student_id': studentId,
-          'num_admission': student['num_admission'] ?? 'N/A',
-          'nom_etudiant': student['nom_etudiant'] ?? 'Sans Nom',
-          'photo_path': student['photo_path'],
-          'devoirs': [
-            res?['devoir1'],
-            res?['devoir2'],
-            res?['devoir3'],
-            res?['devoir4'],
-            res?['devoir5'],
-          ],
-          'moyenne_devoirs': res?['moyenne_devoirs'] ?? 0.0,
-        });
-      }
-
-      final res = {
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      final result = {
         'success': true,
-        'data': gridData,
+        'data': list,
       };
 
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxStudentResults,
         key: cacheKey,
-        data: [res],
+        data: [result],
       );
 
-      return res;
+      return result;
     } catch (e) {
       debugPrint("Error loading devoir grid: $e");
       return {
@@ -639,54 +453,15 @@ class AcademicsRepository {
     }
 
     try {
-      // Fetch existing results mapping
-      final List<dynamic> existingList = await _client
-          .from('student_results')
-          .select('id, student_id')
-          .eq('class_id', classId)
-          .eq('subject_id', subjectId)
-          .eq('session_id', sessionId)
-          .eq('term', term);
-
-      final Map<int, int> existingMap = {
-        for (var item in existingList)
-          (item['student_id'] as num).toInt(): (item['id'] as num).toInt()
-      };
-
-      final List<Future> operations = [];
-      for (var row in devoirsList) {
-        final studentId = row['student_id'] as int;
-        final existingId = existingMap[studentId];
-        final devoirs = row['devoirs'] as List<dynamic>;
-        final avg = row['moyenne_devoirs'] as double;
-
-        final dbValues = {
-          'student_id': studentId,
-          'subject_id': subjectId,
-          'class_id': classId,
-          'session_id': sessionId,
-          'term': term,
-          'devoir1': devoirs[0],
-          'devoir2': devoirs[1],
-          'devoir3': devoirs[2],
-          'devoir4': devoirs[3],
-          'devoir5': devoirs[4],
-          'moyenne_devoirs': avg,
-          'class_work_score': avg, // In the web app, classWorkScore is pre-filled with moyenneDevoirs
-        };
-
-        if (existingId != null) {
-          operations.add(
-            _client.from('student_results').update(dbValues).eq('id', existingId)
-          );
-        } else {
-          operations.add(
-            _client.from('student_results').insert(dbValues)
-          );
-        }
-      }
-
-      await Future.wait(operations);
+      final response = await _apiClient.postJson(
+        '/api/mobile/academics',
+        {
+          'action': 'saveDevoirGrades',
+          'payload': {
+            'devoirsList': devoirsList,
+          },
+        },
+      );
 
       // Re-cache online data
       final Map<String, dynamic> gridRes = {
@@ -707,7 +482,7 @@ class AcademicsRepository {
         data: [gridRes],
       );
 
-      return {'success': true};
+      return response;
     } catch (e) {
       debugPrint("Error saving devoir grades: $e");
       return {

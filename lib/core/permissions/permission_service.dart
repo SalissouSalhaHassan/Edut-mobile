@@ -23,6 +23,8 @@ class AppPermissions {
   static const attendanceManage = 'attendance.manage';
   static const academicsView = 'academics.view';
   static const academicsManage = 'academics.manage';
+  static const messagingView = 'messaging.view';
+  static const messagingManage = 'messaging.manage';
 }
 
 class UserAccessProfile {
@@ -58,7 +60,7 @@ class PermissionService {
     if (sessionPermissions.isNotEmpty) {
       final profile = UserAccessProfile(
         role: role,
-        permissions: sessionPermissions.toSet(),
+        permissions: {..._permissionsForRole(role), ...sessionPermissions},
       );
       _cachedProfile = profile;
       _cachedCacheKey = cacheKey;
@@ -321,6 +323,15 @@ class PermissionService {
       if (canEdit || canDelete) permissions.add(AppPermissions.academicsManage);
     }
 
+    if (_matchesModule(moduleName, const [
+      'messaging',
+      'messages',
+      'notifications',
+    ])) {
+      if (canView) permissions.add(AppPermissions.messagingView);
+      if (canEdit || canDelete) permissions.add(AppPermissions.messagingManage);
+    }
+
     return permissions;
   }
 
@@ -357,6 +368,8 @@ class PermissionService {
         AppPermissions.attendanceManage,
         AppPermissions.academicsView,
         AppPermissions.academicsManage,
+        AppPermissions.messagingView,
+        AppPermissions.messagingManage,
       };
     }
 
@@ -379,6 +392,8 @@ class PermissionService {
         AppPermissions.attendanceManage,
         AppPermissions.academicsView,
         AppPermissions.academicsManage,
+        AppPermissions.messagingView,
+        AppPermissions.messagingManage,
       };
     }
 
@@ -403,6 +418,8 @@ class PermissionService {
         AppPermissions.attendanceManage,
         AppPermissions.academicsView,
         AppPermissions.academicsManage,
+        AppPermissions.messagingView,
+        AppPermissions.messagingManage,
       };
     }
 
@@ -414,6 +431,17 @@ class PermissionService {
         AppPermissions.financeView,
         AppPermissions.examsView,
         AppPermissions.attendanceView,
+        AppPermissions.messagingView,
+        AppPermissions.messagingManage,
+      };
+    }
+
+    if (role == 'student' || role == 'parent') {
+      return {
+        AppPermissions.attendanceView,
+        AppPermissions.academicsView,
+        AppPermissions.examsView,
+        AppPermissions.messagingView,
       };
     }
 

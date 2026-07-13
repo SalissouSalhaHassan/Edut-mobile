@@ -213,10 +213,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                             ),
                           ],
-                        ),
                       ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
                   Center(
                     child: TextButton(
                       onPressed: () => context.push('/register'),

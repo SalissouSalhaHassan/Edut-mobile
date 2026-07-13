@@ -17,6 +17,9 @@ import '../../features/students/data/students_repository.dart';
 import '../../features/hostel/data/hostel_repository.dart';
 import '../../features/hr/data/hr_repository.dart';
 import '../../features/owner/data/owner_repository.dart';
+import '../../features/messaging/data/messaging_repository.dart';
+import '../../features/dashboard/data/dashboard_stats_repository.dart';
+import '../../features/ministry/data/ministry_repository.dart';
 
 final locator = GetIt.instance;
 
@@ -41,10 +44,10 @@ Future<void> setupLocator() async {
   locator.registerSingleton<OfflineQueueManager>(offlineQueue);
 
   // Register SyncEngine
-  locator.registerLazySingleton<SyncEngine>(() => SyncEngine(
-        client: supabaseManager.client,
-        queueManager: offlineQueue,
-      ));
+  locator.registerLazySingleton<SyncEngine>(
+    () =>
+        SyncEngine(client: supabaseManager.client, queueManager: offlineQueue),
+  );
 
   // Register SessionManager
   locator.registerLazySingleton<SessionManager>(() => SessionManager());
@@ -69,41 +72,53 @@ Future<void> setupLocator() async {
   );
 
   // Register AttendanceRepository
-  locator.registerLazySingleton<AttendanceRepository>(() => AttendanceRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<AttendanceRepository>(
+    () => AttendanceRepository(client: supabaseManager.client),
+  );
 
   // Register AcademicsRepository
-  locator.registerLazySingleton<AcademicsRepository>(() => AcademicsRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<AcademicsRepository>(
+    () => AcademicsRepository(client: supabaseManager.client),
+  );
 
-  locator.registerLazySingleton<FamilyRepository>(() => FamilyRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<FamilyRepository>(
+    () => FamilyRepository(client: supabaseManager.client),
+  );
 
-  locator.registerLazySingleton<StudentsRepository>(() => StudentsRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<StudentsRepository>(
+    () => StudentsRepository(client: supabaseManager.client),
+  );
 
-  locator.registerLazySingleton<ExamsRepository>(() => ExamsRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<ExamsRepository>(
+    () => ExamsRepository(client: supabaseManager.client),
+  );
 
-  locator.registerLazySingleton<HostelRepository>(() => HostelRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<HostelRepository>(
+    () => HostelRepository(client: supabaseManager.client),
+  );
 
-  locator.registerLazySingleton<HrRepository>(() => HrRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<HrRepository>(
+    () => HrRepository(client: supabaseManager.client),
+  );
 
-  locator.registerLazySingleton<OwnerRepository>(() => OwnerRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<OwnerRepository>(
+    () => OwnerRepository(client: supabaseManager.client),
+  );
+
+  locator.registerLazySingleton<MessagingRepository>(
+    () => MessagingRepository(apiClient: locator<MobileApiClient>()),
+  );
+
+  locator.registerLazySingleton<DashboardStatsRepository>(
+    () => DashboardStatsRepository(apiClient: locator<MobileApiClient>()),
+  );
 
   // Register FinanceRepository
-  locator.registerLazySingleton<FinanceRepository>(() => FinanceRepository(
-        client: supabaseManager.client,
-      ));
+  locator.registerLazySingleton<FinanceRepository>(
+    () => FinanceRepository(client: supabaseManager.client),
+  );
+
+  locator.registerLazySingleton<MinistryRepository>(
+    () => MinistryRepository(apiClient: locator<MobileApiClient>()),
+  );
 }

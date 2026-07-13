@@ -4,14 +4,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/offline_queue_manager.dart';
 import '../../../core/api/offline_store_manager.dart';
 import '../../../core/api/supabase_client.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/api/sync_engine.dart';
 import '../../../core/di/injection.dart';
 
 class FinanceRepository {
+  final MobileApiClient _apiClient;
   final SupabaseClient _client;
 
-  FinanceRepository({SupabaseClient? client})
-      : _client = client ?? SupabaseClientManager().client;
+  FinanceRepository({MobileApiClient? apiClient, SupabaseClient? client})
+      : _apiClient = apiClient ?? MobileApiClient(),
+        _client = client ?? SupabaseClientManager().client;
 
   String _feesCacheKey(int schoolId, int sessionId) =>
       "student_fees_${schoolId}_$sessionId";
@@ -153,14 +156,11 @@ class FinanceRepository {
     }
 
     try {
-      final List<dynamic> response = await _client
-          .from('student_fees')
-          .select('total_expected, total_paid, balance')
-          .eq('school_id', schoolId)
-          .eq('session_id', sessionId);
-
-      final fees = List<Map<String, dynamic>>.from(response);
-      final result = _buildStatsFromFees(fees);
+      final response = await _apiClient.getJson(
+        '/api/mobile/finance/summary?action=getFinanceStats&schoolId=$schoolId&sessionId=$sessionId',
+      );
+      
+      final result = Map<String, dynamic>.from(response);
 
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxStudentFees,
@@ -203,13 +203,11 @@ class FinanceRepository {
     }
 
     try {
-      final List<dynamic> response = await _client
-          .from('student_fees')
-          .select('id, school_id, student_id, session_id, total_expected, total_paid, total_reduction, balance, status, students(num_admission, nom_etudiant, photo_path, classe, educational_level)')
-          .eq('school_id', schoolId)
-          .eq('session_id', sessionId);
+      final response = await _apiClient.getJson(
+        '/api/mobile/finance/invoices?action=getStudentFeesList&schoolId=$schoolId&sessionId=$sessionId',
+      );
 
-      final list = List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxStudentFees,
         key: cacheKey,
@@ -245,13 +243,11 @@ class FinanceRepository {
     }
 
     try {
-      final List<dynamic> response = await _client
-          .from('fee_payments')
-          .select('*')
-          .eq('fee_id', feeId)
-          .order('date_paid', ascending: false);
+      final response = await _apiClient.getJson(
+        '/api/mobile/finance/payments?action=getFeePayments&feeId=$feeId',
+      );
 
-      final list = List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxFeePayments,
         key: cacheKey,
@@ -360,43 +356,46 @@ class FinanceRepository {
     }
 
     try {
-      final paymentData = {
-        'school_id': schoolId,
-        'fee_id': feeId,
-        'amount': amount,
-        'reduction': reduction,
-        'payment_mode': paymentMode,
-        'reference': reference.isNotEmpty ? reference : null,
-        'month_concerned': monthConcerned.isNotEmpty ? monthConcerned : null,
-        'date_paid': DateTime.now().toIso8601String(),
-        'recorded_by': recordedBy,
-      };
-
-      final paymentResponse = await _client
-          .from('fee_payments')
-          .insert(paymentData)
-          .select()
-          .single();
-
-      await _client.from('student_fees').update({
-        'total_paid': newPaid,
-        'total_reduction': newReduction,
-        'balance': newBalance,
-        'status': newStatus,
-      }).eq('id', feeId);
-
-      await _updateCachedFeeAfterPayment(
-        feeId: feeId,
-        newPaid: newPaid,
-        newReduction: newReduction,
-        newBalance: newBalance,
-        newStatus: newStatus,
+      final response = await _apiClient.postJson(
+        '/api/mobile/finance/payments',
+        {
+          'action': 'recordPayment',
+          'payload': {
+            'feeId': feeId,
+            'schoolId': schoolId,
+            'amount': amount,
+            'reduction': reduction,
+            'paymentMode': paymentMode,
+            'reference': reference,
+            'monthConcerned': monthConcerned,
+            'recordedBy': recordedBy,
+            'currentPaid': currentPaid,
+            'currentReduction': currentReduction,
+            'totalExpected': totalExpected,
+          },
+        },
       );
 
-      return {
-        'success': true,
-        'payment': paymentResponse,
-      };
+      if (response['success'] == true) {
+        final paymentResponse = response['payment'];
+        await _updateCachedFeeAfterPayment(
+          feeId: feeId,
+          newPaid: newPaid,
+          newReduction: newReduction,
+          newBalance: newBalance,
+          newStatus: newStatus,
+        );
+
+        return {
+          'success': true,
+          'payment': paymentResponse,
+        };
+      } else {
+        return {
+          'success': false,
+          'error': response['error'] ?? 'Erreur inconnue',
+        };
+      }
     } catch (e) {
       debugPrint("Error recording payment: $e");
       return {
@@ -406,7 +405,7 @@ class FinanceRepository {
     }
   }
 
-  /// Fetch active academic sessions for the school (to select which session to display fees for)
+  /// Fetch active academic sessions for the school
   Future<List<Map<String, dynamic>>> getSessions(int schoolId) async {
     final syncEngine = locator<SyncEngine>();
     final cacheManager = locator<OfflineStoreManager>();
@@ -421,13 +420,11 @@ class FinanceRepository {
     }
 
     try {
-      final List<dynamic> response = await _client
-          .from('school_sessions')
-          .select('id, session_name, is_active, status')
-          .eq('school_id', schoolId)
-          .order('id', ascending: false);
+      final response = await _apiClient.getJson(
+        '/api/mobile/finance/summary?action=getSessions&schoolId=$schoolId',
+      );
 
-      final list = List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
       await cacheManager.saveDataList(
         boxName: OfflineStoreManager.boxSchoolSessions,
         key: cacheKey,
@@ -449,78 +446,17 @@ class FinanceRepository {
     required int sessionId,
   }) async {
     try {
-      final List<dynamic> studentsList = await _client
-          .from('students')
-          .select('id, frais_mensuels, ancien_solde, frais_inscription')
-          .eq('school_id', schoolId)
-          .eq('statut', 'Actif');
-
-      final List<dynamic> existingFees = await _client
-          .from('student_fees')
-          .select('id, student_id, total_expected, total_paid, total_reduction')
-          .eq('school_id', schoolId)
-          .eq('session_id', sessionId);
-
-      final Map<int, Map<String, dynamic>> feeMap = {
-        for (var f in existingFees)
-          (f['student_id'] as num).toInt(): Map<String, dynamic>.from(f)
-      };
-
-      final List<Map<String, dynamic>> toInsert = [];
-      final List<Future<dynamic>> operations = [];
-
-      for (var s in studentsList) {
-        final sId = (s['id'] as num).toInt();
-        final double monthly = (s['frais_mensuels'] as num?)?.toDouble() ?? 0.0;
-        final double inscr =
-            (s['frais_inscription'] as num?)?.toDouble() ?? 0.0;
-        final double oldBal = (s['ancien_solde'] as num?)?.toDouble() ?? 0.0;
-        final double expected = inscr + oldBal + (monthly * 9);
-
-        final existing = feeMap[sId];
-
-        if (existing != null) {
-          final double currentExpected =
-              (existing['total_expected'] as num?)?.toDouble() ?? 0.0;
-          if (currentExpected != expected) {
-            final double paid =
-                (existing['total_paid'] as num?)?.toDouble() ?? 0.0;
-            final double reduc =
-                (existing['total_reduction'] as num?)?.toDouble() ?? 0.0;
-            final double newBalance = expected - paid - reduc;
-
-            operations.add(_client.from('student_fees').update({
-              'total_expected': expected,
-              'balance': newBalance,
-            }).eq('id', existing['id']));
-          }
-        } else {
-          toInsert.add({
-            'school_id': schoolId,
-            'student_id': sId,
-            'session_id': sessionId,
-            'total_expected': expected,
-            'total_paid': 0.0,
-            'total_reduction': 0.0,
-            'balance': expected,
-            'status': 'Impaye',
-          });
-        }
-      }
-
-      if (toInsert.isNotEmpty) {
-        operations.add(_client.from('student_fees').insert(toInsert));
-      }
-
-      if (operations.isNotEmpty) {
-        await Future.wait(operations);
-      }
-
-      return {
-        'success': true,
-        'inserted': toInsert.length,
-        'updated': operations.length - (toInsert.isNotEmpty ? 1 : 0),
-      };
+      final response = await _apiClient.postJson(
+        '/api/mobile/finance/invoices',
+        {
+          'action': 'syncStudentFees',
+          'payload': {
+            'schoolId': schoolId,
+            'sessionId': sessionId,
+          },
+        },
+      );
+      return response;
     } catch (e) {
       debugPrint("Error syncing student fees: $e");
       return {
