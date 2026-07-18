@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/auth/session_manager.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -80,17 +82,52 @@ class _QRScanScreenState extends State<QRScanScreen> {
       _statusMessage = "Traitement du scan...";
     });
 
-    // Parse URL to find classId
+    // Parse QR content to extract classId
+    // Accepted formats:
+    //   1. Full URL:  https://edut.pro/...?classId=15
+    //   2. Full URL:  https://edut.pro/...?classroom=15
+    //   3. URL with path segment:  https://edut.pro/.../scan/15
+    //   4. Plain number string:  "15"
+    //   5. Compact JSON:  {"classId":15}
     int? classId;
     try {
-      final uri = Uri.parse(url);
-      final classIdStr = uri.queryParameters['classId'] ?? uri.queryParameters['classroom'];
-      if (classIdStr != null) {
-        classId = int.tryParse(classIdStr);
+      final trimmed = url.trim();
+
+      // Try JSON format first: {"classId":15}
+      if (trimmed.startsWith('{')) {
+        try {
+          final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
+          final val = decoded['classId'] ?? decoded['classroom'] ?? decoded['class_id'];
+          if (val != null) classId = int.tryParse(val.toString());
+        } catch (_) {}
       }
+
+      // Try as URL (covers both query params and path segments)
+      if (classId == null) {
+        try {
+          final uri = Uri.parse(trimmed);
+
+          // 1. Query param: ?classId=15 or ?classroom=15
+          final paramVal = uri.queryParameters['classId'] ??
+              uri.queryParameters['classroom'] ??
+              uri.queryParameters['class_id'];
+          if (paramVal != null) classId = int.tryParse(paramVal);
+
+          // 2. Last path segment: /scan/15  or  /qr/15
+          if (classId == null && uri.pathSegments.isNotEmpty) {
+            classId = int.tryParse(uri.pathSegments.last);
+          }
+        } catch (_) {}
+      }
+
+      // Try plain numeric string
+      classId ??= int.tryParse(trimmed);
     } catch (_) {
-      classId = int.tryParse(url);
+      classId = null;
     }
+
+    debugPrint('🔍 QR raw value: $url');
+    debugPrint('🔍 Resolved classId: $classId');
 
     if (classId == null) {
       _showResultSheet(
@@ -100,8 +137,35 @@ class _QRScanScreenState extends State<QRScanScreen> {
       return;
     }
 
-    final employeeIdStr = await locator<SessionManager>().getEmployeeId();
-    final employeeId = int.tryParse(employeeIdStr ?? '');
+
+    final sessionManager = locator<SessionManager>();
+    final employeeIdStr = await sessionManager.getEmployeeId();
+    int? employeeId = int.tryParse(employeeIdStr ?? '');
+
+    // If employeeId is missing from local session (stale cache), refresh from API
+    if (employeeId == null) {
+      debugPrint('⚠️ employeeId missing from session — refreshing profile from API...');
+      try {
+        final freshProfile = await locator<MobileApiClient>().getCurrentProfile();
+        final freshEmpId = int.tryParse(freshProfile.employeeId ?? '');
+        if (freshEmpId != null) {
+          // Update the session storage so future scans don't need a refresh
+          await sessionManager.saveSession(
+            token: (await sessionManager.getToken()) ?? '',
+            email: freshProfile.email,
+            role: freshProfile.role,
+            employeeId: freshProfile.employeeId ?? '',
+            userId: freshProfile.userId,
+            schoolId: freshProfile.schoolId,
+            permissions: freshProfile.permissions,
+          );
+          employeeId = freshEmpId;
+          debugPrint('✅ Refreshed employeeId from API: $employeeId');
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to refresh profile from API: $e');
+      }
+    }
 
     if (employeeId == null) {
       _showResultSheet(
