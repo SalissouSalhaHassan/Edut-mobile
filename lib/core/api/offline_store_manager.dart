@@ -67,7 +67,7 @@ class OfflineStoreManager {
       if (rawData is List) {
         return rawData.map((item) {
           if (item is Map) {
-            return Map<String, dynamic>.from(item);
+            return _cleanMap(item);
           }
           return <String, dynamic>{};
         }).where((element) => element.isNotEmpty).toList();

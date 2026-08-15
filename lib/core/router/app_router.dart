@@ -212,7 +212,7 @@ class AppRouter {
           final subjectName = extra['subjectName'] as String;
 
           return GuardedScreen(
-            permission: AppPermissions.academicsManage,
+            permission: AppPermissions.saisieNotesView,
             child: SaisieNotesScreen(
               classId: classId,
               className: className,
@@ -232,7 +232,7 @@ class AppRouter {
           final subjectName = extra['subjectName'] as String;
 
           return GuardedScreen(
-            permission: AppPermissions.academicsManage,
+            permission: AppPermissions.gestionDevoirsView,
             child: GestionDevoirsScreen(
               classId: classId,
               className: className,

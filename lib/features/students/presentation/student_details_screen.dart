@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -132,7 +134,50 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
   }
 
   Widget _buildHeader() {
-    final photo = _student!['photo_path']?.toString();
+    final rawPhoto = (_student!['photo_path'] ??
+            _student!['photo_url'] ??
+            _student!['photo'] ??
+            _student!['avatar'])
+        ?.toString();
+
+    Widget fallbackIcon() => const Icon(
+          Icons.person_rounded,
+          size: 34,
+          color: Color(0xFF6366F1),
+        );
+
+    Widget imageWidget = fallbackIcon();
+    if (rawPhoto != null && rawPhoto.trim().isNotEmpty) {
+      final trimmed = rawPhoto.trim();
+      if (trimmed.startsWith('data:image')) {
+        try {
+          imageWidget = Image.memory(
+            base64Decode(trimmed.split(',').last),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => fallbackIcon(),
+          );
+        } catch (_) {}
+      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        imageWidget = Image.network(
+          trimmed,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallbackIcon(),
+        );
+      } else if (trimmed.startsWith('/')) {
+        imageWidget = Image.network(
+          '${MobileApiConfig.baseUrl}$trimmed',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallbackIcon(),
+        );
+      } else {
+        imageWidget = Image.network(
+          '${MobileApiConfig.baseUrl}/$trimmed',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallbackIcon(),
+        );
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -150,13 +195,7 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
               borderRadius: BorderRadius.circular(24),
             ),
             clipBehavior: Clip.antiAlias,
-            child: photo != null && photo.isNotEmpty
-                ? Image.network(photo, fit: BoxFit.cover)
-                : const Icon(
-                    Icons.person_rounded,
-                    size: 34,
-                    color: Color(0xFF6366F1),
-                  ),
+            child: imageWidget,
           ),
           const SizedBox(width: 16),
           Expanded(

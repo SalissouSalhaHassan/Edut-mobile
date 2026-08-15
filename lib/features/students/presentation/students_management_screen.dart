@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -631,7 +633,66 @@ class _StudentsManagementScreenState extends State<StudentsManagementScreen> {
   }
 
   Widget _buildAvatar(Map<String, dynamic> student) {
-    final photoPath = student['photo_path']?.toString();
+    final rawPath = (student['photo_path'] ??
+            student['photo_url'] ??
+            student['photo'] ??
+            student['avatar'])
+        ?.toString();
+
+    Widget fallbackIcon() => const Icon(
+          Icons.person_rounded,
+          color: Color(0xFF818CF8),
+          size: 28,
+        );
+
+    if (rawPath == null || rawPath.trim().isEmpty) {
+      return Container(
+        width: 58,
+        height: 58,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: fallbackIcon(),
+      );
+    }
+
+    final trimmed = rawPath.trim();
+
+    Widget imageWidget;
+    if (trimmed.startsWith('data:image')) {
+      try {
+        final base64String = trimmed.split(',').last;
+        imageWidget = Image.memory(
+          base64Decode(base64String),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallbackIcon(),
+        );
+      } catch (_) {
+        imageWidget = fallbackIcon();
+      }
+    } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      imageWidget = Image.network(
+        trimmed,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallbackIcon(),
+      );
+    } else if (trimmed.startsWith('/')) {
+      final fullUrl = '${MobileApiConfig.baseUrl}$trimmed';
+      imageWidget = Image.network(
+        fullUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallbackIcon(),
+      );
+    } else {
+      final fullUrl = '${MobileApiConfig.baseUrl}/$trimmed';
+      imageWidget = Image.network(
+        fullUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallbackIcon(),
+      );
+    }
+
     return Container(
       width: 58,
       height: 58,
@@ -640,21 +701,7 @@ class _StudentsManagementScreenState extends State<StudentsManagementScreen> {
         borderRadius: BorderRadius.circular(18),
       ),
       clipBehavior: Clip.antiAlias,
-      child: photoPath != null && photoPath.isNotEmpty
-          ? Image.network(
-              photoPath,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.person_rounded,
-                color: Color(0xFF818CF8),
-                size: 28,
-              ),
-            )
-          : const Icon(
-              Icons.person_rounded,
-              color: Color(0xFF818CF8),
-              size: 28,
-            ),
+      child: imageWidget,
     );
   }
 

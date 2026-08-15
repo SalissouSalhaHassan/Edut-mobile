@@ -333,6 +333,11 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.fingerprint, size: 22, color: Color(0xFF4F46E5)),
+            onPressed: _showBiometricDialog,
+            tooltip: 'Pointage Biométrique par Empreinte',
+          ),
+          IconButton(
             icon: const Icon(Icons.calendar_today_outlined, size: 20),
             onPressed: _selectDate,
             tooltip: 'Changer la date',
@@ -686,16 +691,22 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildStatusChip(studentId, 'Présent', AppColors.success),
-                const SizedBox(width: 6),
-                _buildStatusChip(studentId, 'Absent', AppColors.danger),
-                const SizedBox(width: 6),
-                _buildStatusChip(studentId, 'En Retard', AppColors.warning),
-                const SizedBox(width: 6),
-                _buildStatusChip(studentId, 'Excusé', AppColors.info),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  SizedBox(width: 70, child: _buildStatusChip(studentId, 'Présent', AppColors.success)),
+                  const SizedBox(width: 4),
+                  SizedBox(width: 70, child: _buildStatusChip(studentId, 'Absent', AppColors.danger)),
+                  const SizedBox(width: 4),
+                  SizedBox(width: 70, child: _buildStatusChip(studentId, 'En Retard', AppColors.warning)),
+                  const SizedBox(width: 4),
+                  SizedBox(width: 70, child: _buildStatusChip(studentId, 'Excusé', AppColors.info)),
+                  const SizedBox(width: 4),
+                  _buildBiometricChip(studentId, studentName),
+                ],
+              ),
             ),
             if (hasRemark) ...[
               const SizedBox(height: 10),
@@ -728,38 +739,233 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
 
   Widget _buildStatusChip(int studentId, String statusLabel, Color activeColor) {
     final isSelected = _statuses[studentId] == statusLabel;
-    
-    return Expanded(
-      child: GestureDetector(
-        onTap: !_canManageAttendance
-            ? null
-            : () {
-          setState(() {
-            _statuses[studentId] = statusLabel;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? activeColor : AppColors.slate50,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? activeColor : const Color(0xFFE2E8F0),
-              width: 1,
-            ),
+
+    return GestureDetector(
+      onTap: !_canManageAttendance
+          ? null
+          : () {
+              setState(() {
+                _statuses[studentId] = statusLabel;
+              });
+            },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : AppColors.slate50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? activeColor : const Color(0xFFE2E8F0),
+            width: 1,
           ),
-          child: Center(
-            child: Text(
-              statusLabel == 'En Retard' ? 'Retard' : (statusLabel == 'Excusé' ? 'Excusé' : statusLabel),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: isSelected ? Colors.white : AppColors.slate700,
-              ),
+        ),
+        child: Center(
+          child: Text(
+            statusLabel == 'En Retard' ? 'Retard' : (statusLabel == 'Excusé' ? 'Excusé' : statusLabel),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: isSelected ? Colors.white : AppColors.slate700,
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBiometricChip(int studentId, String studentName) {
+    final isBiometric = _remarks[studentId]?.contains("Empreinte") == true ||
+        (_statuses[studentId] == 'Présent' && _remarks[studentId] == 'Vérifié par empreinte digitale');
+
+    return GestureDetector(
+      onTap: !_canManageAttendance
+          ? null
+          : () {
+              setState(() {
+                _statuses[studentId] = 'Présent';
+                _remarks[studentId] = 'Vérifié par empreinte digitale';
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.fingerprint, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text("Empreinte validée : $studentName")),
+                    ],
+                  ),
+                  backgroundColor: const Color(0xFF4F46E5),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: isBiometric ? const Color(0xFF4F46E5) : const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isBiometric ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.fingerprint,
+              size: 14,
+              color: isBiometric ? Colors.white : const Color(0xFF4F46E5),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              "Empreinte",
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isBiometric ? Colors.white : const Color(0xFF4F46E5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBiometricDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFC7D2FE), width: 2),
+                ),
+                child: const Icon(
+                  Icons.fingerprint,
+                  size: 42,
+                  color: Color(0xFF4F46E5),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                "Scanner d'Empreinte Digitale",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "Poser le doigt de l'élève sur le capteur biométrique ou sélectionner un élève ci-dessous",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 16),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _students.length,
+                  itemBuilder: (context, index) {
+                    final s = _students[index];
+                    final sId = s['id'] as int;
+                    final sName = s['nom_etudiant'] ?? s['nomEtudiant'] ?? 'Élève';
+                    final numAdm = s['num_admission'] ?? s['numAdmission'] ?? '';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEEF2FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.fingerprint, color: Color(0xFF4F46E5), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  sName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (numAdm.isNotEmpty)
+                                  Text(
+                                    "N° Adm: $numAdm",
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.check, size: 14, color: Colors.white),
+                            label: const Text("Valider", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              setState(() {
+                                _statuses[sId] = 'Présent';
+                                _remarks[sId] = 'Vérifié par empreinte digitale';
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Empreinte validée : $sName"),
+                                  backgroundColor: const Color(0xFF4F46E5),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
     );
   }
 

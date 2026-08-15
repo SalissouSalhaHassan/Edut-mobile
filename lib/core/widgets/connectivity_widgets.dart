@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../api/sync_engine.dart';
+import '../api/offline_queue_manager.dart';
 import '../di/injection.dart';
 
 /// Shows a compact "données en cache" chip when the app is offline.
@@ -97,30 +98,120 @@ class ConnectivityWrapper extends StatefulWidget {
 
 class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
   late final SyncEngine _syncEngine;
+  late final OfflineQueueManager _queueManager;
   bool _isOnline = true;
+  bool _isSyncing = false;
+  int _pendingCount = 0;
 
   @override
   void initState() {
     super.initState();
     _syncEngine = locator<SyncEngine>();
+    _queueManager = locator<OfflineQueueManager>();
     _isOnline = _syncEngine.isOnlineNotifier.value;
-    _syncEngine.isOnlineNotifier.addListener(_onChanged);
+    _isSyncing = _syncEngine.isSyncingNotifier.value;
+    _pendingCount = _queueManager.pendingCountNotifier.value;
+
+    _syncEngine.isOnlineNotifier.addListener(_onStateChanged);
+    _syncEngine.isSyncingNotifier.addListener(_onStateChanged);
+    _queueManager.pendingCountNotifier.addListener(_onStateChanged);
   }
 
-  void _onChanged() {
+  void _onStateChanged() {
     if (!mounted) return;
-    setState(() => _isOnline = _syncEngine.isOnlineNotifier.value);
+    setState(() {
+      _isOnline = _syncEngine.isOnlineNotifier.value;
+      _isSyncing = _syncEngine.isSyncingNotifier.value;
+      _pendingCount = _queueManager.pendingCountNotifier.value;
+    });
   }
 
   @override
   void dispose() {
-    _syncEngine.isOnlineNotifier.removeListener(_onChanged);
+    _syncEngine.isOnlineNotifier.removeListener(_onStateChanged);
+    _syncEngine.isSyncingNotifier.removeListener(_onStateChanged);
+    _queueManager.pendingCountNotifier.removeListener(_onStateChanged);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return widget.child;
+    return Column(
+      children: [
+        if (!_isOnline || _isSyncing || _pendingCount > 0)
+          Material(
+            elevation: 2,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              color: !_isOnline
+                  ? const Color(0xFFC2410C)
+                  : (_isSyncing ? const Color(0xFF4338CA) : const Color(0xFF047857)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: SafeArea(
+                bottom: false,
+                top: false,
+                child: Row(
+                  children: [
+                    Icon(
+                      !_isOnline
+                          ? Icons.wifi_off_rounded
+                          : (_isSyncing ? Icons.sync_rounded : Icons.cloud_done_rounded),
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        !_isOnline
+                            ? (_pendingCount > 0
+                                ? 'Mode Hors-ligne · $_pendingCount enregistrement(s) en attente'
+                                : 'Mode Hors-ligne (Offline) · Données sauvegardées localement')
+                            : (_isSyncing
+                                ? 'Synchronisation en cours...'
+                                : '$_pendingCount opération(s) prête(s) à la مزامنة'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (_isOnline && !_isSyncing && _pendingCount > 0)
+                      InkWell(
+                        onTap: () => _syncEngine.triggerSync(),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.refresh_rounded, size: 14, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Sync Now',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        Expanded(child: widget.child),
+      ],
+    );
   }
 }
 

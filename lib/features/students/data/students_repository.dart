@@ -5,6 +5,8 @@ import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/api/mobile_api_client.dart';
+import '../../../core/api/offline_store_manager.dart';
+import '../../../core/api/sync_engine.dart';
 
 class StudentsRepository {
   final MobileApiClient _apiClient;
@@ -14,31 +16,116 @@ class StudentsRepository {
       : _apiClient = apiClient ?? MobileApiClient(),
         _client = client ?? SupabaseClientManager().client;
 
+  static const String _studentsCacheKey = "students_list";
+
   Future<List<Map<String, dynamic>>> getStudentsList() async {
-    try {
-      final response = await _apiClient.getJson(
-        '/api/mobile/students',
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("📶 Offline Mode: Fetching students list from local cache.");
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
       );
-      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+    }
+
+    try {
+      final response = await _apiClient.getJson('/api/mobile/students');
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
+        data: list,
+      );
+      
+      return list;
     } catch (e) {
       debugPrint('Error fetching students list: $e');
-      return [];
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
+      );
     }
   }
 
   Future<Map<String, dynamic>?> getStudentDetails(int studentId) async {
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = "student_detail_$studentId";
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("📶 Offline Mode: Fetching student details from local cache.");
+      final cached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
+      if (cached.isNotEmpty) {
+        return cached.first;
+      }
+      
+      // Fallback search in cached students list
+      final allStudents = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: _studentsCacheKey,
+      );
+      try {
+        final match = allStudents.firstWhere((s) => (s['id'] as num?)?.toInt() == studentId);
+        return match;
+      } catch (_) {}
+      return null;
+    }
+
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/students/$studentId',
       );
-      return Map<String, dynamic>.from(response['data'] ?? {});
+      final details = Map<String, dynamic>.from(response['data'] ?? {});
+      if (details.isNotEmpty) {
+        await cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudents,
+          key: cacheKey,
+          data: [details],
+        );
+      }
+      return details;
     } catch (e) {
       debugPrint('Error fetching student details: $e');
+      final cached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
+      if (cached.isNotEmpty) return cached.first;
       return null;
     }
   }
 
   Future<Map<String, List<String>>> getStudentFormOptions() async {
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+    const cacheKey = "student_form_options";
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      final cached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
+      if (cached.isNotEmpty && cached.first.containsKey('levels')) {
+        final item = cached.first;
+        return {
+          'levels': List<String>.from(item['levels'] ?? []),
+          'sections': List<String>.from(item['sections'] ?? []),
+          'classes': List<String>.from(item['classes'] ?? []),
+        };
+      }
+      return {
+        'levels': ['Collège', 'Lycée', 'Primaire'],
+        'sections': ['Générale'],
+        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
+      };
+    }
+
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/students/0/summary?action=getStudentFormOptions',
@@ -48,6 +135,14 @@ class StudentsRepository {
       final sections = List<String>.from(response['sections'] ?? []);
       final classes = List<String>.from(response['classes'] ?? []);
 
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+        data: [
+          {'levels': levels, 'sections': sections, 'classes': classes}
+        ],
+      );
+
       return {
         'levels': levels,
         'sections': sections,
@@ -56,9 +151,9 @@ class StudentsRepository {
     } catch (e) {
       debugPrint('Error fetching student form options: $e');
       return {
-        'levels': [],
-        'sections': [],
-        'classes': [],
+        'levels': ['Collège', 'Lycée', 'Primaire'],
+        'sections': ['Générale'],
+        'classes': ['6ème A', '5ème A', '4ème A', '3ème A', '2nde A', '1ère A', 'Tle A'],
       };
     }
   }

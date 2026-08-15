@@ -9,6 +9,8 @@ import 'supabase_client.dart';
 import '../../features/attendance/data/attendance_repository.dart';
 import '../../features/academics/data/academics_repository.dart';
 import '../../features/finance/data/finance_repository.dart';
+import '../../features/students/data/students_repository.dart';
+import '../../features/dashboard/data/dashboard_stats_repository.dart';
 
 class SyncEngine {
   final SupabaseClient _client;
@@ -53,6 +55,7 @@ class SyncEngine {
     _updateConnectionStatus(results);
     if (isOnlineNotifier.value) {
       triggerSync();
+      preloadAllOfflineData();
     }
   }
 
@@ -64,6 +67,27 @@ class SyncEngine {
     if (isOnlineNotifier.value && wasOffline) {
       debugPrint("🔌 Connection Restored! Starting synchronization...");
       triggerSync();
+      preloadAllOfflineData();
+    }
+  }
+
+  /// Preload and hydrate local Hive cache for offline availability
+  Future<void> preloadAllOfflineData() async {
+    if (!isOnlineNotifier.value) return;
+    try {
+      debugPrint("📦 SyncEngine: Hydrating local Hive cache for offline mode...");
+      await Future.wait([
+        locator<StudentsRepository>().getStudentsList().catchError((_) => <Map<String, dynamic>>[]),
+        locator<DashboardStatsRepository>().getSummary().catchError((_) => <String, dynamic>{}),
+        locator<AcademicsRepository>().getSessions(1).catchError((_) => <Map<String, dynamic>>[]),
+        locator<AcademicsRepository>().getPeriods(1, 1).catchError((_) => <Map<String, dynamic>>[]),
+        locator<AcademicsRepository>().getAllClassesAndSubjects(1).catchError((_) => <Map<String, dynamic>>[]),
+        locator<FinanceRepository>().getStudentFeesList(schoolId: 1, sessionId: 1).catchError((_) => <Map<String, dynamic>>[]),
+      ]);
+      await updateLastSyncTime();
+      debugPrint("✅ SyncEngine: Offline cache hydrated successfully.");
+    } catch (e) {
+      debugPrint("⚠️ SyncEngine: Preload warning: $e");
     }
   }
 
@@ -98,22 +122,54 @@ class SyncEngine {
     isSyncingNotifier.value = true;
     debugPrint("🔄 SyncEngine: Starting sync for ${pending.length} pending operations.");
 
+    int successCount = 0;
+    int failedCount = 0;
+
     try {
-      bool allSuccessful = true;
       for (var op in pending) {
-        final success = await _replayOperation(op);
-        if (success) {
-          await _queueManager.dequeue(op.id);
-        } else {
-          allSuccessful = false;
-          // If an operation fails, stop and retry later to maintain execution order
-          debugPrint("⚠️ SyncEngine: Operation failed. Halting sync queue.");
+        if (!isOnlineNotifier.value) {
+          debugPrint("📵 SyncEngine: Lost connection during sync. Pausing.");
           break;
         }
+
+        try {
+          final success = await _replayOperation(op);
+          if (success) {
+            await _queueManager.dequeue(op.id);
+            successCount++;
+          } else {
+            // Increment retry count — move to DLQ if maxRetries exceeded
+            if (op.retryCount >= OfflineOperation.maxRetries) {
+              debugPrint("☠️ SyncEngine: Operation ${op.id} exceeded max retries. Moving to Dead-Letter Queue.");
+              await _queueManager.moveToDeadLetter(
+                op.id,
+                reason: "Exceeded max retries (${OfflineOperation.maxRetries}). Last error: ${op.lastError ?? 'unknown'}",
+              );
+              failedCount++;
+            } else {
+              await _queueManager.incrementRetry(op.id, error: "Replay returned false");
+              failedCount++;
+              debugPrint("⚠️ SyncEngine: Operation ${op.id} failed (retry ${op.retryCount + 1}/${OfflineOperation.maxRetries}). Continuing with next.");
+            }
+            // ✅ Do NOT break — continue processing the remaining operations
+          }
+        } catch (opError) {
+          debugPrint("❌ SyncEngine: Exception replaying operation ${op.id}: $opError");
+          if (op.retryCount >= OfflineOperation.maxRetries) {
+            await _queueManager.moveToDeadLetter(op.id, reason: opError.toString());
+          } else {
+            await _queueManager.incrementRetry(op.id, error: opError.toString());
+          }
+          failedCount++;
+          // ✅ Continue with next operation — do NOT halt the whole queue
+        }
       }
-      if (allSuccessful) {
+
+      if (failedCount == 0) {
         await updateLastSyncTime();
       }
+
+      debugPrint("🔄 SyncEngine: Sync complete — ✅ $successCount succeeded, ❌ $failedCount failed/deferred.");
     } catch (e) {
       debugPrint("❌ SyncEngine: Unexpected error during sync: $e");
     } finally {

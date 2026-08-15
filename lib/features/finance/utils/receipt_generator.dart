@@ -125,6 +125,7 @@ class ReceiptGenerator {
             );
           } else {
             // Fallback (original simple header)
+            final fallbackSchoolName = headerConfig?['schoolName'] ?? student['school_name'] ?? 'Établissement Scolaire';
             headerWidget = pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -132,16 +133,16 @@ class ReceiptGenerator {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'EDUT PRO',
+                      fallbackSchoolName,
                       style: pw.TextStyle(
                         font: amiriBold,
-                        fontSize: 28,
+                        fontSize: 18,
                         color: primaryColor,
                       ),
                     ),
                     pw.SizedBox(height: 4),
                     pw.Text(
-                      'Systeme de gestion scolaire ERP',
+                      'Système de Gestion Scolaire',
                       style: pw.TextStyle(font: amiriFont, fontSize: 10, color: greyColor),
                     ),
                   ],
@@ -268,20 +269,19 @@ class ReceiptGenerator {
                     ),
                   ],
                 ),
-                pw.SizedBox(height: 30),
-                pw.TableHelper.fromTextArray(
+                       pw.TableHelper.fromTextArray(
                   headers: const [
                     'Description',
-                    'Montant (FCFA)',
-                    'Reduction (FCFA)',
-                    'Total impute (FCFA)',
+                    'Montant',
+                    'Réduction',
+                    'Total imputé',
                   ],
                   data: [
                     [
                       'Frais de scolarite - Periode: $month',
-                      amount.toStringAsFixed(0),
-                      reduction.toStringAsFixed(0),
-                      (amount + reduction).toStringAsFixed(0),
+                      _formatCfa(amount),
+                      _formatCfa(reduction),
+                      _formatCfa(amount + reduction),
                     ],
                   ],
                   headerStyle: pw.TextStyle(
@@ -305,17 +305,17 @@ class ReceiptGenerator {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                       children: [
-                        _buildSummaryRow('Montant verse:', '${amount.toStringAsFixed(0)} FCFA', font: amiriFont, boldFont: amiriBold, isBold: true),
+                        _buildSummaryRow('Montant verse:', _formatCfa(amount), font: amiriFont, boldFont: amiriBold, isBold: true),
                         pw.SizedBox(height: 4),
-                        _buildSummaryRow('Reduction:', '${reduction.toStringAsFixed(0)} FCFA', font: amiriFont, boldFont: amiriBold),
+                        _buildSummaryRow('Reduction:', _formatCfa(reduction), font: amiriFont, boldFont: amiriBold),
                         pw.SizedBox(height: 8),
                         pw.Divider(color: borderGreyColor),
                         pw.SizedBox(height: 4),
-                        _buildSummaryRow('Total attendu:', '${totalExpected.toStringAsFixed(0)} FCFA', font: amiriFont, boldFont: amiriBold),
+                        _buildSummaryRow('Total attendu:', _formatCfa(totalExpected), font: amiriFont, boldFont: amiriBold),
                         pw.SizedBox(height: 4),
                         _buildSummaryRow(
                           'Solde restant:',
-                          '${remainingBalance.toStringAsFixed(0)} FCFA',
+                          _formatCfa(remainingBalance),
                           font: amiriFont,
                           boldFont: amiriBold,
                           isBold: true,
@@ -443,5 +443,10 @@ class ReceiptGenerator {
         ),
       ],
     );
+  }
+
+  static String _formatCfa(double amount) {
+    final formatter = NumberFormat('#,##0', 'fr_FR');
+    return '${formatter.format(amount).replaceAll('\u00A0', ' ').replaceAll('\u202F', ' ')} CFA';
   }
 }

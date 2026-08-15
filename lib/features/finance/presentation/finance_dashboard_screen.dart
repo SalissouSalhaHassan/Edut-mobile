@@ -128,18 +128,49 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     }
   }
 
+  String _clean(dynamic val) {
+    if (val == null) return '';
+    return val
+        .toString()
+        .replaceAll('\u00A0', ' ')
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim()
+        .toLowerCase();
+  }
+
   void _applyFilters() {
-    final query = _searchController.text.toLowerCase().trim();
+    final query = _clean(_searchController.text);
 
     setState(() {
       _filteredFees = _fees.where((fee) {
         final student = fee['students'] as Map<String, dynamic>? ?? {};
-        final name = (student['nom_etudiant'] as String? ?? '').toLowerCase();
-        final code = (student['num_admission'] as String? ?? '').toLowerCase();
-        final matchesSearch = query.isEmpty || name.contains(query) || code.contains(query);
+        final name = _clean(student['nom_etudiant']);
+        final code = _clean(student['num_admission']);
+        final classe = _clean(student['classe']);
+        final level = _clean(student['educational_level']);
 
-        final status = fee['status'] as String? ?? 'Impayé';
-        final matchesStatus = _statusFilter == 'Tous' || status == _statusFilter;
+        final matchesSearch = query.isEmpty ||
+            name.contains(query) ||
+            code.contains(query) ||
+            classe.contains(query) ||
+            level.contains(query);
+
+        final rawStatus = _clean(fee['status']);
+        final targetStatus = _clean(_statusFilter);
+
+        bool matchesStatus = _statusFilter == 'Tous' || targetStatus.isEmpty;
+        if (!matchesStatus) {
+          if (targetStatus.contains('solde') || targetStatus.contains('paye')) {
+            matchesStatus = rawStatus.contains('solde') || rawStatus.contains('paye');
+          } else if (targetStatus.contains('partiel')) {
+            matchesStatus = rawStatus.contains('partiel');
+          } else if (targetStatus.contains('impay') || targetStatus.contains('retard')) {
+            matchesStatus = rawStatus.contains('impay') || rawStatus.contains('retard');
+          } else {
+            matchesStatus = rawStatus == targetStatus;
+          }
+        }
 
         return matchesSearch && matchesStatus;
       }).toList();

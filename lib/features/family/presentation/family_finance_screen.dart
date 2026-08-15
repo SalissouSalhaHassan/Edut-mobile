@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
@@ -8,6 +9,7 @@ import '../../finance/utils/receipt_generator.dart';
 import '../../finance/data/finance_repository.dart';
 import '../data/family_repository.dart';
 import '../data/payment_gateway_service.dart';
+import 'mobile_money_payment_dialog.dart';
 
 class FamilyFinanceScreen extends StatefulWidget {
   const FamilyFinanceScreen({super.key});
@@ -92,6 +94,23 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
     }
   }
 
+  void _openMobileMoneyDialog() {
+    if (_studentId == null) return;
+    final balance = (_summary['totalBalance'] as num?)?.toDouble() ?? 0;
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => MobileMoneyPaymentDialog(
+        studentId: _studentId!,
+        studentName: _studentName,
+        defaultAmount: balance > 0 ? balance : 25000,
+        onPaymentSuccess: (result) {
+          _loadData();
+        },
+      ),
+    );
+  }
+
   Future<void> _shareReceipt(Map<String, dynamic> payment) async {
     final fee = _fees.firstWhere(
       (item) => item['id'] == payment['fee_id'],
@@ -142,7 +161,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text('Finance & Paiements'),
+        title: const Text('Finance & Mobile Money 🇳🇪'),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.slate900,
       ),
@@ -159,6 +178,10 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
                     padding: const EdgeInsets.all(20),
                     children: [
                       _buildSummaryCard(),
+                      const SizedBox(height: 16),
+                      _buildMobileMoneyBanner(),
+                      const SizedBox(height: 16),
+                      _buildDigitalIdCard(),
                       if (_role == 'parent') ...[
                         const SizedBox(height: 16),
                         _buildGatewayCard(),
@@ -171,10 +194,10 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
                       else
                         ..._fees.map(_buildFeeCard),
                       const SizedBox(height: 20),
-                      Text('Recus et paiements', style: AppTextStyles.heading3),
+                      Text('Reçus et paiements', style: AppTextStyles.heading3),
                       const SizedBox(height: 12),
                       if (_payments.isEmpty)
-                        _buildEmptyCard('Aucun paiement enregistre.')
+                        _buildEmptyCard('Aucun paiement enregistré.')
                       else
                         ..._payments.map(_buildPaymentCard),
                     ],
@@ -200,8 +223,151 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
           Row(
             children: [
               Expanded(child: _metric('Attendu', _summary['totalExpected'])),
-              Expanded(child: _metric('Paye', _summary['totalPaid'])),
+              Expanded(child: _metric('Payé', _summary['totalPaid'])),
               Expanded(child: _metric('Reste', _summary['totalBalance'])),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileMoneyBanner() {
+    final balance = (_summary['totalBalance'] as num?)?.toDouble() ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF8B5CF6)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.indigo.withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.smartphone, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Guichet Mobile Money Direct 🇳🇪', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                    Text('Airtel Money, Moov Money, Flooz, Orange & Wave', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 2,
+              ),
+              onPressed: _openMobileMoneyDialog,
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: Text(
+                balance > 0 
+                    ? 'Payer le Solde (${balance.toStringAsFixed(0)} FCFA)' 
+                    : 'Payer via Mobile Money',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDigitalIdCard() {
+    final studentIdStr = _studentId != null ? 'CARD-EDUT-$_studentId' : 'CARD-EDUT-00';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1B4B),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.indigo.shade800),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('CARTE SCOLAIRE NUMÉRIQUE 🪪', style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.w900, fontSize: 11)),
+                  Text('Établissement Scolaire Edut Pro', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFF34D399).withOpacity(0.4)),
+                ),
+                child: const Text('VALIDE', style: TextStyle(color: Color(0xFF6EE7B7), fontWeight: FontWeight.bold, fontSize: 9)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 70,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade900,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.indigo.shade400.withOpacity(0.5)),
+                ),
+                child: const Icon(Icons.person, color: Colors.white54, size: 40),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_studentName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                    const SizedBox(height: 2),
+                    Text('Matricule: $studentIdStr', style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.w700, fontSize: 11)),
+                    const SizedBox(height: 2),
+                    const Text('Niveau: Enseignement Général', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              QrImageView(
+                data: 'https://edut.ne/verify/student/$studentIdStr',
+                version: QrVersions.auto,
+                size: 64,
+                backgroundColor: Colors.white,
+              ),
             ],
           ),
         ],
@@ -227,10 +393,10 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Passerelles de paiement', style: AppTextStyles.bodyBold),
+          Text('Autres passerelles externes', style: AppTextStyles.bodyBold),
           const SizedBox(height: 8),
           const Text(
-            'Lancez une page de paiement compatible Stripe, CinetPay ou un integrateur local.',
+            'Lancez une page de paiement compatible Stripe, CinetPay ou un intégrateur local.',
             style: TextStyle(color: AppColors.slate500, fontSize: 12),
           ),
           const SizedBox(height: 14),
@@ -270,7 +436,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
           Row(
             children: [
               Expanded(child: Text('Attendu: ${expected.toStringAsFixed(0)} F')),
-              Expanded(child: Text('Paye: ${paid.toStringAsFixed(0)} F')),
+              Expanded(child: Text('Payé: ${paid.toStringAsFixed(0)} F')),
               Expanded(child: Text('Reste: ${balance.toStringAsFixed(0)} F')),
             ],
           ),

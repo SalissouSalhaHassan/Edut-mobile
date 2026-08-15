@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../api/supabase_client.dart';
 import '../auth/session_manager.dart';
+import '../api/mobile_api_client.dart';
 
 class AppPermissions {
   static const ownerPlatformView = 'owner.platform.view';
@@ -23,6 +25,10 @@ class AppPermissions {
   static const attendanceManage = 'attendance.manage';
   static const academicsView = 'academics.view';
   static const academicsManage = 'academics.manage';
+  static const saisieNotesView = 'academics.saisieNotes.view';
+  static const saisieNotesEdit = 'academics.saisieNotes.edit';
+  static const gestionDevoirsView = 'academics.gestionDevoirs.view';
+  static const gestionDevoirsEdit = 'academics.gestionDevoirs.edit';
   static const messagingView = 'messaging.view';
   static const messagingManage = 'messaging.manage';
 }
@@ -43,7 +49,7 @@ class PermissionService {
   UserAccessProfile? _cachedProfile;
   String? _cachedCacheKey;
 
-  Future<UserAccessProfile> getCurrentProfile() async {
+  Future<UserAccessProfile> getCurrentProfile({bool forceRefresh = false}) async {
     final role = ((await _sessionManager.getRole()) ?? 'staff')
         .toLowerCase()
         .trim();
@@ -52,19 +58,24 @@ class PermissionService {
         (await _sessionManager.getEmail())?.toLowerCase().trim() ?? '';
     final cacheKey = '$userId|$email|$role';
 
-    if (_cachedProfile != null && _cachedCacheKey == cacheKey) {
+    if (!forceRefresh && _cachedProfile != null && _cachedCacheKey == cacheKey) {
       return _cachedProfile!;
     }
 
-    final sessionPermissions = await _sessionManager.getPermissions();
-    if (sessionPermissions.isNotEmpty) {
-      final profile = UserAccessProfile(
-        role: role,
-        permissions: {..._permissionsForRole(role), ...sessionPermissions},
-      );
-      _cachedProfile = profile;
-      _cachedCacheKey = cacheKey;
-      return profile;
+    try {
+      final apiProfile = await MobileApiClient().getCurrentProfile();
+      if (apiProfile.permissions.isNotEmpty) {
+        await _sessionManager.savePermissions(apiProfile.permissions);
+        final profile = UserAccessProfile(
+          role: apiProfile.role,
+          permissions: apiProfile.permissions.toSet(),
+        );
+        _cachedProfile = profile;
+        _cachedCacheKey = cacheKey;
+        return profile;
+      }
+    } catch (e) {
+      debugPrint('PermissionService Web API lookup error: $e');
     }
 
     try {
@@ -77,15 +88,27 @@ class PermissionService {
       _cachedCacheKey = cacheKey;
       return profile;
     } catch (e) {
-      debugPrint('PermissionService fallback to role mapping: $e');
+      debugPrint('PermissionService DB lookup error: $e');
+    }
+
+    final sessionPermissions = await _sessionManager.getPermissions();
+    if (sessionPermissions.isNotEmpty) {
       final profile = UserAccessProfile(
         role: role,
-        permissions: _permissionsForRole(role),
+        permissions: sessionPermissions.toSet(),
       );
       _cachedProfile = profile;
       _cachedCacheKey = cacheKey;
       return profile;
     }
+
+    final profile = UserAccessProfile(
+      role: role,
+      permissions: _permissionsForRole(role),
+    );
+    _cachedProfile = profile;
+    _cachedCacheKey = cacheKey;
+    return profile;
   }
 
   Future<bool> hasPermission(String permission) async {
@@ -130,25 +153,47 @@ class PermissionService {
 
     final isAdmin = userRecord['admin'] == true;
     final isSuperAdmin = userRecord['super_admin'] == true;
-    final roleId = userRecord['role_id'];
+    var roleId = userRecord['role_id'];
+    final roleNameStr = userRecord['roles']?['role_name']?.toString();
+
     final dbRole = _normalizeRoleName(
-      userRecord['roles']?['role_name']?.toString(),
+      roleNameStr,
       isAdmin: isAdmin,
       isSuperAdmin: isSuperAdmin,
       fallbackRole: fallbackRole,
     );
 
-    var permissions = <String>{..._permissionsForRole(dbRole)};
+    if (roleId == null && roleNameStr != null && roleNameStr.isNotEmpty) {
+      try {
+        final roleRow = await _client
+            .from('roles')
+            .select('id')
+            .ilike('role_name', roleNameStr)
+            .maybeSingle();
+        if (roleRow != null && roleRow['id'] != null) {
+          roleId = roleRow['id'];
+        }
+      } catch (_) {}
+    }
+
+    var permissions = <String>{};
 
     if (roleId != null) {
       final rows = await _client
           .from('role_permissions')
-          .select('module_name, can_view, can_edit, can_delete')
+          .select('module_name, can_view, can_edit, can_delete, field_permissions')
           .eq('role_id', roleId);
 
-      for (final row in List<Map<String, dynamic>>.from(rows)) {
-        permissions.addAll(_mapModulePermissionRow(row));
+      final rowList = List<Map<String, dynamic>>.from(rows);
+      if (rowList.isNotEmpty) {
+        for (final row in rowList) {
+          permissions.addAll(_mapModulePermissionRow(row));
+        }
+      } else {
+        permissions = <String>{..._permissionsForRole(dbRole)};
       }
+    } else {
+      permissions = <String>{..._permissionsForRole(dbRole)};
     }
 
     return UserAccessProfile(role: dbRole, permissions: permissions);
@@ -165,13 +210,16 @@ class PermissionService {
 
     if (userId != null && userId.isNotEmpty) {
       try {
-        final byId = await _client
-            .from('users')
-            .select(select)
-            .eq('id', int.parse(userId))
-            .maybeSingle();
-        if (byId != null) {
-          return byId;
+        final parsedId = int.tryParse(userId);
+        if (parsedId != null) {
+          final byId = await _client
+              .from('users')
+              .select(select)
+              .eq('id', parsedId)
+              .maybeSingle();
+          if (byId != null) {
+            return byId;
+          }
         }
       } catch (_) {}
     }
@@ -221,11 +269,9 @@ class PermissionService {
     required bool isSuperAdmin,
     required String fallbackRole,
   }) {
-    if (isSuperAdmin) return 'super_admin';
-    if (isAdmin) return 'admin';
-
     final role = (roleName ?? fallbackRole).toLowerCase().trim();
-    if (role.contains('owner') || role.contains('propriet')) return 'owner';
+
+    if (role.contains('super') || isSuperAdmin) return 'super_admin';
     if (role.contains('teacher') ||
         role.contains('enseignant') ||
         role.contains('professeur')) {
@@ -239,6 +285,9 @@ class PermissionService {
     }
     if (role.contains('secret')) return 'secretary';
     if (role.contains('personnel') || role == 'hr') return 'personnel';
+    if (role.contains('owner') || role.contains('propriet')) return 'owner';
+    if (role.contains('admin') || isAdmin) return 'admin';
+
     return role.isEmpty ? fallbackRole : role;
   }
 
@@ -321,6 +370,31 @@ class PermissionService {
     ])) {
       if (canView) permissions.add(AppPermissions.academicsView);
       if (canEdit || canDelete) permissions.add(AppPermissions.academicsManage);
+
+      // Parse sub-permissions / field_permissions JSON column
+      final rawFieldPerms = row['field_permissions'];
+      Map<String, dynamic>? fieldPerms;
+      if (rawFieldPerms != null) {
+        try {
+          fieldPerms = rawFieldPerms is String
+              ? jsonDecode(rawFieldPerms) as Map<String, dynamic>
+              : Map<String, dynamic>.from(rawFieldPerms as Map);
+        } catch (_) {}
+      }
+
+      final snConfig = fieldPerms?['saisieNotes'];
+      final snView = (snConfig?['view'] as bool?) ?? canView;
+      final snEdit = (snConfig?['edit'] as bool?) ?? canEdit;
+
+      if (snView) permissions.add(AppPermissions.saisieNotesView);
+      if (snEdit) permissions.add(AppPermissions.saisieNotesEdit);
+
+      final gdConfig = fieldPerms?['gestionDevoirs'];
+      final gdView = (gdConfig?['view'] as bool?) ?? canView;
+      final gdEdit = (gdConfig?['edit'] as bool?) ?? canEdit;
+
+      if (gdView) permissions.add(AppPermissions.gestionDevoirsView);
+      if (gdEdit) permissions.add(AppPermissions.gestionDevoirsEdit);
     }
 
     if (_matchesModule(moduleName, const [
@@ -368,6 +442,10 @@ class PermissionService {
         AppPermissions.attendanceManage,
         AppPermissions.academicsView,
         AppPermissions.academicsManage,
+        AppPermissions.saisieNotesView,
+        AppPermissions.saisieNotesEdit,
+        AppPermissions.gestionDevoirsView,
+        AppPermissions.gestionDevoirsEdit,
         AppPermissions.messagingView,
         AppPermissions.messagingManage,
       };
@@ -392,6 +470,10 @@ class PermissionService {
         AppPermissions.attendanceManage,
         AppPermissions.academicsView,
         AppPermissions.academicsManage,
+        AppPermissions.saisieNotesView,
+        AppPermissions.saisieNotesEdit,
+        AppPermissions.gestionDevoirsView,
+        AppPermissions.gestionDevoirsEdit,
         AppPermissions.messagingView,
         AppPermissions.messagingManage,
       };
@@ -417,7 +499,10 @@ class PermissionService {
         AppPermissions.attendanceView,
         AppPermissions.attendanceManage,
         AppPermissions.academicsView,
-        AppPermissions.academicsManage,
+        AppPermissions.saisieNotesView,
+        AppPermissions.saisieNotesEdit,
+        AppPermissions.gestionDevoirsView,
+        AppPermissions.gestionDevoirsEdit,
         AppPermissions.messagingView,
         AppPermissions.messagingManage,
       };

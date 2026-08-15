@@ -48,13 +48,18 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
   }
 
   Future<void> _load() async {
-    final profile = await locator<PermissionService>().getCurrentProfile();
     setState(() => _isLoading = true);
 
-    final students = await _repository.getStudentsForExam(
-      classId: widget.exam['class_id'] as int,
-    );
-    final results = await _repository.getExamResults(_examId);
+    final classId = widget.exam['class_id'] as int;
+    final futures = await Future.wait([
+      locator<PermissionService>().getCurrentProfile(),
+      _repository.getStudentsForExam(classId: classId),
+      _repository.getExamResults(_examId),
+    ]);
+
+    final profile = futures[0] as dynamic;
+    final students = futures[1] as List<Map<String, dynamic>>;
+    final results = futures[2] as List<Map<String, dynamic>>;
 
     for (final controller in _marksControllers.values) {
       controller.dispose();

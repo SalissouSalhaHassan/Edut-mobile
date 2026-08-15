@@ -36,30 +36,32 @@ class StudentMetrics {
 }
 
 String getAppreciation(double average, List<Map<String, dynamic>> scale) {
-  if (scale.isEmpty) {
-    // Default fallback scales matching usual French grading system
-    if (average >= 16) return "Excellent";
-    if (average >= 14) return "Très Bien";
-    if (average >= 12) return "Bien";
-    if (average >= 10) return "Assez Bien / Passable";
-    if (average >= 8) return "Insuffisant";
-    return "Médiocre";
-  }
+  if (scale.isNotEmpty) {
+    final sortedScale = List<Map<String, dynamic>>.from(scale);
+    sortedScale.sort((a, b) {
+      final aScore = (a['base_score'] as num?)?.toDouble() ?? 0.0;
+      final bScore = (b['base_score'] as num?)?.toDouble() ?? 0.0;
+      return bScore.compareTo(aScore);
+    });
 
-  final sortedScale = List<Map<String, dynamic>>.from(scale);
-  sortedScale.sort((a, b) {
-    final aScore = (a['base_score'] as num?)?.toDouble() ?? 0.0;
-    final bScore = (b['base_score'] as num?)?.toDouble() ?? 0.0;
-    return bScore.compareTo(aScore);
-  });
-
-  for (var item in sortedScale) {
-    final baseScore = (item['base_score'] as num?)?.toDouble() ?? 0.0;
-    if (average >= baseScore) {
-      return item['name'] as String? ?? 'Insuffisant';
+    for (var item in sortedScale) {
+      final baseScore = (item['base_score'] as num?)?.toDouble() ?? 0.0;
+      if (average >= baseScore) {
+        final name = item['name']?.toString() ?? item['appreciation']?.toString();
+        if (name != null && name.isNotEmpty && name.toLowerCase() != 'nul' && name.toLowerCase() != 'null') {
+          return name;
+        }
+      }
     }
   }
-  return "Insuffisant";
+
+  // Standard fallback scales matching French system
+  if (average >= 16) return "Excellent";
+  if (average >= 14) return "Très Bien";
+  if (average >= 12) return "Bien";
+  if (average >= 10) return "Passable";
+  if (average >= 8) return "Insuffisant";
+  return "Médiocre";
 }
 
 Map<int, int> calculateRanks(List<Map<String, dynamic>> studentsList) {

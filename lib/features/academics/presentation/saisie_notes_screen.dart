@@ -44,6 +44,8 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
   String _selectedSessionName = '';
   String _selectedPeriodName = '';
   bool _isHigherEd = false;
+  bool _isEditable = true;
+  String? _lockReason;
   double _coefficient = 1.0;
   int _schoolId = 1; // stored to reuse in period/session changes
 
@@ -73,37 +75,47 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final profile = await locator<PermissionService>().getCurrentProfile();
+    final profile = await locator<PermissionService>().getCurrentProfile(forceRefresh: true);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _canManageAcademics = profile.permissions.contains(AppPermissions.saisieNotesEdit);
     });
 
     try {
       final sessionManager = locator<SessionManager>();
-      final employeeIdStr = await sessionManager.getEmployeeId();
-      final employeeId = int.tryParse(employeeIdStr ?? '');
       
-      // Default schoolId fallback
-      int schoolId = 1;
-      if (employeeId != null) {
-        final client = SupabaseClientManager().client;
-        final List<dynamic> empInfo = await client
-            .from('employees')
-            .select('school_id')
-            .eq('id', employeeId);
-        if (empInfo.isNotEmpty && empInfo.first['school_id'] != null) {
-          schoolId = empInfo.first['school_id'] as int;
-          _schoolId = schoolId; // store in state
-          debugPrint("✅ schoolId from employee: $schoolId");
+      // Retrieve schoolId directly from SessionManager
+      final schoolIdStr = await sessionManager.getSchoolId();
+      int schoolId = int.tryParse(schoolIdStr ?? '') ?? 1;
+      _schoolId = schoolId;
+      debugPrint("✅ schoolId from session: $schoolId");
+
+      // Fallback: If not found or defaults to 1, try querying database
+      if (schoolId == 1) {
+        final employeeIdStr = await sessionManager.getEmployeeId();
+        final employeeId = int.tryParse(employeeIdStr ?? '');
+        if (employeeId != null) {
+          try {
+            final client = SupabaseClientManager().client;
+            final List<dynamic> empInfo = await client
+                .from('employees')
+                .select('school_id')
+                .eq('id', employeeId);
+            if (empInfo.isNotEmpty && empInfo.first['school_id'] != null) {
+              schoolId = empInfo.first['school_id'] as int;
+              _schoolId = schoolId; // store in state
+              debugPrint("✅ schoolId from employee DB: $schoolId");
+            }
+          } catch (e) {
+            debugPrint("⚠️ Failed to lookup schoolId in Supabase DB: $e");
+          }
         }
       }
 
       // Fetch sessions and grading scales
       _sessions = await _repository.getSessions(schoolId);
       _gradingScale = await _repository.getGradingScale();
-      _canManageAcademics =
-          profile.permissions.contains(AppPermissions.academicsManage);
       
       debugPrint("📋 Sessions found: ${_sessions.length}");
 
@@ -118,7 +130,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         debugPrint("✅ Active session: [$_selectedSessionId] $_selectedSessionName");
 
         // Fetch periods for this session
-        _periods = await _repository.getPeriods(schoolId, _selectedSessionId!);
+        _periods = await _repository.getPeriods(schoolId, _selectedSessionId!, classId: widget.classId);
         debugPrint("📋 Periods found: ${_periods.length}");
         
         if (_periods.isNotEmpty) {
@@ -164,8 +176,13 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
       );
 
       if (result['success'] == true) {
-        _students = List<Map<String, dynamic>>.from(result['data']);
+        final List rawData = result['data'] is List ? (result['data'] as List) : [];
+        _students = rawData
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         _filteredStudents = _students;
+        _isEditable = result['is_editable'] as bool? ?? true;
+        _lockReason = result['lock_reason'] as String?;
         _isHigherEd = ["Licence", "Master", "Doctorat", "Supérieur", "Université"]
             .contains(result['level']);
         _coefficient = (result['coefficient'] as num?)?.toDouble() ?? 1.0;
@@ -396,6 +413,73 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
     }
   }
 
+  void _showExtensionDialog() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.assignment_late_outlined, color: AppColors.warning),
+              SizedBox(width: 8),
+              Text("Demande de dérogation", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "La période est actuellement verrouillée. Vous pouvez transmettre une demande de réouverture à la direction.",
+                style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.slate600),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: "Motif / Raison (optionnel)",
+                  hintText: "Ex: Retard d'évaluation pour raisons médicales...",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Annuler"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                if (_selectedSessionId != null) {
+                  final res = await _repository.requestPeriodExtension(
+                    sessionId: _selectedSessionId!,
+                    term: _selectedPeriodName,
+                    reason: reasonController.text.trim(),
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res['message'] ?? 'Demande transmise avec succès !'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: const Text("Envoyer la demande"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showPeriodSelector() {
     showModalBottomSheet(
       context: context,
@@ -423,9 +507,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                           child: Text(s['session_name'] as String),
                         );
                       }).toList(),
-                      onChanged: !_canManageAcademics
-                          ? null
-                          : (val) async {
+                      onChanged: (val) async {
                         if (val == null) return;
                         final selected = _sessions.firstWhere((s) => s['id'] == val);
                         setModalState(() {
@@ -435,7 +517,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                         });
                         
                         // Load new periods using the correct schoolId
-                        final pList = await _repository.getPeriods(_schoolId, val);
+                        final pList = await _repository.getPeriods(_schoolId, val, classId: widget.classId);
                         setModalState(() {
                           _periods = pList;
                           if (_periods.isNotEmpty) {
@@ -455,9 +537,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                             child: Text(p['name'] as String),
                           );
                         }).toList(),
-                        onChanged: !_canManageAcademics
-                            ? null
-                            : (val) {
+                        onChanged: (val) {
                           if (val == null) return;
                           setModalState(() {
                             _selectedPeriodName = val;
@@ -554,7 +634,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.tune, color: AppColors.primary),
-            onPressed: _canManageAcademics ? _showPeriodSelector : null,
+            onPressed: _showPeriodSelector,
             tooltip: 'Période académique',
           ),
         ],
@@ -605,6 +685,45 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
 
           // Overview Stats Panel
           _buildStatsPanel(stats),
+
+          // Lock Banner if Period is Locked or Read-Only
+          if (!_isEditable || !_canManageAcademics)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.shade600),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_clock, color: Colors.amber.shade900, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _lockReason ?? (!_canManageAcademics 
+                          ? 'Mode lecture seule (Droits d\'édition désactivés).'
+                          : 'Période verrouillée : La date limite de saisie des notes est dépassée.'),
+                      style: TextStyle(
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _showExtensionDialog,
+                    icon: const Icon(Icons.send_rounded, size: 14, color: AppColors.primary),
+                    label: const Text(
+                      "Dérogation",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Search Bar
           Padding(
@@ -670,7 +789,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         child: SafeArea(
           child: ElevatedButton(
             onPressed:
-                _isSaving || !_canManageAcademics ? null : _saveGrades,
+                _isSaving || !_canManageAcademics || !_isEditable ? null : _saveGrades,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -848,7 +967,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                         const SizedBox(height: 6),
                         TextField(
                           controller: _classWorkControllers[studentId],
-                          enabled: _canManageAcademics,
+                          enabled: _canManageAcademics && _isEditable,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
                             hintText: "--",
@@ -882,7 +1001,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                       const SizedBox(height: 6),
                       TextField(
                         controller: _examControllers[studentId],
-                        enabled: _canManageAcademics,
+                        enabled: _canManageAcademics && _isEditable,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
                           hintText: "--",
@@ -943,7 +1062,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                   ],
                 ),
                 TextButton.icon(
-                  onPressed: _canManageAcademics
+                  onPressed: _canManageAcademics && _isEditable
                       ? () => _showObservationDialog(studentId, name)
                       : null,
                   icon: Icon(

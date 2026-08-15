@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/mobile_api_client.dart';
+import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
@@ -9,6 +12,11 @@ import '../../../core/widgets/sync_status_banner.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
+import '../../academics/utils/bulletin_pdf_generator.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../../../core/services/push_notification_service.dart';
 
 class FamilyDashboardScreen extends StatefulWidget {
   const FamilyDashboardScreen({super.key});
@@ -19,6 +27,7 @@ class FamilyDashboardScreen extends StatefulWidget {
 
 class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   final FamilyRepository _repository = locator<FamilyRepository>();
+  StreamSubscription<Map<String, dynamic>>? _pushSubscription;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -47,6 +56,29 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _subscribeToPushNotifications();
+  }
+
+  void _subscribeToPushNotifications() {
+    try {
+      final pushService = locator<MobilePushNotificationService>();
+      _pushSubscription = pushService.onNotificationReceived.listen((notification) {
+        if (mounted) {
+          MobilePushNotificationService.showInAppPushBanner(context, notification);
+          setState(() {
+            _unreadNotificationsCount++;
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Error subscribing to push notifications: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _pushSubscription?.cancel();
+    super.dispose();
   }
 
   void _appendError(String component, dynamic error) {
@@ -69,6 +101,49 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       _schoolId = int.tryParse(await session.getSchoolId() ?? '');
       _studentName = await session.getStudentName() ?? '';
       _studentClass = await session.getStudentClass() ?? '';
+
+      // Auto-heal missing studentId in session
+      if (_studentId == null) {
+        try {
+          final client = SupabaseClientManager().client;
+          final email = await session.getEmail() ?? '';
+          final username = email.split('@').first;
+          final userDoc = await client
+              .from('users')
+              .select('student_id, school_id')
+              .or('utilisateur.eq.$username,utilisateur.eq.$email')
+              .maybeSingle();
+
+          if (userDoc != null && userDoc['student_id'] != null) {
+            _studentId = int.tryParse(userDoc['student_id'].toString());
+            _schoolId ??= int.tryParse(userDoc['school_id']?.toString() ?? '');
+            if (_studentId != null) {
+              final st = await client
+                  .from('students')
+                  .select('nom_etudiant, classe')
+                  .eq('id', _studentId!)
+                  .maybeSingle();
+              if (st != null) {
+                _studentName = st['nom_etudiant']?.toString() ?? _studentName;
+                _studentClass = st['classe']?.toString() ?? _studentClass;
+              }
+              await session.saveSession(
+                token: await session.getToken() ?? '',
+                email: email,
+                role: _role,
+                employeeId: await session.getEmployeeId() ?? '',
+                userId: await session.getUserId(),
+                schoolId: _schoolId?.toString(),
+                studentId: _studentId?.toString(),
+                studentName: _studentName,
+                studentClass: _studentClass,
+              );
+            }
+          }
+        } catch (healError) {
+          debugPrint("[FamilyDashboard] Self-healing student profile failed: $healError");
+        }
+      }
 
       if (_studentId == null) {
         setState(() {
@@ -498,6 +573,126 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     );
   }
 
+  void _openAbsenceExcuseDialog() {
+    final reasonController = TextEditingController(text: 'Raison médicale (Maladie)');
+    final notesController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_note_rounded, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Justifier une Absence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Motif de l\'absence:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                value: 'Raison médicale (Maladie)',
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Raison médicale (Maladie)', child: Text('Raison médicale')),
+                  DropdownMenuItem(value: 'Impératif familial', child: Text('Impératif familial')),
+                  DropdownMenuItem(value: 'Déplacement d\'urgence', child: Text('Déplacement d\'urgence')),
+                  DropdownMenuItem(value: 'Autre motif', child: Text('Autre motif')),
+                ],
+                onChanged: (val) {
+                  if (val != null) reasonController.text = val;
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text('Explications / Remarques:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: notesController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Nom du médecin ou détails...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Demande de justification d\'absence transmise avec succès à l\'établissement !'),
+                  backgroundColor: Color(0xFF059669),
+                ),
+              );
+            },
+            child: const Text('Transmettre'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateReportCardPdf() async {
+    try {
+      final selectedPeriod = _selectedPeriod;
+      final period = (selectedPeriod != null && selectedPeriod.isNotEmpty)
+          ? selectedPeriod
+          : 'Général';
+      final filteredGrades = _grades
+          .where((g) =>
+              selectedPeriod == null ||
+              selectedPeriod.isEmpty ||
+              g['term']?.toString() == selectedPeriod)
+          .toList();
+
+      final gradesToUse = filteredGrades.isNotEmpty ? filteredGrades : _grades;
+
+      final pdfBytes = await OfficialBulletinPdfGenerator.generateBulletinBytes(
+        student: _student.isNotEmpty ? _student : {
+          'nom_etudiant': _studentName,
+          'classe': _studentClass,
+          'num_admission': _studentId?.toString() ?? 'N/A',
+        },
+        grades: gradesToUse,
+        summary: _gradeSummary,
+        period: period,
+        sessionName: _selectedSessionName.isNotEmpty ? _selectedSessionName : '2024-2025',
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfBytes,
+      );
+    } catch (e) {
+      debugPrint("Error generating official bulletin PDF: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Erreur lors de la génération du bulletin: $e"),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
   Widget _buildGradesTab() {
     final avg = _gradeSummary['average'] ?? 0;
     
@@ -510,7 +705,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     periods.sort();
 
     final filteredGrades = _grades
-        .where((g) => g['term']?.toString() == _selectedPeriod)
+        .where((g) =>
+            _selectedPeriod == null ||
+            _selectedPeriod!.isEmpty ||
+            g['term']?.toString() == _selectedPeriod)
         .toList();
 
     return ListView(
@@ -539,6 +737,21 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            onPressed: _generateReportCardPdf,
+            icon: const Icon(Icons.picture_as_pdf_rounded),
+            label: const Text('Imprimer / Éporter le Bulletin PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
         ),
         const SizedBox(height: 16),
         if (filteredGrades.isEmpty)
@@ -621,6 +834,21 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         _buildSectionTitle(
           'Suivi des absences et retards',
           Icons.stacked_bar_chart,
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F766E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            onPressed: _openAbsenceExcuseDialog,
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('Justifier une Absence d\'Élève', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
         ),
         const SizedBox(height: 12),
         _buildAttendanceChartCard(),

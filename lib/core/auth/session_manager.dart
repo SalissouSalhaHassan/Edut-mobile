@@ -1,12 +1,13 @@
 import 'dart:convert';
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:crypto/crypto.dart';
 
 class SessionManager {
   final _storage = const FlutterSecureStorage();
 
   static const String _keyToken = 'auth_token';
   static const String _keyEmail = 'auth_email';
+  static const String _keyPasswordHash = 'auth_password_hash';
   static const String _keyRole = 'auth_role';
   static const String _keyEmployeeId = 'auth_employee_id';
   static const String _keySchoolId = 'auth_school_id';
@@ -21,6 +22,7 @@ class SessionManager {
     required String email,
     required String role,
     required String employeeId,
+    String? password,
     String? userId,
     String? schoolId,
     String? studentId,
@@ -29,7 +31,11 @@ class SessionManager {
     List<String>? permissions,
   }) async {
     await _storage.write(key: _keyToken, value: token);
-    await _storage.write(key: _keyEmail, value: email);
+    await _storage.write(key: _keyEmail, value: email.toLowerCase().trim());
+    if (password != null && password.isNotEmpty) {
+      final hash = sha256.convert(utf8.encode(password)).toString();
+      await _storage.write(key: _keyPasswordHash, value: hash);
+    }
     await _storage.write(key: _keyRole, value: role);
     await _storage.write(key: _keyEmployeeId, value: employeeId);
     if (userId != null) {
@@ -68,6 +74,14 @@ class SessionManager {
       await _storage.read(key: _keyStudentName);
   Future<String?> getStudentClass() async =>
       await _storage.read(key: _keyStudentClass);
+
+  Future<void> savePermissions(List<String> permissions) async {
+    await _storage.write(
+      key: _keyPermissions,
+      value: jsonEncode(permissions),
+    );
+  }
+
   Future<List<String>> getPermissions() async {
     final rawValue = await _storage.read(key: _keyPermissions);
     if (rawValue == null || rawValue.isEmpty) return const [];
@@ -82,14 +96,36 @@ class SessionManager {
     return const [];
   }
 
+  Future<bool> validateOfflineCredentials(String email, String password) async {
+    final cachedEmail = await getEmail();
+    if (cachedEmail == null || cachedEmail.isEmpty) return false;
+
+    final normalizedInput = email.toLowerCase().trim();
+    final inputUsername = normalizedInput.split('@').first;
+    final cachedUsername = cachedEmail.toLowerCase().split('@').first;
+
+    final emailMatches = normalizedInput == cachedEmail || inputUsername == cachedUsername;
+    if (!emailMatches) return false;
+
+    final cachedHash = await _storage.read(key: _keyPasswordHash);
+    if (cachedHash == null || cachedHash.isEmpty) {
+      // If no password hash stored yet but email matches cached user on device, allow offline login
+      return true;
+    }
+
+    final inputHash = sha256.convert(utf8.encode(password)).toString();
+    return cachedHash == inputHash;
+  }
+
   Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null;
+    return token != null && token.isNotEmpty;
   }
 
   Future<void> clearSession() async {
     await _storage.delete(key: _keyToken);
     await _storage.delete(key: _keyEmail);
+    await _storage.delete(key: _keyPasswordHash);
     await _storage.delete(key: _keyRole);
     await _storage.delete(key: _keyEmployeeId);
     await _storage.delete(key: _keyUserId);

@@ -3,6 +3,7 @@ import 'core/di/injection.dart';
 import 'core/api/sync_engine.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,9 @@ void main() async {
 
   // Start Offline Sync Engine
   locator<SyncEngine>().start();
+
+  // Initialize Mobile Push Notifications Service
+  await locator<MobilePushNotificationService>().initialize();
 
   runApp(const MyApp());
 }

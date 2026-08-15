@@ -15,6 +15,8 @@ import '../../academics/data/academics_repository.dart';
 import '../../exams/data/exams_repository.dart';
 import '../data/dashboard_stats_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
+import 'dart:async';
+import '../../../core/services/push_notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,6 +26,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  StreamSubscription<Map<String, dynamic>>? _pushSubscription;
   String _userEmail = '';
   String _userRole = 'staff';
   bool _isLoading = true;
@@ -169,6 +172,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadUserInfo();
+    _subscribeToPushNotifications();
+  }
+
+  void _subscribeToPushNotifications() {
+    try {
+      final pushService = locator<MobilePushNotificationService>();
+      _pushSubscription = pushService.onNotificationReceived.listen((notification) {
+        if (mounted) {
+          MobilePushNotificationService.showInAppPushBanner(context, notification);
+          setState(() {
+            _unreadNotificationsCount++;
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Error subscribing to push notifications in Dashboard: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _pushSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserInfo() async {

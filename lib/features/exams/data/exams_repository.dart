@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/api/mobile_api_client.dart';
+import '../../../core/api/offline_store_manager.dart';
+import '../../../core/api/sync_engine.dart';
+import '../../../core/di/injection.dart';
 
 class ExamsRepository {
   final MobileApiClient _apiClient;
@@ -7,19 +10,44 @@ class ExamsRepository {
   ExamsRepository({MobileApiClient? apiClient})
       : _apiClient = apiClient ?? MobileApiClient();
 
+  OfflineStoreManager get _cacheManager => locator<OfflineStoreManager>();
+  SyncEngine get _syncEngine => locator<SyncEngine>();
+
   // ─────────────────────────────────────────────────────────────────────────
   //  LIST & FORM OPTIONS
   // ─────────────────────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getExamsList() async {
+    const cacheKey = 'exams_list';
+
+    // 1. If offline, immediately return cached list
+    if (!_syncEngine.isOnlineNotifier.value) {
+      return _cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
+    }
+
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/exams?action=getExamsList',
       );
-      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      
+      // Update cache in background
+      await _cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+        data: list,
+      );
+
+      return list;
     } catch (e) {
       debugPrint('Error fetching exams list: $e');
-      return [];
+      return _cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
     }
   }
 
@@ -59,14 +87,34 @@ class ExamsRepository {
 
   /// Fetch all results for a specific exam (admin / teacher use).
   Future<List<Map<String, dynamic>>> getExamResults(int examId) async {
+    final cacheKey = 'exam_results_$examId';
+
+    if (!_syncEngine.isOnlineNotifier.value) {
+      return _cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
+    }
+
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/exams?action=getExamResults&examId=$examId',
       );
-      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      
+      await _cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+        data: list,
+      );
+
+      return list;
     } catch (e) {
       debugPrint('Error fetching exam results: $e');
-      return [];
+      return _cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
     }
   }
 
@@ -139,6 +187,17 @@ class ExamsRepository {
           },
         },
       );
+
+      // Update cached results immediately
+      if (response['success'] == true) {
+        final cacheKey = 'exam_results_$examId';
+        await _cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudentResults,
+          key: cacheKey,
+          data: results,
+        );
+      }
+
       return response;
     } catch (e) {
       debugPrint('Error saving batch exam results: $e');
@@ -153,14 +212,34 @@ class ExamsRepository {
   Future<List<Map<String, dynamic>>> getStudentsForExam({
     required int classId,
   }) async {
+    final cacheKey = 'students_exam_$classId';
+
+    if (!_syncEngine.isOnlineNotifier.value) {
+      return _cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
+    }
+
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/exams?action=getStudentsForExam&classId=$classId',
       );
-      return List<Map<String, dynamic>>.from(response['data'] ?? []);
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+
+      await _cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+        data: list,
+      );
+
+      return list;
     } catch (e) {
       debugPrint('Error fetching students for exam: $e');
-      return [];
+      return _cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
     }
   }
 

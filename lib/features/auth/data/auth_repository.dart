@@ -27,7 +27,7 @@ class AuthRepository {
     MobileApiClient? mobileApiClient,
   }) : _client = client ?? SupabaseClientManager().client,
        _sessionManager = sessionManager ?? SessionManager(),
-       _mobileApiClient = mobileApiClient ?? MobileApiClient();
+        _mobileApiClient = mobileApiClient ?? MobileApiClient();
 
   Future<Map<String, dynamic>?> _resolveStudentProfile({
     required String role,
@@ -63,10 +63,31 @@ class AuthRepository {
       }
     }
 
+    // 1. First priority: Direct student_id from users table
+    final directStudentId = userData?['student_id'];
+    if (directStudentId != null) {
+      final directStudent = await queryStudentByField('id', directStudentId);
+      if (directStudent != null) return directStudent;
+    }
+
+    // 2. Secondary check: Query users table if userData didn't include student_id
+    try {
+      final userRow = await _client
+          .from('users')
+          .select('student_id, school_id')
+          .or('utilisateur.eq.$username,utilisateur.eq.$loginEmail')
+          .maybeSingle();
+      if (userRow != null && userRow['student_id'] != null) {
+        final directStudent = await queryStudentByField('id', userRow['student_id']);
+        if (directStudent != null) return directStudent;
+      }
+    } catch (_) {}
+
     if (normalizedRole == 'student') {
       final candidates = <Future<Map<String, dynamic>?>>[
         queryStudentByField('num_admission', username),
         queryStudentByField('num_admission', username.toUpperCase()),
+        queryStudentByField('num_admission', loginEmail),
         queryStudentByField('mobile', username),
         queryStudentByField('whatsapp', username),
       ];
@@ -221,6 +242,7 @@ class AuthRepository {
           email: canonicalProfile.email.isNotEmpty
               ? canonicalProfile.email
               : loginEmail,
+          password: password,
           role: canonicalProfile.role,
           employeeId: canonicalProfile.employeeId ?? '',
           userId: canonicalProfile.userId,
@@ -251,7 +273,7 @@ class AuthRepository {
           userId: response.session!.user.id,
           email: loginEmail,
           select:
-              'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, roles(role_name)',
+              'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, student_id, roles(role_name)',
         );
 
         debugPrint("DEBUG LOGIN: Profile data fetched: $userData");
@@ -300,7 +322,7 @@ class AuthRepository {
             userId: response.session!.user.id,
             email: loginEmail,
             select:
-                'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id',
+                'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, student_id',
           );
 
           debugPrint("DEBUG LOGIN: Fallback profile data: $userData");
@@ -405,6 +427,7 @@ class AuthRepository {
       await _sessionManager.saveSession(
         token: response.session!.accessToken,
         email: loginEmail,
+        password: password,
         role: role,
         employeeId: employeeId,
         userId: userData?['id']?.toString(),
@@ -426,11 +449,21 @@ class AuthRepository {
           'Veuillez confirmer cet email avant de vous connecter.',
         );
       }
+      final isOfflineValid = await _sessionManager.validateOfflineCredentials(email, password);
+      if (isOfflineValid) {
+        debugPrint("DEBUG LOGIN: Offline login validation succeeded!");
+        return const LoginResult.success();
+      }
       return LoginResult.failure('Erreur d\'authentification: ${e.message}');
     } catch (e, stack) {
       debugPrint("DEBUG LOGIN: Unexpected error during login: $e\n$stack");
+      final isOfflineValid = await _sessionManager.validateOfflineCredentials(email, password);
+      if (isOfflineValid) {
+        debugPrint("DEBUG LOGIN: Offline login validation succeeded after network error!");
+        return const LoginResult.success();
+      }
       return const LoginResult.failure(
-        'Problème de connexion. Vérifiez internet puis réessayez.',
+        'Mode hors-ligne: Aucun compte valide trouvé en cache pour ces identifiants.',
       );
     }
   }

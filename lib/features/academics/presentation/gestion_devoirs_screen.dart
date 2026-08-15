@@ -41,6 +41,8 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
   int? _selectedSessionId;
   String _selectedSessionName = '';
   String _selectedPeriodName = '';
+  bool _isEditable = true;
+  String? _lockReason;
   int _schoolId = 1;
 
   final TextEditingController _searchController = TextEditingController();
@@ -66,10 +68,11 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final profile = await locator<PermissionService>().getCurrentProfile();
+    final profile = await locator<PermissionService>().getCurrentProfile(forceRefresh: true);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _canManageAcademics = profile.permissions.contains(AppPermissions.gestionDevoirsEdit);
     });
 
     try {
@@ -93,8 +96,6 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
 
       // Fetch sessions
       _sessions = await _repository.getSessions(schoolId);
-      _canManageAcademics =
-          profile.permissions.contains(AppPermissions.academicsManage);
 
       if (_sessions.isNotEmpty) {
         // Find active session
@@ -106,7 +107,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         _selectedSessionName = activeSession['session_name'] as String;
 
         // Fetch periods
-        _periods = await _repository.getPeriods(schoolId, _selectedSessionId!);
+        _periods = await _repository.getPeriods(schoolId, _selectedSessionId!, classId: widget.classId);
         if (_periods.isNotEmpty) {
           final activePeriod = _periods.firstWhere(
             (p) => p['is_active'] == true,
@@ -145,7 +146,12 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       );
 
       if (result['success'] == true) {
-        _students = List<Map<String, dynamic>>.from(result['data']);
+        _isEditable = result['is_editable'] as bool? ?? true;
+        _lockReason = result['lock_reason'] as String?;
+        final List rawData = result['data'] is List ? (result['data'] as List) : [];
+        _students = rawData
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         _filteredStudents = _students;
 
         // Initialize controllers for devoirs
@@ -288,6 +294,73 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     }
   }
 
+  void _showExtensionDialog() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.assignment_late_outlined, color: AppColors.warning),
+              SizedBox(width: 8),
+              Text("Demande de dérogation", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "La période est actuellement verrouillée. Vous pouvez transmettre une demande de réouverture à la direction.",
+                style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.slate600),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: "Motif / Raison (optionnel)",
+                  hintText: "Ex: Retard d'évaluation pour raisons médicales...",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Annuler"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                if (_selectedSessionId != null) {
+                  final res = await _repository.requestPeriodExtension(
+                    sessionId: _selectedSessionId!,
+                    term: _selectedPeriodName,
+                    reason: reasonController.text.trim(),
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res['message'] ?? 'Demande transmise avec succès !'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: const Text("Envoyer la demande"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showPeriodSelector() {
     showModalBottomSheet(
       context: context,
@@ -315,9 +388,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                           child: Text(s['session_name'] as String),
                         );
                       }).toList(),
-                      onChanged: !_canManageAcademics
-                          ? null
-                          : (val) async {
+                      onChanged: (val) async {
                         if (val == null) return;
                         final selected = _sessions.firstWhere((s) => s['id'] == val);
                         setModalState(() {
@@ -327,7 +398,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                         });
                         
                         // Load new periods using the correct schoolId
-                        final pList = await _repository.getPeriods(_schoolId, val);
+                        final pList = await _repository.getPeriods(_schoolId, val, classId: widget.classId);
                         setModalState(() {
                           _periods = pList;
                           if (_periods.isNotEmpty) {
@@ -347,9 +418,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                             child: Text(p['name'] as String),
                           );
                         }).toList(),
-                        onChanged: !_canManageAcademics
-                            ? null
-                            : (val) {
+                        onChanged: (val) {
                           if (val == null) return;
                           setModalState(() {
                             _selectedPeriodName = val;
@@ -403,7 +472,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.tune, color: AppColors.primary),
-            onPressed: _canManageAcademics ? _showPeriodSelector : null,
+            onPressed: _showPeriodSelector,
             tooltip: 'Période académique',
           ),
         ],
@@ -451,6 +520,45 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
               ],
             ),
           ),
+
+          // Lock Banner if Period is Locked or Read-Only
+          if (!_isEditable || !_canManageAcademics)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.shade600),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_clock, color: Colors.amber.shade900, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _lockReason ?? (!_canManageAcademics 
+                          ? 'Mode lecture seule (Droits d\'édition désactivés).'
+                          : 'Période verrouillée : La date limite de saisie des devoirs est dépassée.'),
+                      style: TextStyle(
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _showExtensionDialog,
+                    icon: const Icon(Icons.send_rounded, size: 14, color: AppColors.primary),
+                    label: const Text(
+                      "Dérogation",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Search Bar
           Padding(
@@ -514,7 +622,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         child: SafeArea(
           child: ElevatedButton(
             onPressed:
-                _isSaving || !_canManageAcademics ? null : _saveDevoirs,
+                _isSaving || !_canManageAcademics || !_isEditable ? null : _saveDevoirs,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -618,7 +726,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                     margin: const EdgeInsets.only(right: 8),
                     child: TextField(
                       controller: _devoirControllers[studentId]?[index],
-                      enabled: _canManageAcademics,
+                      enabled: _canManageAcademics && _isEditable,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),

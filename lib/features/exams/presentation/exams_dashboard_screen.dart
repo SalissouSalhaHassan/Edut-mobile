@@ -38,10 +38,14 @@ class _ExamsDashboardScreenState extends State<ExamsDashboardScreen> {
   }
 
   Future<void> _load() async {
-    final profile = await locator<PermissionService>().getCurrentProfile();
     setState(() => _isLoading = true);
-    final exams = await _repository.getExamsList();
+    final results = await Future.wait([
+      locator<PermissionService>().getCurrentProfile(),
+      _repository.getExamsList(),
+    ]);
     if (!mounted) return;
+    final profile = results[0] as dynamic;
+    final exams = results[1] as List<Map<String, dynamic>>;
     setState(() {
       _canManageExams =
           profile.permissions.contains(AppPermissions.examsManage);

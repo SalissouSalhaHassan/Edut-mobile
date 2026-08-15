@@ -98,6 +98,20 @@ class MessagingRepository {
     }
   }
 
+  /// Register device push token with the backend server.
+  Future<bool> registerPushToken(String token, {String deviceType = 'Flutter/Mobile'}) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/push-token', {
+        'pushToken': token,
+        'deviceType': deviceType,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('Error registering push token: $e');
+      return false;
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   //  MESSAGING DASHBOARD (staff / teacher / admin only)
   // ─────────────────────────────────────────────────────────────────────────
