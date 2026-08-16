@@ -1481,7 +1481,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   Widget _buildAttendanceCard(Map<String, dynamic> row) {
     final status = row['status'] as String? ?? 'Présent';
-    final date = row['date'] as String? ?? '';
+    final rawDate = row['date'] as String? ?? '';
     final remark = row['remark'] as String? ?? 'Aucune remarque';
     final subject = row['school_subjects']?['subject_name'] ?? 'Général';
     final color = status.toLowerCase().contains('retard')
@@ -1489,6 +1489,17 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         : status.toLowerCase().contains('abs')
         ? AppColors.danger
         : AppColors.success;
+
+    String displayDate = rawDate;
+    if (rawDate.isNotEmpty) {
+      try {
+        final parsed = DateTime.tryParse(rawDate);
+        if (parsed != null) {
+          displayDate = DateFormat('dd/MM/yyyy à HH:mm').format(parsed.toLocal());
+        }
+      } catch (_) {}
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1510,7 +1521,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               children: [
                 Text('$status • $subject', style: AppTextStyles.bodyBold),
                 const SizedBox(height: 4),
-                Text(date, style: AppTextStyles.caption),
+                Text(displayDate.isNotEmpty ? displayDate : 'Date non définie', style: AppTextStyles.caption),
                 const SizedBox(height: 4),
                 Text(remark, style: AppTextStyles.caption),
               ],
