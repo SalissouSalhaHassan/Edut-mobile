@@ -138,6 +138,33 @@ class MobileApiClient {
       final errorMsg = e.response?.data?['error']?.toString() ?? 'Erreur lors de l\'inscription.';
       throw MobileApiException(errorMsg);
     }
+  Future<Map<String, dynamic>> resetPassword({
+    required String role,
+    required String schoolSlug,
+    required String matriculeOrEmail,
+    required String verificationCodeOrPhone,
+    String? newPassword,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/mobile/forgot-password',
+        data: {
+          'role': role,
+          'schoolSlug': schoolSlug,
+          'matriculeOrEmail': matriculeOrEmail,
+          'verificationCodeOrPhone': verificationCodeOrPhone,
+          if (newPassword != null && newPassword.isNotEmpty) 'newPassword': newPassword,
+        },
+      );
+      final body = response.data;
+      if (body == null || body['success'] != true) {
+        throw MobileApiException(body?['error']?.toString() ?? 'Erreur lors de la réinitialisation.');
+      }
+      return Map<String, dynamic>.from(body['data'] as Map);
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data?['error']?.toString() ?? 'Erreur lors de la réinitialisation.';
+      throw MobileApiException(errorMsg);
+    }
   }
 
   Future<Map<String, dynamic>> getJson(String path) async {

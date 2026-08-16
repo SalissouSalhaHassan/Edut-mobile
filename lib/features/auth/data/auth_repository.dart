@@ -523,6 +523,29 @@ class AuthRepository {
     }
   }
 
+  Future<Map<String, dynamic>?> resetPassword({
+    required String role,
+    required String schoolSlug,
+    required String matriculeOrEmail,
+    required String verificationCodeOrPhone,
+    String? newPassword,
+  }) async {
+    try {
+      final data = await _mobileApiClient.resetPassword(
+        role: role,
+        schoolSlug: schoolSlug,
+        matriculeOrEmail: matriculeOrEmail,
+        verificationCodeOrPhone: verificationCodeOrPhone,
+        newPassword: newPassword,
+      );
+      return data;
+    } on MobileApiException catch (e) {
+      throw e.message;
+    } catch (e) {
+      throw e.toString();
+    }
+  }
+
   Future<void> logout() async {
     await _client.auth.signOut();
     await _sessionManager.clearSession();

@@ -173,6 +173,28 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               validator: Validators.validatePassword,
                             ),
+                            const SizedBox(height: 6),
+
+                            // Forgot Password Button
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () => context.push('/forgot-password'),
+                                child: const Text(
+                                  'Mot de passe oublié ?',
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
                             const SizedBox(height: 12),
 
                             // Error display
