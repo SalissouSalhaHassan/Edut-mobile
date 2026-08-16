@@ -13,6 +13,7 @@ import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
+import '../../academics/utils/timetable_pdf_generator.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -492,7 +493,31 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         children: [
           _buildHeroCard(),
           const SizedBox(height: 24),
-          _buildSectionTitle('Programme du jour', Icons.today),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildSectionTitle('Programme du jour', Icons.today),
+              if (_timetable.isNotEmpty)
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F766E),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    backgroundColor: const Color(0xFFCCFBF1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    TimetablePdfGenerator.printOrShareTimetable(
+                      student: _student,
+                      timetableEntries: _timetable,
+                      className: _studentClass,
+                      sessionName: _selectedSessionName.isNotEmpty ? _selectedSessionName : '2025-2026',
+                    );
+                  },
+                  icon: const Icon(Icons.print_rounded, size: 16),
+                  label: const Text('Imprimer PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
           if (todayCourses.isEmpty)
             _buildEmptyCard('Aucun cours planifié pour aujourd’hui.')
