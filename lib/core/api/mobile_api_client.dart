@@ -138,6 +138,8 @@ class MobileApiClient {
       final errorMsg = e.response?.data?['error']?.toString() ?? 'Erreur lors de l\'inscription.';
       throw MobileApiException(errorMsg);
     }
+  }
+
   Future<Map<String, dynamic>> resetPassword({
     required String role,
     required String schoolSlug,
