@@ -28,6 +28,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
   int? _studentId;
   int? _schoolId;
   String _studentName = '';
+  String _studentClass = '—';
   String _role = 'student';
 
   List<Map<String, dynamic>> _fees = [];
@@ -57,6 +58,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
       _studentId = int.tryParse(await session.getStudentId() ?? '');
       _schoolId = int.tryParse(await session.getSchoolId() ?? '');
       _studentName = await session.getStudentName() ?? 'Eleve';
+      _studentClass = await session.getStudentClass() ?? '—';
 
       if (_studentId == null) {
         setState(() {

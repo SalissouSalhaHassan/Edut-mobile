@@ -418,7 +418,7 @@ class ReceiptGenerator {
                     height: isA5 ? 56 : 70,
                     decoration: pw.BoxDecoration(
                       shape: pw.BoxShape.circle,
-                      border: pw.Border.all(color: darkNavy.withOpacity(0.35), width: 1.2),
+                      border: pw.Border.all(color: const PdfColor(0.06, 0.09, 0.16, 0.35), width: 1.2),
                     ),
                     child: pw.Center(
                       child: pw.Container(
@@ -426,13 +426,13 @@ class ReceiptGenerator {
                         height: isA5 ? 46 : 58,
                         decoration: pw.BoxDecoration(
                           shape: pw.BoxShape.circle,
-                          border: pw.Border.all(color: darkNavy.withOpacity(0.35), width: 0.8),
+                          border: pw.Border.all(color: const PdfColor(0.06, 0.09, 0.16, 0.35), width: 0.8),
                         ),
                         child: pw.Center(
                           child: pw.Text(
                             '★ ${school.toUpperCase()} ★\nSERVICE SCOLARITÉ',
                             textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 4 : 5, color: darkNavy.withOpacity(0.4)),
+                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 4 : 5, color: const PdfColor(0.06, 0.09, 0.16, 0.45)),
                           ),
                         ),
                       ),
