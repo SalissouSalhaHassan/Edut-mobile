@@ -119,6 +119,18 @@ class OfficialBulletinPdfGenerator {
     final address = headerConfig?['address']?.toString() ?? '';
     final phone = headerConfig?['phone']?.toString() ?? '';
 
+    if (stage == EducationalStage.universite) {
+      return _generateUniversityReleveBytes(
+        student: student,
+        grades: grades,
+        summary: summary,
+        period: period,
+        sessionName: sessionName,
+        headerConfig: headerConfig,
+        amiriBold: amiriBold,
+      );
+    }
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -173,6 +185,440 @@ class OfficialBulletinPdfGenerator {
 
               // 6. Signatures and Official Seals
               _buildSignaturesBlock(stage),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  //  OFFICIAL UNIVERSITY RELEVE DE NOTES (LMD) - EXACT MATCH WITH WEB
+  // ───────────────────────────────────────────────────────────────────────────
+  static Future<Uint8List> _generateUniversityReleveBytes({
+    required Map<String, dynamic> student,
+    required List<Map<String, dynamic>> grades,
+    required Map<String, dynamic> summary,
+    required String period,
+    required String sessionName,
+    Map<String, dynamic>? headerConfig,
+    required pw.Font amiriBold,
+  }) async {
+    final pdf = pw.Document();
+
+    final studentName = student['nom_etudiant']?.toString() ?? 'Sans Nom';
+    final matricule = student['num_admission']?.toString() ??
+        student['matricule']?.toString() ??
+        'N/A';
+    final className = student['classe']?.toString() ?? 'Classe';
+    final rawDob = student['date_naissance']?.toString() ?? '-';
+    final rawPob = student['lieu_naissance']?.toString() ?? '-';
+    final birthInfo = rawPob != '-' ? '$rawDob à $rawPob' : rawDob;
+
+    // School Header Logos
+    pw.MemoryImage? leftLogoImage;
+    if (headerConfig?['leftLogo'] != null &&
+        headerConfig!['leftLogo'].toString().startsWith('data:image/')) {
+      try {
+        final base64Str = headerConfig['leftLogo'].toString().split(',').last;
+        leftLogoImage = pw.MemoryImage(base64.decode(base64Str));
+      } catch (_) {}
+    }
+
+    final schoolName = headerConfig?['schoolName']?.toString() ?? 'UNIVERSITÉ EXCELLENCE';
+    final country = headerConfig?['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
+    final ministry = headerConfig?['ministry']?.toString() ??
+        'MINISTÈRE DE L\'ENSEIGNEMENT SUPÉRIEUR ET DE LA RECHERCHE';
+    final address = headerConfig?['address']?.toString() ?? '';
+    final phone = headerConfig?['phone']?.toString() ?? '';
+
+    // Split grades into Semestre 1 and Semestre 2
+    final s1Grades = <Map<String, dynamic>>[];
+    final s2Grades = <Map<String, dynamic>>[];
+
+    for (final g in grades) {
+      final term = (g['term']?.toString() ?? '').toLowerCase();
+      if (term.contains('2') || term.contains('s2') || term.contains('f2')) {
+        s2Grades.add(g);
+      } else {
+        s1Grades.add(g);
+      }
+    }
+
+    // Mention helper
+    String getMention(double avg) {
+      if (avg >= 18) return 'Excellent';
+      if (avg >= 16) return 'Très Bien';
+      if (avg >= 14) return 'Bien';
+      if (avg >= 12) return 'Assez Bien';
+      if (avg >= 10) return 'Passable';
+      return 'Ajourné';
+    }
+
+    // Decision helper
+    String getDecision(double avg) {
+      if (avg < 10) return 'Ajourné';
+      if (avg >= 18) return 'Admis avec la mention Excellent';
+      if (avg >= 16) return 'Admis avec la mention Très Bien';
+      if (avg >= 14) return 'Admis avec la mention Bien';
+      if (avg >= 12) return 'Admis avec la mention Assez Bien';
+      if (avg >= 10) return 'Admis avec la mention Passable';
+      return 'Ajourné';
+    }
+
+    // Helper to build Semester Table
+    pw.Widget buildSemesterTable(String semesterTitle, List<Map<String, dynamic>> semesterGrades, String sfx) {
+      double totalPoints = 0.0;
+      int totalCredits = 0;
+
+      final rows = semesterGrades.map((g) {
+        final subName = g['subject_name']?.toString() ?? 'Matière';
+        final subCode = g['subject_code']?.toString() ??
+            ('${subName.substring(0, subName.length >= 4 ? 4 : subName.length).toUpperCase()} $sfx');
+        final score = (g['total_score'] as num?)?.toDouble() ??
+            (g['exam_score'] as num?)?.toDouble() ??
+            (g['cc_score'] as num?)?.toDouble() ??
+            0.0;
+        final credits = (g['credits'] as num?)?.toInt() ?? (g['coef'] as num?)?.toInt() ?? 4;
+        final mention = getMention(score);
+
+        totalPoints += (score * credits);
+        totalCredits += credits;
+
+        final scoreColor = score >= 16
+            ? PdfColors.green800
+            : (score >= 10 ? PdfColors.blue800 : PdfColors.red800);
+
+        return [
+          subCode,
+          subName,
+          credits.toString(),
+          score.toStringAsFixed(2),
+          mention,
+          scoreColor,
+        ];
+      }).toList();
+
+      final semesterAvg = totalCredits > 0 ? (totalPoints / totalCredits) : 0.0;
+      final semesterDecision = getDecision(semesterAvg);
+
+      const headerBg = PdfColor(0.824, 0.902, 0.824); // #D2E6D2
+      const borderColor = PdfColors.black;
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Center(
+            child: pw.Text(
+              semesterTitle,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.black),
+            ),
+          ),
+          pw.SizedBox(height: 3),
+          pw.Table(
+            border: pw.TableBorder.all(color: borderColor, width: 0.5),
+            columnWidths: const {
+              0: pw.FlexColumnWidth(1.4),
+              1: pw.FlexColumnWidth(3.8),
+              2: pw.FlexColumnWidth(1.1),
+              3: pw.FlexColumnWidth(1.3),
+              4: pw.FlexColumnWidth(1.5),
+            },
+            children: [
+              // Header Row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: headerBg),
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(3),
+                    child: pw.Text('Code', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(3),
+                    child: pw.Text('Matières', textAlign: pw.TextAlign.left, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(3),
+                    child: pw.Text('Crédits', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(3),
+                    child: pw.Text('Notes/20', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(3),
+                    child: pw.Text('Mention', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  ),
+                ],
+              ),
+              // Data Rows
+              if (rows.isEmpty)
+                pw.TableRow(
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text('Aucune note saisie pour ce semestre', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(6),
+                      child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                    ),
+                  ],
+                )
+              else
+                ...rows.map(
+                  (r) => pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 3),
+                        child: pw.Text(r[0] as String, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 3),
+                        child: pw.Text(r[1] as String, style: const pw.TextStyle(fontSize: 7.5)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 3),
+                        child: pw.Text(r[2] as String, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 3),
+                        child: pw.Text(
+                          r[3] as String,
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: r[5] as PdfColor),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 3),
+                        child: pw.Text(r[4] as String, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                      ),
+                    ],
+                  ),
+                ),
+              // Total Row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColor(0.92, 0.96, 0.92)),
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('TOTAL', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text(totalCredits.toString(), textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text(totalPoints.toStringAsFixed(2), textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                ],
+              ),
+              // Moyenne Row
+              pw.TableRow(
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('Moyenne Semestrielle', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text(rows.isNotEmpty ? semesterAvg.toStringAsFixed(2) : '—', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8, color: semesterAvg >= 10 ? PdfColors.green800 : PdfColors.red800)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                ],
+              ),
+              // Decision Row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColor(0.85, 0.93, 0.85)),
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('DECISION DU JURY', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text(rows.isNotEmpty ? semesterDecision : '—', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: semesterAvg >= 10 ? PdfColors.green900 : PdfColors.red900)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    final qrData = 'RELEVE: $studentName | MATRICULE: $matricule | PARCOURS: $className | SESSION: $sessionName';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // 1. Header (School & Republic)
+              _buildHeader(
+                country: country,
+                ministry: ministry,
+                schoolName: schoolName,
+                address: address,
+                phone: phone,
+                sessionName: sessionName,
+                logo: leftLogoImage,
+                amiriBold: amiriBold,
+              ),
+
+              pw.SizedBox(height: 6),
+
+              // 2. Green Title Bar: RELEVE DE NOTES
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                decoration: const pw.BoxDecoration(
+                  color: PdfColor(0.824, 0.902, 0.824), // #D2E6D2
+                ),
+                child: pw.Center(
+                  child: pw.Text(
+                    'RELEVE DE NOTES',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 11,
+                      color: const PdfColor(0.0, 0.2, 0.0), // dark green
+                    ),
+                  ),
+                ),
+              ),
+
+              pw.SizedBox(height: 6),
+
+              // 3. Student Info Section & QR Code
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(
+                          children: [
+                            pw.Text('Etudiant: ', style: const pw.TextStyle(fontSize: 8.5)),
+                            pw.Text(studentName.toUpperCase(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                            pw.SizedBox(width: 14),
+                            pw.Text('Né(e) le : ', style: const pw.TextStyle(fontSize: 8.5)),
+                            pw.Text(birthInfo, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                          ],
+                        ),
+                        pw.SizedBox(height: 2.5),
+                        pw.Row(
+                          children: [
+                            pw.Text('Matricule: ', style: const pw.TextStyle(fontSize: 8.5)),
+                            pw.Text(matricule, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                          ],
+                        ),
+                        pw.SizedBox(height: 2.5),
+                        pw.Row(
+                          children: [
+                            pw.Text('Parcours: ', style: const pw.TextStyle(fontSize: 8.5)),
+                            pw.Text(className, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                          ],
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Row(
+                          children: [
+                            pw.Text('Première session  ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                            pw.Text(sessionName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.Container(
+                    width: 44,
+                    height: 44,
+                    child: pw.BarcodeWidget(
+                      barcode: pw.Barcode.qrCode(),
+                      data: qrData,
+                    ),
+                  ),
+                ],
+              ),
+
+              pw.SizedBox(height: 6),
+
+              // 4. Semestre 1 Table
+              buildSemesterTable('SEMESTRE 1', s1Grades, '1'),
+
+              pw.SizedBox(height: 8),
+
+              // 5. Semestre 2 Table
+              buildSemesterTable('SEMESTRE 2', s2Grades, '2'),
+
+              pw.Spacer(),
+
+              // 6. Signature: Le Doyen
+              pw.Center(
+                child: pw.Text(
+                  'Le Doyen',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                ),
+              ),
+
+              pw.SizedBox(height: 10),
+
+              // 7. Footer Notice
+              pw.Center(
+                child: pw.Text(
+                  'Il ne sera pas délivré de duplicata de ce relevé. Il vous appartient d\'en faire des copies et de les faire certifier conformes.',
+                  style: const pw.TextStyle(fontSize: 6.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700),
+                ),
+              ),
             ],
           );
         },
