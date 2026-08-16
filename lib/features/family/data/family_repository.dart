@@ -101,6 +101,28 @@ class FamilyRepository {
     }
   }
 
+  Future<bool> justifyAbsence({
+    required int studentId,
+    required String reason,
+    String? notes,
+  }) async {
+    try {
+      final res = await _apiClient.postJson(
+        '/api/mobile/family/attendance',
+        {
+          'studentId': studentId,
+          'reason': reason,
+          'notes': notes ?? '',
+          'date': DateTime.now().toIso8601String(),
+        },
+      );
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint("Error submitting absence justification: $e");
+      return false;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getHomework({
     required String className,
   }) async {

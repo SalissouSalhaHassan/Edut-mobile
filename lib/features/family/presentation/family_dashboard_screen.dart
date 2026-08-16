@@ -611,78 +611,99 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   void _openAbsenceExcuseDialog() {
     final reasonController = TextEditingController(text: 'Raison médicale (Maladie)');
     final notesController = TextEditingController();
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.edit_note_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Justifier une Absence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
             children: [
-              const Text('Motif de l\'absence:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: 'Raison médicale (Maladie)',
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Raison médicale (Maladie)', child: Text('Raison médicale')),
-                  DropdownMenuItem(value: 'Impératif familial', child: Text('Impératif familial')),
-                  DropdownMenuItem(value: 'Déplacement d\'urgence', child: Text('Déplacement d\'urgence')),
-                  DropdownMenuItem(value: 'Autre motif', child: Text('Autre motif')),
-                ],
-                onChanged: (val) {
-                  if (val != null) reasonController.text = val;
-                },
-              ),
-              const SizedBox(height: 12),
-              const Text('Explications / Remarques:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: notesController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Nom du médecin ou détails...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
+              Icon(Icons.edit_note_rounded, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('Justifier une Absence', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Demande de justification d\'absence transmise avec succès à l\'établissement !'),
-                  backgroundColor: Color(0xFF059669),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Motif de l\'absence:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: reasonController.text,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Raison médicale (Maladie)', child: Text('Raison médicale (Maladie)')),
+                    DropdownMenuItem(value: 'Impératif familial', child: Text('Impératif familial')),
+                    DropdownMenuItem(value: 'Déplacement d\'urgence', child: Text('Déplacement d\'urgence')),
+                    DropdownMenuItem(value: 'Autre motif légitime', child: Text('Autre motif légitime')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => reasonController.text = val);
+                  },
                 ),
-              );
-            },
-            child: const Text('Transmettre'),
+                const SizedBox(height: 12),
+                const Text('Explications / Remarques:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Précisez les détails ou le nom du praticien...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F766E),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (_studentId == null) return;
+                      setDialogState(() => isSubmitting = true);
+                      final ok = await _repository.justifyAbsence(
+                        studentId: _studentId!,
+                        reason: reasonController.text,
+                        notes: notesController.text,
+                      );
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? 'Justification d\'absence transmise à l\'administration !'
+                                : 'Erreur lors de la transmission du justificatif.'),
+                            backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
+                          ),
+                        );
+                        _loadAttendance();
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Transmettre'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -888,11 +909,97 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               label: const Text('Justifier une Absence d\'Élève', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _buildAttendanceChartCard(),
           const SizedBox(height: 16),
           if (_attendance.isEmpty)
-            _buildEmptyCard('Aucun enregistrement de présence disponible.')
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: _cardDecoration(),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFA7F3D0), width: 2),
+                    ),
+                    child: const Icon(Icons.verified_rounded, color: Color(0xFF059669), size: 30),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Excellente Assiduité Scolaire 🎓',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'L\'élève ${_studentName.isNotEmpty ? _studentName : "inscrit"} est à jour et ne présente aucune absence injustifiée ni retard.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Text('100%', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF059669), fontSize: 14)),
+                              SizedBox(height: 2),
+                              Text('Présence', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Text('0 h', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A), fontSize: 14)),
+                              SizedBox(height: 2),
+                              Text('Manquées', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Text('Exemplaire', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF4F46E5), fontSize: 12)),
+                              SizedBox(height: 2),
+                              Text('Discipline', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
           else
             ..._attendance.take(50).map(_buildAttendanceCard),
         ],
@@ -1093,40 +1200,46 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   Widget _buildAttendanceChartCard() {
     final summary = _attendanceSummary;
+    final totalIncidents = summary['justified']! + summary['unjustified']! + summary['late']!;
+    final attendanceRate = totalIncidents == 0 ? 100 : (100 - (summary['unjustified']! * 4 + summary['late']! * 2)).clamp(40, 100);
+
     final sections = [
-      PieChartSectionData(
-        value: summary['justified']!.toDouble(),
-        title: 'Abs. just.',
-        color: AppColors.info,
-        radius: 58,
-        titleStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
+      if (summary['justified']! > 0)
+        PieChartSectionData(
+          value: summary['justified']!.toDouble(),
+          title: 'Just.',
+          color: AppColors.info,
+          radius: 54,
+          titleStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      PieChartSectionData(
-        value: summary['unjustified']!.toDouble(),
-        title: 'Abs. non just.',
-        color: AppColors.danger,
-        radius: 62,
-        titleStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
+      if (summary['unjustified']! > 0)
+        PieChartSectionData(
+          value: summary['unjustified']!.toDouble(),
+          title: 'Non just.',
+          color: AppColors.danger,
+          radius: 58,
+          titleStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      PieChartSectionData(
-        value: summary['late']!.toDouble(),
-        title: 'Retards',
-        color: AppColors.warning,
-        radius: 54,
-        titleStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
+      if (summary['late']! > 0)
+        PieChartSectionData(
+          value: summary['late']!.toDouble(),
+          title: 'Retard',
+          color: AppColors.warning,
+          radius: 50,
+          titleStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
     ];
 
     return Container(
@@ -1135,20 +1248,75 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Répartition des incidents', style: AppTextStyles.bodyBold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Répartition des incidents', style: AppTextStyles.bodyBold),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: attendanceRate >= 90
+                      ? const Color(0xFF10B981).withOpacity(0.15)
+                      : const Color(0xFFF59E0B).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Assiduité: $attendanceRate%',
+                  style: TextStyle(
+                    color: attendanceRate >= 90 ? const Color(0xFF059669) : const Color(0xFFD97706),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           SizedBox(
-            height: 220,
+            height: 180,
             child: Row(
               children: [
                 Expanded(
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 36,
-                      sections: sections,
-                    ),
-                  ),
+                  child: totalIncidents == 0
+                      ? Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const SizedBox(
+                                width: 110,
+                                height: 110,
+                                child: CircularProgressIndicator(
+                                  value: 1.0,
+                                  strokeWidth: 9,
+                                  backgroundColor: Color(0xFFE2E8F0),
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                                ),
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    '100%',
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF0F172A)),
+                                  ),
+                                  Text(
+                                    'Assidu',
+                                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        )
+                      : PieChart(
+                          PieChartData(
+                            sectionsSpace: 2,
+                            centerSpaceRadius: 32,
+                            sections: sections,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
