@@ -132,10 +132,12 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
     await ReceiptGenerator.generateAndShare(
       student: {
         'nom_etudiant': _studentName,
+        'classe': _studentClass,
       },
       payment: payment,
       totalExpected: (fee['total_expected'] as num?)?.toDouble() ?? 0,
       remainingBalance: (fee['balance'] as num?)?.toDouble() ?? 0,
+      allPayments: _payments,
       headerConfig: headerConfig,
     );
   }

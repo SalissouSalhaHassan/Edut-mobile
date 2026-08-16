@@ -113,11 +113,16 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
         }
       }
 
+      final allPaymentsList = _currentFee['payments'] != null
+          ? List<Map<String, dynamic>>.from(_currentFee['payments'])
+          : null;
+
       await ReceiptGenerator.generateAndPrint(
         student: student,
         payment: payment,
         totalExpected: expected,
         remainingBalance: balance,
+        allPayments: allPaymentsList,
         headerConfig: headerConfig,
       );
     } catch (e) {
