@@ -54,7 +54,12 @@ class AppRouter {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => LoginScreen(
+          initialUsername: state.extra as String?,
+        ),
+      ),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
       GoRoute(

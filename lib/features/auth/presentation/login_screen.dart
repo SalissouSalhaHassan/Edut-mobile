@@ -9,7 +9,8 @@ import '../../../core/auth/session_manager.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? initialUsername;
+  const LoginScreen({super.key, this.initialUsername});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -23,6 +24,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialUsername != null && widget.initialUsername!.isNotEmpty) {
+      _emailController.text = widget.initialUsername!;
+    }
+  }
 
   @override
   void dispose() {

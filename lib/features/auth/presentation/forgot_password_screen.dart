@@ -190,7 +190,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.go('/login');
+              context.go('/login', extra: username);
             },
             child: const Text(
               'Aller à la connexion',

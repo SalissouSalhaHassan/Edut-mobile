@@ -218,10 +218,72 @@ class AuthRepository {
     debugPrint("DEBUG LOGIN: Attempting login for $loginEmail");
 
     try {
-      final response = await _client.auth.signInWithPassword(
-        email: loginEmail,
-        password: password,
-      );
+      var effectiveEmail = loginEmail;
+      AuthResponse? response;
+
+      try {
+        response = await _client.auth.signInWithPassword(
+          email: effectiveEmail,
+          password: password,
+        );
+      } catch (initialErr) {
+        debugPrint("DEBUG LOGIN: Initial sign in failed with $effectiveEmail: $initialErr. Checking resolution...");
+
+        // If user typed an email (e.g. almou@gmail.com) but their Supabase account is username@test.com
+        try {
+          final emp = await _client
+              .from('employees')
+              .select('id')
+              .or('email.eq.$normalizedEmail,mobile.eq.$normalizedEmail')
+              .maybeSingle();
+          if (emp != null) {
+            final userRow = await _client
+                .from('users')
+                .select('utilisateur')
+                .eq('employee_id', emp['id'])
+                .maybeSingle();
+            if (userRow != null && userRow['utilisateur'] != null) {
+              final resolved = userRow['utilisateur'].toString().trim().toLowerCase();
+              effectiveEmail = resolved.contains('@') ? resolved : '$resolved@test.com';
+              debugPrint("DEBUG LOGIN: Resolved employee user to $effectiveEmail, retrying sign-in...");
+              response = await _client.auth.signInWithPassword(
+                email: effectiveEmail,
+                password: password,
+              );
+            }
+          }
+        } catch (_) {}
+
+        if (response == null) {
+          try {
+            final std = await _client
+                .from('students')
+                .select('id')
+                .or('num_admission.eq.$normalizedEmail,mobile.eq.$normalizedEmail,whatsapp.eq.$normalizedEmail')
+                .maybeSingle();
+            if (std != null) {
+              final userRow = await _client
+                  .from('users')
+                  .select('utilisateur')
+                  .eq('student_id', std['id'])
+                  .maybeSingle();
+              if (userRow != null && userRow['utilisateur'] != null) {
+                final resolved = userRow['utilisateur'].toString().trim().toLowerCase();
+                effectiveEmail = resolved.contains('@') ? resolved : '$resolved@test.com';
+                debugPrint("DEBUG LOGIN: Resolved student user to $effectiveEmail, retrying sign-in...");
+                response = await _client.auth.signInWithPassword(
+                  email: effectiveEmail,
+                  password: password,
+                );
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (response == null) {
+          rethrow;
+        }
+      }
 
       if (response.session == null) {
         debugPrint("DEBUG LOGIN: Session was null");
