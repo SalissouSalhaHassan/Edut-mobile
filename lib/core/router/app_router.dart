@@ -312,10 +312,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => const GuardedScreen(
-          permission: AppPermissions.messagingView,
-          child: NotificationsScreen(),
-        ),
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/messaging',
