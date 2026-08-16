@@ -863,36 +863,40 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   }
 
   Widget _buildAttendanceTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        _buildSectionTitle(
-          'Suivi des absences et retards',
-          Icons.stacked_bar_chart,
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F766E),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            onPressed: _openAbsenceExcuseDialog,
-            icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('Justifier une Absence d\'Élève', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          _buildSectionTitle(
+            'Suivi des absences et retards',
+            Icons.stacked_bar_chart,
           ),
-        ),
-        const SizedBox(height: 12),
-        _buildAttendanceChartCard(),
-        const SizedBox(height: 16),
-        if (_attendance.isEmpty)
-          _buildEmptyCard('Aucun enregistrement de présence disponible.')
-        else
-          ..._attendance.take(20).map(_buildAttendanceCard),
-      ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F766E),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onPressed: _openAbsenceExcuseDialog,
+              icon: const Icon(Icons.edit_note_rounded),
+              label: const Text('Justifier une Absence d\'Élève', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildAttendanceChartCard(),
+          const SizedBox(height: 16),
+          if (_attendance.isEmpty)
+            _buildEmptyCard('Aucun enregistrement de présence disponible.')
+          else
+            ..._attendance.take(50).map(_buildAttendanceCard),
+        ],
+      ),
     );
   }
 
