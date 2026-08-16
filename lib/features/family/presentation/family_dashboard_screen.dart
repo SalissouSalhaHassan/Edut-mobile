@@ -243,12 +243,22 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   Future<void> _loadAttendance() async {
     if (_studentId == null) return;
-    _attendance = await _repository.getAttendance(studentId: _studentId!);
+    final res = await _repository.getAttendance(studentId: _studentId!);
+    if (mounted) {
+      setState(() {
+        _attendance = res;
+      });
+    }
   }
 
   Future<void> _loadHomework() async {
     if (_studentClass.isEmpty) return;
-    _homework = await _repository.getHomework(className: _studentClass);
+    final res = await _repository.getHomework(className: _studentClass);
+    if (mounted) {
+      setState(() {
+        _homework = res;
+      });
+    }
   }
 
   Future<void> _changeSession(int? sessionId) async {
