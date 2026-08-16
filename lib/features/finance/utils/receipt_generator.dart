@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -16,8 +16,10 @@ class ReceiptGenerator {
     required double remainingBalance,
     List<Map<String, dynamic>>? allPayments,
     Map<String, dynamic>? headerConfig,
+    PdfPageFormat pageFormat = PdfPageFormat.a5,
   }) async {
     final pdf = pw.Document();
+    final isA5 = pageFormat == PdfPageFormat.a5;
 
     // Load custom fonts to support Arabic/Unicode text
     final amiriFont = await PdfGoogleFonts.amiriRegular();
@@ -58,13 +60,13 @@ class ReceiptGenerator {
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
+        pageFormat: pageFormat,
+        margin: pw.EdgeInsets.all(isA5 ? 16 : 26),
         build: (context) {
           const darkNavy = PdfColor.fromInt(0xFF0F172A);
           const primaryIndigo = PdfColor.fromInt(0xFF4F46E5);
           const emeraldGreen = PdfColor.fromInt(0xFF10B981);
-          const textColor = PdfColor.fromInt(0xFF1E293B);
+          const royalBlue = PdfColor.fromInt(0xFF2563EB);
           const greyColor = PdfColor.fromInt(0xFF64748B);
           const lightBorder = PdfColor.fromInt(0xFFE2E8F0);
           const lightBg = PdfColor.fromInt(0xFFF8FAFC);
@@ -97,13 +99,13 @@ class ReceiptGenerator {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text(country, style: pw.TextStyle(font: amiriBold, fontSize: 8, color: darkNavy)),
-                        pw.Text(ministry, style: pw.TextStyle(font: amiriFont, fontSize: 7.5, color: greyColor)),
-                        pw.SizedBox(height: 2),
-                        pw.Text(school, style: pw.TextStyle(font: amiriBold, fontSize: 8.5, color: darkNavy)),
-                        if (service.isNotEmpty) pw.Text(service, style: pw.TextStyle(font: amiriFont, fontSize: 7, color: greyColor)),
-                        pw.Text('Tél: $phone', style: pw.TextStyle(font: amiriFont, fontSize: 7, color: greyColor)),
-                        pw.Text('Email: $email', style: pw.TextStyle(font: amiriFont, fontSize: 7, color: greyColor)),
+                        pw.Text(country, style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 8, color: darkNavy)),
+                        pw.Text(ministry, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 7, color: greyColor)),
+                        pw.SizedBox(height: 1),
+                        pw.Text(school, style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 7 : 8.5, color: darkNavy)),
+                        if (service.isNotEmpty) pw.Text(service, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
+                        pw.Text('Tél: $phone', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
+                        pw.Text('Email: $email', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
                       ],
                     ),
                   ),
@@ -111,13 +113,13 @@ class ReceiptGenerator {
                   // Center Logo
                   if (centerLogoImage != null)
                     pw.Container(
-                      margin: const pw.EdgeInsets.symmetric(horizontal: 10),
-                      width: 48,
-                      height: 48,
+                      margin: pw.EdgeInsets.symmetric(horizontal: isA5 ? 6 : 10),
+                      width: isA5 ? 36 : 46,
+                      height: isA5 ? 36 : 46,
                       child: pw.Image(centerLogoImage),
                     )
                   else
-                    pw.Container(width: 48, height: 48),
+                    pw.Container(width: isA5 ? 36 : 46, height: isA5 ? 36 : 46),
 
                   // Right Arabic
                   pw.Expanded(
@@ -125,67 +127,98 @@ class ReceiptGenerator {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text(countryAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 8, color: darkNavy)),
-                        pw.Text(ministryAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: 7.5, color: greyColor)),
-                        pw.SizedBox(height: 2),
-                        pw.Text(schoolAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 8.5, color: darkNavy)),
-                        pw.Text(phoneAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: 7, color: greyColor)),
-                        pw.Text(emailAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: 7, color: greyColor)),
+                        pw.Text(countryAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 8, color: darkNavy)),
+                        pw.Text(ministryAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 7, color: greyColor)),
+                        pw.SizedBox(height: 1),
+                        pw.Text(schoolAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 7 : 8.5, color: darkNavy)),
+                        pw.Text(phoneAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
+                        pw.Text(emailAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
                       ],
                     ),
                   ),
                 ],
               ),
 
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: isA5 ? 6 : 8),
 
-              // Title Banner: REÇU DE PAIEMENT
+              // Title Banner: REÇU DE PAIEMENT + ORIGINAL Badge
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(vertical: 8),
+                padding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 8 : 12, vertical: isA5 ? 5 : 7),
                 decoration: const pw.BoxDecoration(
                   color: darkNavy,
                   borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
                 ),
-                child: pw.Center(
-                  child: pw.Text(
-                    'REÇU DE PAIEMENT',
-                    style: pw.TextStyle(
-                      font: amiriBold,
-                      fontSize: 13,
-                      color: PdfColors.white,
-                      letterSpacing: 1.2,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'REÇU DE PAIEMENT',
+                          style: pw.TextStyle(
+                            font: amiriBold,
+                            fontSize: isA5 ? 10 : 12,
+                            color: PdfColors.white,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        pw.Text(
+                          'Preuve officielle de paiement des frais scolaires',
+                          style: pw.TextStyle(
+                            font: amiriFont,
+                            fontSize: isA5 ? 6 : 7,
+                            color: const PdfColor.fromInt(0xFFCBD5E1),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    pw.Container(
+                      padding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 8 : 10, vertical: isA5 ? 2 : 3),
+                      decoration: const pw.BoxDecoration(
+                        color: royalBlue,
+                        borderRadius: pw.BorderRadius.all(pw.Radius.circular(12)),
+                      ),
+                      child: pw.Text(
+                        'ORIGINAL',
+                        style: pw.TextStyle(
+                          font: amiriBold,
+                          fontSize: isA5 ? 6 : 7.5,
+                          color: PdfColors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              pw.SizedBox(height: 6),
+              pw.SizedBox(height: isA5 ? 4 : 6),
 
               // Reference Badge
               pw.Center(
                 child: pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  padding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 16 : 22, vertical: isA5 ? 2.5 : 4),
                   decoration: pw.BoxDecoration(
                     color: const PdfColor.fromInt(0xFFF1F5FF),
                     border: pw.Border.all(color: const PdfColor.fromInt(0xFFC8D2FF)),
                     borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
                   ),
                   child: pw.Text(
-                    'RÉF : REC-$paymentId',
+                    'RÉFÉRENCE : REC-$paymentId',
                     style: pw.TextStyle(
                       font: amiriBold,
-                      fontSize: 8.5,
+                      fontSize: isA5 ? 7 : 8.5,
                       color: primaryIndigo,
                     ),
                   ),
                 ),
               ),
 
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: isA5 ? 6 : 8),
 
-              // Student Info + Date & Financial Situation Card (Combined)
+              // Student Info + Date & Financial Situation (2 Cards side by side)
               pw.Container(
-                padding: const pw.EdgeInsets.all(12),
+                padding: pw.EdgeInsets.all(isA5 ? 8 : 10),
                 decoration: pw.BoxDecoration(
                   color: PdfColors.white,
                   border: pw.Border.all(color: lightBorder),
@@ -202,19 +235,19 @@ class ReceiptGenerator {
                         children: [
                           pw.Text(
                             'INFORMATIONS ÉLÈVE',
-                            style: pw.TextStyle(font: amiriBold, fontSize: 8, color: primaryIndigo),
+                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 7.5, color: primaryIndigo),
                           ),
-                          pw.SizedBox(height: 4),
+                          pw.SizedBox(height: 2),
                           pw.Text(
                             studentName,
-                            style: pw.TextStyle(font: amiriBold, fontSize: 12, color: darkNavy),
+                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 9.5 : 11, color: darkNavy),
                           ),
-                          pw.SizedBox(height: 6),
-                          _buildDetailRow('Classe', className, amiriFont, amiriBold),
                           pw.SizedBox(height: 3),
-                          _buildDetailRow('Matricule', admissionNo, amiriFont, amiriBold),
-                          pw.SizedBox(height: 3),
-                          _buildDetailRow('Année Scolaire', schoolYear, amiriFont, amiriBold),
+                          _buildDetailRow('Classe', className, amiriFont, amiriBold, isA5: isA5),
+                          pw.SizedBox(height: 1.5),
+                          _buildDetailRow('Matricule', admissionNo, amiriFont, amiriBold, isA5: isA5),
+                          pw.SizedBox(height: 1.5),
+                          _buildDetailRow('Année Scolaire', schoolYear, amiriFont, amiriBold, isA5: isA5),
                         ],
                       ),
                     ),
@@ -222,9 +255,9 @@ class ReceiptGenerator {
                     // Divider
                     pw.Container(
                       width: 1,
-                      height: 75,
+                      height: isA5 ? 58 : 68,
                       color: lightBorder,
-                      margin: const pw.EdgeInsets.symmetric(horizontal: 10),
+                      margin: pw.EdgeInsets.symmetric(horizontal: isA5 ? 6 : 10),
                     ),
 
                     // Right Column: Date du reçu & Situation Financière
@@ -234,25 +267,32 @@ class ReceiptGenerator {
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
                           pw.Text(
-                            'DATE DU REÇU & SITUATION',
-                            style: pw.TextStyle(font: amiriBold, fontSize: 8, color: emeraldGreen),
+                            'DATE DU REÇU',
+                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 7.5, color: emeraldGreen),
                           ),
-                          pw.SizedBox(height: 4),
-                          _buildDetailRow('Date du reçu', datePaidStr, amiriFont, amiriBold),
-                          pw.SizedBox(height: 3),
-                          _buildDetailRow('Total Attendu', _formatCfa(totalExpected), amiriFont, amiriBold),
-                          pw.SizedBox(height: 3),
-                          _buildDetailRow('Total Déjà Payé', _formatCfa(totalPaid), amiriFont, amiriBold),
-                          pw.SizedBox(height: 4),
-                          pw.Divider(color: lightBorder, thickness: 0.5),
                           pw.SizedBox(height: 2),
-                          _buildDetailRow(
-                            'Solde Restant',
-                            _formatCfa(remainingBalance),
-                            amiriFont,
-                            amiriBold,
-                            valueColor: isSolde ? emeraldGreen : primaryIndigo,
-                            isBoldVal: true,
+                          pw.Text(
+                            datePaidStr,
+                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 9.5 : 11, color: darkNavy),
+                          ),
+                          pw.SizedBox(height: 3),
+                          _buildDetailRow('Total Attendu (Frais annuels)', _formatCfa(totalExpected), amiriFont, amiriBold, isA5: isA5),
+                          pw.SizedBox(height: 1.5),
+                          _buildDetailRow('Total Déjà Payé', _formatCfa(totalPaid), amiriFont, amiriBold, isA5: isA5),
+                          pw.SizedBox(height: 2.5),
+                          pw.Container(
+                            padding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 5 : 8, vertical: isA5 ? 2 : 3),
+                            decoration: const pw.BoxDecoration(
+                              color: royalBlue,
+                              borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+                            ),
+                            child: pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('SOLDE RESTANT', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7.5, color: PdfColors.white)),
+                                pw.Text(_formatCfa(remainingBalance), style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 8, color: PdfColors.white)),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -261,161 +301,193 @@ class ReceiptGenerator {
                 ),
               ),
 
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: isA5 ? 6 : 8),
 
-              // Table: HISTORIQUE DES VERSEMENTS
+              // Table: HISTORIQUE DES VERSEMENTS (6 Columns)
               pw.TableHelper.fromTextArray(
                 headers: [
-                  'Réf / N°',
-                  'Date de Versement',
-                  'Mode',
-                  'Motif / Libellé',
-                  'Montant Versé',
+                  'N°',
+                  'Date de Paiement',
+                  'Référence Paiement',
+                  'Mode de Paiement',
+                  'Montant (CFA)',
+                  'Reçu par',
                 ],
-                data: paymentsList.map((p) {
-                  final pId = p['id'] ?? 1;
+                data: paymentsList.asMap().entries.map((entry) {
+                  final idx = entry.key + 1;
+                  final p = entry.value;
+                  final pId = p['id'] ?? idx;
                   final pDate = p['date_paid'] != null
                       ? DateFormat('dd/MM/yyyy').format(DateTime.parse(p['date_paid'].toString()))
                       : datePaidStr;
+                  final pRef = 'PAY-${pId.toString().padLeft(6, '0')}';
                   final pMode = p['payment_mode'] ?? 'Espèces';
-                  final pMotif = p['month_concerned'] ?? p['remark'] ?? 'Frais de scolarité';
                   final pAmount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                  final pRec = p['recorded_by'] ?? 'Admin Scolarité';
                   return [
-                    'VER-$pId',
+                    '$idx',
                     pDate,
+                    pRef,
                     pMode,
-                    pMotif,
-                    _formatCfa(pAmount),
+                    _formatCfa(pAmount).replaceAll(' CFA', ''),
+                    pRec,
                   ];
                 }).toList(),
                 headerStyle: pw.TextStyle(
                   font: amiriBold,
-                  fontSize: 8.5,
+                  fontSize: isA5 ? 6.5 : 7.5,
                   color: PdfColors.white,
                 ),
                 headerDecoration: const pw.BoxDecoration(color: darkNavy),
-                cellStyle: pw.TextStyle(font: amiriFont, fontSize: 8),
+                cellStyle: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 6 : 7.5),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellAlignments: {
                   0: pw.Alignment.center,
                   1: pw.Alignment.center,
                   2: pw.Alignment.center,
-                  3: pw.Alignment.centerLeft,
+                  3: pw.Alignment.center,
                   4: pw.Alignment.centerRight,
+                  5: pw.Alignment.center,
                 },
                 headerAlignments: {
                   0: pw.Alignment.center,
                   1: pw.Alignment.center,
                   2: pw.Alignment.center,
-                  3: pw.Alignment.centerLeft,
+                  3: pw.Alignment.center,
                   4: pw.Alignment.centerRight,
+                  5: pw.Alignment.center,
                 },
-                cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                cellPadding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 4 : 6, vertical: isA5 ? 3 : 4),
               ),
 
-              // Table Footer Totals
+              // Table Footer Row: Total Versé
               pw.Container(
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: lightBorder),
                   color: lightBg,
                 ),
-                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 8 : 10, vertical: isA5 ? 3.5 : 5),
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('TOTAL DÉJÀ VERSÉ', style: pw.TextStyle(font: amiriBold, fontSize: 8.5, color: darkNavy)),
-                    pw.Text(_formatCfa(totalPaid), style: pw.TextStyle(font: amiriBold, fontSize: 9, color: darkNavy)),
-                  ],
-                ),
-              ),
-              pw.Container(
-                decoration: const pw.BoxDecoration(
-                  color: primaryIndigo,
-                ),
-                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('SOLDE RESTANT À PAYER', style: pw.TextStyle(font: amiriBold, fontSize: 9, color: PdfColors.white)),
-                    pw.Text(_formatCfa(remainingBalance), style: pw.TextStyle(font: amiriBold, fontSize: 10, color: PdfColors.white)),
+                    pw.Text('TOTAL VERSÉ', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 7 : 8.5, color: darkNavy)),
+                    pw.Text(_formatCfa(totalPaid), style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 7.5 : 9, color: darkNavy)),
                   ],
                 ),
               ),
 
-              pw.SizedBox(height: 16),
+              pw.SizedBox(height: isA5 ? 8 : 10),
 
-              // Footer: Status Badge | Stamp | Signature & QR Code
+              // Footer: 3 Cards (Certification | Stamp | QR Code)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  // Status Badge
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: pw.BoxDecoration(
-                      color: isSolde ? const PdfColor.fromInt(0xFFECFDF5) : const PdfColor.fromInt(0xFFFFFBEB),
-                      border: pw.Border.all(
-                        color: isSolde ? const PdfColor.fromInt(0xFFA7F3D0) : const PdfColor.fromInt(0xFFFDE68A),
+                  // Left Card: Certification
+                  pw.Expanded(
+                    flex: 4,
+                    child: pw.Container(
+                      height: isA5 ? 64 : 76,
+                      padding: const pw.EdgeInsets.all(6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: lightBorder),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
                       ),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                    ),
-                    child: pw.Text(
-                      isSolde ? '✓ SOLDÉ — COMPLET' : '⏳ EN COURS — DU',
-                      style: pw.TextStyle(
-                        font: amiriBold,
-                        fontSize: 8.5,
-                        color: isSolde ? const PdfColor.fromInt(0xFF065F46) : const PdfColor.fromInt(0xFF92400E),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text('CERTIFICATION', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: royalBlue)),
+                          pw.Text(
+                            'Nous certifions que le montant indiqué ci-dessus a été reçu de l\'élève mentionné.',
+                            style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor),
+                          ),
+                          pw.Center(
+                            child: pw.Text('Signature & Cachet', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
+                          ),
+                        ],
                       ),
                     ),
                   ),
 
-                  // Circular Stamp
+                  pw.SizedBox(width: 8),
+
+                  // Center: Circular Official Stamp
                   pw.Container(
-                    width: 70,
-                    height: 70,
+                    width: isA5 ? 56 : 70,
+                    height: isA5 ? 56 : 70,
                     decoration: pw.BoxDecoration(
                       shape: pw.BoxShape.circle,
-                      border: pw.Border.all(color: primaryIndigo.withOpacity(0.35), width: 1.5),
+                      border: pw.Border.all(color: darkNavy.withOpacity(0.35), width: 1.2),
                     ),
                     child: pw.Center(
                       child: pw.Container(
-                        width: 58,
-                        height: 58,
+                        width: isA5 ? 46 : 58,
+                        height: isA5 ? 46 : 58,
                         decoration: pw.BoxDecoration(
                           shape: pw.BoxShape.circle,
-                          border: pw.Border.all(color: primaryIndigo.withOpacity(0.35), width: 0.8),
+                          border: pw.Border.all(color: darkNavy.withOpacity(0.35), width: 0.8),
                         ),
                         child: pw.Center(
                           child: pw.Text(
-                            'ÉCOLE EXCELLENCE\nNIAMEY - NIGER',
+                            '★ ${school.toUpperCase()} ★\nSERVICE SCOLARITÉ',
                             textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(font: amiriBold, fontSize: 5, color: primaryIndigo.withOpacity(0.4)),
+                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 4 : 5, color: darkNavy.withOpacity(0.4)),
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // Signature & Cachet
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      pw.Text(
-                        'Signature & Cachet',
-                        style: pw.TextStyle(font: amiriFont, fontSize: 8, color: greyColor),
-                      ),
-                      pw.SizedBox(height: 25),
-                      pw.Container(width: 90, height: 0.5, color: greyColor),
-                    ],
-                  ),
+                  pw.SizedBox(width: 8),
 
-                  // QR Code
-                  pw.BarcodeWidget(
-                    barcode: pw.Barcode.qrCode(),
-                    data: 'REC-$paymentId|$studentName|$className|${_formatCfa(totalPaid)}|${_formatCfa(remainingBalance)}',
-                    width: 48,
-                    height: 48,
+                  // Right Card: QR Code
+                  pw.Expanded(
+                    flex: 4,
+                    child: pw.Container(
+                      height: isA5 ? 64 : 76,
+                      padding: const pw.EdgeInsets.all(6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: lightBorder),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      ),
+                      child: pw.Row(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.BarcodeWidget(
+                            barcode: pw.Barcode.qrCode(),
+                            data: 'REC-$paymentId|$studentName|$className|${_formatCfa(totalPaid)}|${_formatCfa(remainingBalance)}',
+                            width: isA5 ? 38 : 46,
+                            height: isA5 ? 38 : 46,
+                          ),
+                          pw.SizedBox(width: 6),
+                          pw.Expanded(
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              mainAxisAlignment: pw.MainAxisAlignment.center,
+                              children: [
+                                pw.Text('Scannez pour vérifier l\'authenticité', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
+                                pw.SizedBox(height: 2),
+                                pw.Text('REC-$paymentId', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: royalBlue)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
+                ],
+              ),
+
+              pw.SizedBox(height: isA5 ? 6 : 8),
+
+              // Security & Legal Footer
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Émis le : $datePaidStr', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
+                  pw.Text('Ce reçu est généré électroniquement et ne nécessite pas de signature manuscrite.', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
+                  pw.Text('Merci pour votre confiance. $school', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
                 ],
               ),
             ],
@@ -427,6 +499,157 @@ class ReceiptGenerator {
     return pdf.save();
   }
 
+  static Future<void> showFormatAndActionDialog({
+    required BuildContext context,
+    required Map<String, dynamic> student,
+    required Map<String, dynamic> payment,
+    required double totalExpected,
+    required double remainingBalance,
+    List<Map<String, dynamic>>? allPayments,
+    Map<String, dynamic>? headerConfig,
+  }) async {
+    PdfPageFormat selectedFormat = PdfPageFormat.a5;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Exporter / Imprimer le Reçu',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Format du papier :',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(
+                            child: Text('A5 — Reçu standard (Défaut)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          selected: selectedFormat == PdfPageFormat.a5,
+                          selectedColor: const Color(0xFF4F46E5),
+                          labelStyle: TextStyle(
+                            color: selectedFormat == PdfPageFormat.a5 ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedFormat = PdfPageFormat.a5);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Center(
+                            child: Text('A4 — Reçu détaillé', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          selected: selectedFormat == PdfPageFormat.a4,
+                          selectedColor: const Color(0xFF4F46E5),
+                          labelStyle: TextStyle(
+                            color: selectedFormat == PdfPageFormat.a4 ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedFormat = PdfPageFormat.a4);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: const Icon(Icons.print, size: 18),
+                          label: const Text('Imprimer', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            await generateAndPrint(
+                              student: student,
+                              payment: payment,
+                              totalExpected: totalExpected,
+                              remainingBalance: remainingBalance,
+                              allPayments: allPayments,
+                              headerConfig: headerConfig,
+                              pageFormat: selectedFormat,
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF4F46E5),
+                            side: const BorderSide(color: Color(0xFFC8D2FF)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: const Icon(Icons.share, size: 18),
+                          label: const Text('Partager', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            await generateAndShare(
+                              student: student,
+                              payment: payment,
+                              totalExpected: totalExpected,
+                              remainingBalance: remainingBalance,
+                              allPayments: allPayments,
+                              headerConfig: headerConfig,
+                              pageFormat: selectedFormat,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   static Future<void> generateAndPrint({
     required Map<String, dynamic> student,
     required Map<String, dynamic> payment,
@@ -434,6 +657,7 @@ class ReceiptGenerator {
     required double remainingBalance,
     List<Map<String, dynamic>>? allPayments,
     Map<String, dynamic>? headerConfig,
+    PdfPageFormat pageFormat = PdfPageFormat.a5,
   }) async {
     final paymentId = payment['id'] ?? 0;
     final bytes = await generatePdfBytes(
@@ -443,6 +667,7 @@ class ReceiptGenerator {
       remainingBalance: remainingBalance,
       allPayments: allPayments,
       headerConfig: headerConfig,
+      pageFormat: pageFormat,
     );
 
     await Printing.layoutPdf(
@@ -458,6 +683,7 @@ class ReceiptGenerator {
     required double remainingBalance,
     List<Map<String, dynamic>>? allPayments,
     Map<String, dynamic>? headerConfig,
+    PdfPageFormat pageFormat = PdfPageFormat.a5,
   }) async {
     final paymentId = payment['id'] ?? 0;
     final bytes = await generatePdfBytes(
@@ -467,6 +693,7 @@ class ReceiptGenerator {
       remainingBalance: remainingBalance,
       allPayments: allPayments,
       headerConfig: headerConfig,
+      pageFormat: pageFormat,
     );
 
     await SharePlus.instance.share(
@@ -488,26 +715,25 @@ class ReceiptGenerator {
     String value,
     pw.Font font,
     pw.Font boldFont, {
-    PdfColor? valueColor,
-    bool isBoldVal = false,
+    bool isA5 = false,
   }) {
     return pw.Row(
       children: [
         pw.SizedBox(
-          width: 75,
+          width: isA5 ? 68 : 80,
           child: pw.Text(
             label,
-            style: pw.TextStyle(font: font, fontSize: 8, color: const PdfColor.fromInt(0xFF64748B)),
+            style: pw.TextStyle(font: font, fontSize: isA5 ? 5.5 : 7, color: const PdfColor.fromInt(0xFF64748B)),
           ),
         ),
-        pw.Text(': ', style: pw.TextStyle(font: font, fontSize: 8, color: const PdfColor.fromInt(0xFF94A3B8))),
+        pw.Text(': ', style: pw.TextStyle(font: font, fontSize: isA5 ? 5.5 : 7, color: const PdfColor.fromInt(0xFF94A3B8))),
         pw.Expanded(
           child: pw.Text(
             value,
             style: pw.TextStyle(
-              font: isBoldVal ? boldFont : boldFont,
-              fontSize: isBoldVal ? 8.5 : 8,
-              color: valueColor ?? const PdfColor.fromInt(0xFF1E293B),
+              font: boldFont,
+              fontSize: isA5 ? 6 : 7.5,
+              color: const PdfColor.fromInt(0xFF1E293B),
             ),
           ),
         ),

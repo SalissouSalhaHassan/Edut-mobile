@@ -129,7 +129,9 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
       }
     }
 
-    await ReceiptGenerator.generateAndShare(
+    if (!mounted) return;
+    await ReceiptGenerator.showFormatAndActionDialog(
+      context: context,
       student: {
         'nom_etudiant': _studentName,
         'classe': _studentClass,

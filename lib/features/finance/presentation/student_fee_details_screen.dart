@@ -98,44 +98,32 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     final balance = (_currentFee['balance'] as num?)?.toDouble() ?? 0.0;
     final schoolId = _currentFee['school_id'] as int?;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      Map<String, dynamic>? headerConfig;
-      if (schoolId != null) {
+    Map<String, dynamic>? headerConfig;
+    if (schoolId != null) {
+      try {
         final res = await _repository.getDocumentHeader(schoolId);
         if (res['success'] == true) {
           headerConfig = res['data'] as Map<String, dynamic>?;
         }
-      }
-
-      final allPaymentsList = _currentFee['payments'] != null
-          ? List<Map<String, dynamic>>.from(_currentFee['payments'])
-          : null;
-
-      await ReceiptGenerator.generateAndPrint(
-        student: student,
-        payment: payment,
-        totalExpected: expected,
-        remainingBalance: balance,
-        allPayments: allPaymentsList,
-        headerConfig: headerConfig,
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Échec d'impression du reçu: $e")),
-        );
-      }
-    } finally {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
+      } catch (e) {
+        debugPrint("Error fetching document header: $e");
       }
     }
+
+    final allPaymentsList = _currentFee['payments'] != null
+        ? List<Map<String, dynamic>>.from(_currentFee['payments'])
+        : null;
+
+    if (!mounted) return;
+    await ReceiptGenerator.showFormatAndActionDialog(
+      context: context,
+      student: student,
+      payment: payment,
+      totalExpected: expected,
+      remainingBalance: balance,
+      allPayments: allPaymentsList,
+      headerConfig: headerConfig,
+    );
   }
 
   @override
