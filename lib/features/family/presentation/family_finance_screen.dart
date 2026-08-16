@@ -445,7 +445,7 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
     final isSolde = balance <= 0 && expected > 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(),
       child: Column(
@@ -485,9 +485,68 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: Text('Attendu: ${expected.toStringAsFixed(0)} F', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
-              Expanded(child: Text('Payé: ${paid.toStringAsFixed(0)} F', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669)))),
-              Expanded(child: Text('Reste: ${balance.toStringAsFixed(0)} F', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)))),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('Attendu', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('${expected.toStringAsFixed(0)} F', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('Payé', style: TextStyle(fontSize: 10, color: Color(0xFF059669), fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('${paid.toStringAsFixed(0)} F', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: balance > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: balance > 0 ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text('Reste', style: TextStyle(fontSize: 10, color: balance > 0 ? const Color(0xFFDC2626) : const Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('${balance.toStringAsFixed(0)} F', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: balance > 0 ? const Color(0xFFDC2626) : const Color(0xFF059669))),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
           if (paid > 0) ...[
@@ -530,52 +589,107 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
     final date = payment['date_paid'] != null
         ? DateFormat('dd/MM/yyyy').format(DateTime.parse(payment['date_paid'] as String))
-        : '-';
+        : DateFormat('dd/MM/yyyy').format(DateTime.now());
     final ref = payment['reference'] ?? 'REC-${payment['id'] ?? 1}';
+    final mode = payment['payment_mode'] ?? 'Espèces';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.receipt_long, color: Color(0xFF4F46E5), size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${amount.toStringAsFixed(0)} FCFA',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF0F172A)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF4F46E5), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${amount.toStringAsFixed(0)} FCFA',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        ref,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$ref • ${payment['payment_mode'] ?? 'Espèces'} • $date',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                child: const Text(
+                  'ENCAISSÉ',
+                  style: TextStyle(
+                    color: Color(0xFF059669),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Mode: $mode',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              ),
+              Text(
+                'Date: $date',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.picture_as_pdf, size: 16),
+              label: const Text(
+                'Télécharger / Imprimer le Reçu (PDF)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => _shareReceipt(payment),
             ),
-            icon: const Icon(Icons.print, size: 14),
-            label: const Text('Reçu', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-            onPressed: () => _shareReceipt(payment),
           ),
         ],
       ),
