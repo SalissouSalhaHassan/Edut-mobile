@@ -104,9 +104,34 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       _studentName = await session.getStudentName() ?? '';
       _studentClass = await session.getStudentClass() ?? '';
 
-      // Auto-heal missing studentId in session
-      if (_studentId == null) {
-        try {
+      // Sync fresh profile from API
+      try {
+        final token = await session.getToken() ?? '';
+        if (token.isNotEmpty) {
+          final apiProfile = await locator<MobileApiClient>().getMeProfile(token);
+          if (apiProfile != null && apiProfile.studentId != null) {
+            final freshId = int.tryParse(apiProfile.studentId!);
+            if (freshId != null) {
+              _studentId = freshId;
+              _schoolId = int.tryParse(apiProfile.schoolId ?? '') ?? _schoolId;
+              _studentName = apiProfile.studentName ?? _studentName;
+              _studentClass = apiProfile.studentClass ?? _studentClass;
+              await session.saveSession(
+                token: token,
+                email: await session.getEmail() ?? '',
+                role: _role,
+                employeeId: await session.getEmployeeId() ?? '',
+                userId: await session.getUserId(),
+                schoolId: _schoolId?.toString(),
+                studentId: _studentId?.toString(),
+                studentName: _studentName,
+                studentClass: _studentClass,
+              );
+            }
+          }
+        }
+
+        if (_studentId == null) {
           final client = SupabaseClientManager().client;
           final email = await session.getEmail() ?? '';
           final username = email.split('@').first;
@@ -119,32 +144,49 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           if (userDoc != null && userDoc['student_id'] != null) {
             _studentId = int.tryParse(userDoc['student_id'].toString());
             _schoolId ??= int.tryParse(userDoc['school_id']?.toString() ?? '');
-            if (_studentId != null) {
-              final st = await client
-                  .from('students')
-                  .select('nom_etudiant, classe')
-                  .eq('id', _studentId!)
-                  .maybeSingle();
-              if (st != null) {
-                _studentName = st['nom_etudiant']?.toString() ?? _studentName;
-                _studentClass = st['classe']?.toString() ?? _studentClass;
-              }
-              await session.saveSession(
-                token: await session.getToken() ?? '',
-                email: email,
-                role: _role,
-                employeeId: await session.getEmployeeId() ?? '',
-                userId: await session.getUserId(),
-                schoolId: _schoolId?.toString(),
-                studentId: _studentId?.toString(),
-                studentName: _studentName,
-                studentClass: _studentClass,
-              );
+          } else {
+            // Match student by num_admission
+            final studentRow = await client
+                .from('students')
+                .select('id, school_id, nom_etudiant, classe')
+                .or('num_admission.eq.${username.toUpperCase()},num_admission.eq.$username,num_admission.eq.$email')
+                .maybeSingle();
+            if (studentRow != null) {
+              _studentId = int.tryParse(studentRow['id'].toString());
+              _schoolId ??= int.tryParse(studentRow['school_id']?.toString() ?? '');
+              _studentName = studentRow['nom_etudiant']?.toString() ?? _studentName;
+              _studentClass = studentRow['classe']?.toString() ?? _studentClass;
             }
           }
-        } catch (healError) {
-          debugPrint("[FamilyDashboard] Self-healing student profile failed: $healError");
         }
+
+        if (_studentId != null) {
+          if (_studentName.isEmpty || _studentClass.isEmpty) {
+            final client = SupabaseClientManager().client;
+            final st = await client
+                .from('students')
+                .select('nom_etudiant, classe')
+                .eq('id', _studentId!)
+                .maybeSingle();
+            if (st != null) {
+              _studentName = st['nom_etudiant']?.toString() ?? _studentName;
+              _studentClass = st['classe']?.toString() ?? _studentClass;
+            }
+          }
+          await session.saveSession(
+            token: await session.getToken() ?? '',
+            email: await session.getEmail() ?? '',
+            role: _role,
+            employeeId: await session.getEmployeeId() ?? '',
+            userId: await session.getUserId(),
+            schoolId: _schoolId?.toString(),
+            studentId: _studentId?.toString(),
+            studentName: _studentName,
+            studentClass: _studentClass,
+          );
+        }
+      } catch (healError) {
+        debugPrint("[FamilyDashboard] Self-healing student profile failed: $healError");
       }
 
       if (_studentId == null) {
@@ -349,14 +391,12 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     for (final row in _attendance) {
       final status = (row['status'] as String? ?? '').toLowerCase();
       final remark = (row['remark'] as String? ?? '').toLowerCase();
-      if (status.contains('retard')) {
+      if (status.contains('retard') || status.contains('late')) {
         late++;
+      } else if (status.contains('excus') || status.contains('justif') || remark.contains('just')) {
+        justified++;
       } else if (status.contains('abs')) {
-        if (remark.contains('just')) {
-          justified++;
-        } else {
-          unjustified++;
-        }
+        unjustified++;
       }
     }
     return {'justified': justified, 'unjustified': unjustified, 'late': late};
@@ -1202,7 +1242,15 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   Widget _buildAttendanceChartCard() {
     final summary = _attendanceSummary;
     final totalIncidents = summary['justified']! + summary['unjustified']! + summary['late']!;
-    final attendanceRate = totalIncidents == 0 ? 100 : (100 - (summary['unjustified']! * 4 + summary['late']! * 2)).clamp(40, 100);
+    final totalSessions = _attendance.length;
+    int presents = 0;
+    for (final r in _attendance) {
+      final s = (r['status'] as String? ?? '').toLowerCase();
+      if (s.contains('présent') || s.contains('present')) presents++;
+    }
+    final attendanceRate = totalSessions == 0
+        ? 100
+        : (((presents + summary['justified']!) / totalSessions) * 100).round().clamp(0, 100);
 
     final sections = [
       if (summary['justified']! > 0)
@@ -1487,6 +1535,8 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     final subject = row['school_subjects']?['subject_name'] ?? 'Général';
     final color = status.toLowerCase().contains('retard')
         ? AppColors.warning
+        : (status.toLowerCase().contains('excus') || status.toLowerCase().contains('justif'))
+        ? AppColors.info
         : status.toLowerCase().contains('abs')
         ? AppColors.danger
         : AppColors.success;

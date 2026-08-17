@@ -131,6 +131,90 @@ class AuthRepository {
     return null;
   }
 
+  Future<List<String>> _resolveCandidateLoginEmails(String rawInput) async {
+    final clean = rawInput.trim();
+    if (clean.isEmpty) return const [];
+
+    final candidates = <String>{};
+
+    // 1. Direct from users table
+    try {
+      final userRows = await _client
+          .from('users')
+          .select('utilisateur')
+          .or('utilisateur.eq.$clean,utilisateur.eq.${clean.toLowerCase()}')
+          .limit(5);
+      for (final row in userRows) {
+        final u = (row['utilisateur'] as String?)?.trim().toLowerCase();
+        if (u != null && u.isNotEmpty) {
+          candidates.add(u.contains('@') ? u : '$u@test.com');
+        }
+      }
+    } catch (_) {}
+
+    // 2. From students table (num_admission, mobile, whatsapp)
+    try {
+      final studentRows = await _client
+          .from('students')
+          .select('id, num_admission')
+          .or('num_admission.eq.$clean,num_admission.eq.${clean.toUpperCase()},num_admission.eq.${clean.toLowerCase()},mobile.eq.$clean,whatsapp.eq.$clean')
+          .limit(5);
+
+      for (final student in studentRows) {
+        final studentId = student['id'];
+        if (studentId != null) {
+          final userMatch = await _client
+              .from('users')
+              .select('utilisateur')
+              .eq('student_id', studentId)
+              .maybeSingle();
+          if (userMatch != null && userMatch['utilisateur'] != null) {
+            final u = userMatch['utilisateur'].toString().trim().toLowerCase();
+            candidates.add(u.contains('@') ? u : '$u@test.com');
+          }
+        }
+        final adm = (student['num_admission'] as String?)?.trim().toLowerCase();
+        if (adm != null && adm.isNotEmpty) {
+          candidates.add(adm.contains('@') ? adm : '$adm@test.com');
+        }
+      }
+    } catch (_) {}
+
+    // 3. From employees table (emp_id, email, mobile)
+    try {
+      final empRows = await _client
+          .from('employees')
+          .select('id, email, emp_id')
+          .or('emp_id.eq.$clean,email.eq.$clean,email.eq.${clean.toLowerCase()},mobile.eq.$clean')
+          .limit(5);
+
+      for (final emp in empRows) {
+        final empId = emp['id'];
+        if (empId != null) {
+          final userMatch = await _client
+              .from('users')
+              .select('utilisateur')
+              .eq('employee_id', empId)
+              .maybeSingle();
+          if (userMatch != null && userMatch['utilisateur'] != null) {
+            final u = userMatch['utilisateur'].toString().trim().toLowerCase();
+            candidates.add(u.contains('@') ? u : '$u@test.com');
+          }
+        }
+        final emailVal = (emp['email'] as String?)?.trim().toLowerCase();
+        if (emailVal != null && emailVal.isNotEmpty) {
+          candidates.add(emailVal.contains('@') ? emailVal : '$emailVal@test.com');
+        }
+        final empIdVal = (emp['emp_id'] as String?)?.trim().toLowerCase();
+        if (empIdVal != null && empIdVal.isNotEmpty) {
+          candidates.add(empIdVal.contains('@') ? empIdVal : '$empIdVal@test.com');
+        }
+      }
+    } catch (_) {}
+
+    return candidates.toList();
+  }
+
   /// Normalize role name to canonical values: 'teacher', 'admin', 'super_admin', 'director', 'owner', 'student', 'parent', 'accountant', 'secretary', 'staff'
   String _normalizeRole(String? rawRole, bool isAdmin, bool isSuperAdmin) {
     if (isSuperAdmin) {
@@ -210,75 +294,46 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final loginEmail = normalizedEmail.contains('@')
+    final rawInput = email.trim();
+    final normalizedEmail = rawInput.toLowerCase();
+    final primaryEmail = normalizedEmail.contains('@')
         ? normalizedEmail
         : '$normalizedEmail@test.com';
 
-    debugPrint("DEBUG LOGIN: Attempting login for $loginEmail");
+    debugPrint("DEBUG LOGIN: Attempting login for $primaryEmail (input: $rawInput)");
+
+    AuthResponse? response;
+    String effectiveLoginEmail = primaryEmail;
 
     try {
-      var effectiveEmail = loginEmail;
-      AuthResponse? response;
-
       try {
         response = await _client.auth.signInWithPassword(
-          email: effectiveEmail,
+          email: primaryEmail,
           password: password,
-        );
-      } catch (initialErr) {
-        debugPrint("DEBUG LOGIN: Initial sign in failed with $effectiveEmail: $initialErr. Checking resolution...");
-
-        // If user typed an email (e.g. almou@gmail.com) but their Supabase account is username@test.com
+        ).timeout(const Duration(seconds: 8));
+      } catch (firstErr) {
+        debugPrint("DEBUG LOGIN: Primary sign-in error with $primaryEmail: $firstErr");
+        // If primary failed, try to resolve candidate from users/students/employees
         try {
-          final emp = await _client
-              .from('employees')
-              .select('id')
-              .or('email.eq.$normalizedEmail,mobile.eq.$normalizedEmail')
-              .maybeSingle();
-          if (emp != null) {
-            final userRow = await _client
-                .from('users')
-                .select('utilisateur')
-                .eq('employee_id', emp['id'])
-                .maybeSingle();
-            if (userRow != null && userRow['utilisateur'] != null) {
-              final resolved = userRow['utilisateur'].toString().trim().toLowerCase();
-              effectiveEmail = resolved.contains('@') ? resolved : '$resolved@test.com';
-              debugPrint("DEBUG LOGIN: Resolved employee user to $effectiveEmail, retrying sign-in...");
+          final candidates = await _resolveCandidateLoginEmails(rawInput).timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => const [],
+          );
+          for (final candidate in candidates) {
+            if (candidate.toLowerCase() == primaryEmail.toLowerCase()) continue;
+            try {
+              debugPrint("DEBUG LOGIN: Retrying sign-in with resolved candidate: $candidate");
               response = await _client.auth.signInWithPassword(
-                email: effectiveEmail,
+                email: candidate,
                 password: password,
-              );
+              ).timeout(const Duration(seconds: 5));
+              effectiveLoginEmail = candidate;
+              break;
+            } catch (retryErr) {
+              debugPrint("DEBUG LOGIN: Candidate $candidate failed: $retryErr");
             }
           }
         } catch (_) {}
-
-        if (response == null) {
-          try {
-            final std = await _client
-                .from('students')
-                .select('id')
-                .or('num_admission.eq.$normalizedEmail,mobile.eq.$normalizedEmail,whatsapp.eq.$normalizedEmail')
-                .maybeSingle();
-            if (std != null) {
-              final userRow = await _client
-                  .from('users')
-                  .select('utilisateur')
-                  .eq('student_id', std['id'])
-                  .maybeSingle();
-              if (userRow != null && userRow['utilisateur'] != null) {
-                final resolved = userRow['utilisateur'].toString().trim().toLowerCase();
-                effectiveEmail = resolved.contains('@') ? resolved : '$resolved@test.com';
-                debugPrint("DEBUG LOGIN: Resolved student user to $effectiveEmail, retrying sign-in...");
-                response = await _client.auth.signInWithPassword(
-                  email: effectiveEmail,
-                  password: password,
-                );
-              }
-            }
-          } catch (_) {}
-        }
 
         if (response == null) {
           rethrow;
@@ -288,22 +343,22 @@ class AuthRepository {
       if (response.session == null) {
         debugPrint("DEBUG LOGIN: Session was null");
         return const LoginResult.failure(
-          'Session non créée. Veuillez réessayer.',
+          'Session non créée. Veuillez vérifier vos identifiants.',
         );
       }
 
       debugPrint("DEBUG LOGIN: Auth success. User ID: ${response.user?.id}");
 
       try {
-        final canonicalProfile = await _mobileApiClient.getCurrentProfile(
-          accessToken: response.session!.accessToken,
-        );
+        final canonicalProfile = await _mobileApiClient
+            .getCurrentProfile(accessToken: response.session!.accessToken)
+            .timeout(const Duration(seconds: 4));
 
         await _sessionManager.saveSession(
           token: response.session!.accessToken,
           email: canonicalProfile.email.isNotEmpty
               ? canonicalProfile.email
-              : loginEmail,
+              : effectiveLoginEmail,
           password: password,
           role: canonicalProfile.role,
           employeeId: canonicalProfile.employeeId ?? '',
@@ -321,7 +376,7 @@ class AuthRepository {
         return const LoginResult.success();
       } catch (e, stack) {
         debugPrint(
-          "DEBUG LOGIN: Edut web API profile unavailable, using legacy Supabase fallback: $e\n$stack",
+          "DEBUG LOGIN: Edut web API profile unavailable, using fast Supabase fallback: $e\n$stack",
         );
       }
 
@@ -333,7 +388,7 @@ class AuthRepository {
       try {
         userData = await _fetchUserProfile(
           userId: response.session!.user.id,
-          email: loginEmail,
+          email: effectiveLoginEmail,
           select:
               'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, student_id, roles(role_name)',
         );
@@ -382,7 +437,7 @@ class AuthRepository {
         try {
           userData = await _fetchUserProfile(
             userId: response.session!.user.id,
-            email: loginEmail,
+            email: effectiveLoginEmail,
             select:
                 'id, utilisateur, nom_prenom, admin, super_admin, school_id, role_id, student_id',
           );
@@ -433,7 +488,7 @@ class AuthRepository {
         final employeeData = await _client
             .from('employees')
             .select('id, school_id')
-            .eq('email', loginEmail)
+            .eq('email', effectiveLoginEmail)
             .maybeSingle();
 
         debugPrint("DEBUG LOGIN: Employee query result: $employeeData");
@@ -456,7 +511,7 @@ class AuthRepository {
 
       final studentProfile = await _resolveStudentProfile(
         role: role,
-        loginEmail: loginEmail,
+        loginEmail: effectiveLoginEmail,
         schoolIdStr: schoolIdStr,
         userData: userData,
       );
@@ -483,12 +538,12 @@ class AuthRepository {
       }
 
       debugPrint(
-        "DEBUG LOGIN: Final resolved values for SessionManager -> Email: $loginEmail, Role: $role, EmployeeId: $employeeId, SchoolId: $schoolIdStr",
+        "DEBUG LOGIN: Final resolved values for SessionManager -> Email: $effectiveLoginEmail, Role: $role, EmployeeId: $employeeId, SchoolId: $schoolIdStr",
       );
 
       await _sessionManager.saveSession(
         token: response.session!.accessToken,
-        email: loginEmail,
+        email: effectiveLoginEmail,
         password: password,
         role: role,
         employeeId: employeeId,

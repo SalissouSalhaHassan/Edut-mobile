@@ -28,8 +28,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialUsername != null && widget.initialUsername!.isNotEmpty) {
-      _emailController.text = widget.initialUsername!;
+    if (widget.initialUsername != null && widget.initialUsername!.trim().isNotEmpty) {
+      _emailController.text = widget.initialUsername!.trim();
     }
   }
 
@@ -48,23 +48,38 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    final result = await locator<AuthRepository>().login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    try {
+      final result = await locator<AuthRepository>().login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      ).timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => const LoginResult.failure(
+          'Délai de connexion dépassé. Vérifiez votre connexion internet.',
+        ),
+      );
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (result.success) {
-        final role = await locator<SessionManager>().getRole() ?? 'staff';
-        if (!mounted) return;
-        context.go(getHomeRouteForRole(role));
-      } else {
+      if (mounted) {
+        if (result.success) {
+          final role = await locator<SessionManager>().getRole() ?? 'staff';
+          if (!mounted) return;
+          context.go(getHomeRouteForRole(role));
+        } else {
+          setState(() {
+            _errorMessage = result.message ?? 'Email ou mot de passe incorrect.';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _errorMessage = result.message ?? 'Connexion impossible.';
+          _errorMessage = 'Erreur de connexion : ${e.toString().replaceAll('Exception:', '').trim()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
         });
       }
     }
@@ -152,11 +167,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(
-                                labelText: 'Email',
-                                hintText: 'entrer votre email',
+                                labelText: 'Adresse Email',
+                                hintText: 'Ex: nom@domaine.com ou votre email',
                                 prefixIcon: Icon(Icons.email_outlined, color: AppColors.slate400),
                               ),
-                              validator: Validators.validateEmail,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'L\'adresse email est requise';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 16),
 

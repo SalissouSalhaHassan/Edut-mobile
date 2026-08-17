@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/utils/validators.dart';
 import '../data/auth_repository.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -84,7 +83,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   void _showSuccessDialog(Map<String, dynamic> data) {
-    final username = data['username']?.toString() ?? '';
+    final email = data['email']?.toString() ?? data['username']?.toString() ?? '';
     final fullName = data['fullName']?.toString() ?? '';
     final schoolName = data['schoolName']?.toString() ?? '';
     final message = data['message']?.toString() ?? 'Opération réussie !';
@@ -152,7 +151,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ],
                   const Divider(height: 12),
                   const Text(
-                    'Votre identifiant de connexion :',
+                    'Votre Email de connexion :',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
@@ -161,18 +160,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withAlpha(25),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      username,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: AppColors.primary,
-                      ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.email_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            email,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -190,10 +197,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.go('/login', extra: username);
+              context.go('/login', extra: {'username': email});
             },
             child: const Text(
-              'Aller à la connexion',
+              'Se connecter avec cet Email',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),

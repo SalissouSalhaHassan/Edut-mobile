@@ -146,8 +146,10 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
 
   Future<void> _loadOptions() async {
     try {
-      await locator<PermissionService>().getCurrentProfile().catchError((_) => null);
-      final options = await _repository.getStudentFormOptions().catchError((_) => {'levels': [], 'sections': [], 'classes': []});
+      try {
+        await locator<PermissionService>().getCurrentProfile();
+      } catch (_) {}
+      final options = await _repository.getStudentFormOptions();
       if (!mounted) return;
       setState(() {
         _hasFormPermission = true;

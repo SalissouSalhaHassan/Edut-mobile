@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
@@ -59,6 +60,36 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
       _schoolId = int.tryParse(await session.getSchoolId() ?? '');
       _studentName = await session.getStudentName() ?? 'Eleve';
       _studentClass = await session.getStudentClass() ?? '—';
+
+      // Sync latest student profile from API
+      try {
+        final token = await session.getToken() ?? '';
+        if (token.isNotEmpty) {
+          final apiProfile = await locator<MobileApiClient>().getMeProfile(token);
+          if (apiProfile != null && apiProfile.studentId != null) {
+            final freshStudentId = int.tryParse(apiProfile.studentId!);
+            if (freshStudentId != null) {
+              _studentId = freshStudentId;
+              _schoolId = int.tryParse(apiProfile.schoolId ?? '') ?? _schoolId;
+              _studentName = apiProfile.studentName ?? _studentName;
+              _studentClass = apiProfile.studentClass ?? _studentClass;
+              await session.saveSession(
+                token: token,
+                email: await session.getEmail() ?? '',
+                role: _role,
+                employeeId: await session.getEmployeeId() ?? '',
+                userId: await session.getUserId(),
+                schoolId: _schoolId?.toString(),
+                studentId: _studentId?.toString(),
+                studentName: _studentName,
+                studentClass: _studentClass,
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("[FamilyFinance] Profile sync fallback: $e");
+      }
 
       if (_studentId == null) {
         setState(() {

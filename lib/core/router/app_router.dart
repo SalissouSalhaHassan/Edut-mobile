@@ -56,9 +56,11 @@ class AppRouter {
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => LoginScreen(
-          initialUsername: state.extra as String?,
-        ),
+        builder: (context, state) {
+          final initialUsername = (state.extra as Map<String, dynamic>?)?['username'] as String? ??
+              state.uri.queryParameters['username'];
+          return LoginScreen(initialUsername: initialUsername);
+        },
       ),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),

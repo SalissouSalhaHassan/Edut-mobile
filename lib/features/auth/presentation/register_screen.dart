@@ -107,7 +107,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.go('/login');
+              context.go('/login', extra: {'username': _usernameController.text.trim()});
             },
             child: const Text(
               'Se connecter',

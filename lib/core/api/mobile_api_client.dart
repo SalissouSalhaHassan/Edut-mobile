@@ -108,6 +108,14 @@ class MobileApiClient {
     );
   }
 
+  Future<MobileApiProfile?> getMeProfile(String token) async {
+    try {
+      return await getCurrentProfile(accessToken: token);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> register({
     required String role,
     required String schoolSlug,
