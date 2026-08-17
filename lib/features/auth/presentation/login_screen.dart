@@ -4,6 +4,7 @@ import '../../../core/auth/role_redirect.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/auth/session_manager.dart';
+import '../../../core/services/inactivity_lock_service.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -83,6 +84,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
       if (mounted) {
         if (result.success) {
+          locator<InactivityLockService>().unlock();
+          locator<InactivityLockService>().recordActivity();
           final role = await locator<SessionManager>().getRole() ?? 'staff';
           if (!mounted) return;
           context.go(getHomeRouteForRole(role));

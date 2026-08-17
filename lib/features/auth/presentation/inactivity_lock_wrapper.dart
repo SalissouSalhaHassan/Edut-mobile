@@ -19,6 +19,12 @@ class _InactivityLockWrapperState extends State<InactivityLockWrapper> {
   final InactivityLockService _lockService = locator<InactivityLockService>();
 
   @override
+  void initState() {
+    super.initState();
+    _lockService.startTracking();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Listener(
       behavior: HitTestBehavior.translucent,
@@ -26,6 +32,7 @@ class _InactivityLockWrapperState extends State<InactivityLockWrapper> {
       onPointerMove: (_) => _lockService.recordActivity(),
       onPointerUp: (_) => _lockService.recordActivity(),
       child: Stack(
+        fit: StackFit.expand,
         textDirection: TextDirection.ltr,
         children: [
           widget.child,
@@ -33,7 +40,9 @@ class _InactivityLockWrapperState extends State<InactivityLockWrapper> {
             valueListenable: _lockService.isLocked,
             builder: (context, isLocked, _) {
               if (!isLocked) return const SizedBox.shrink();
-              return const _AppLockScreenOverlay();
+              return const Positioned.fill(
+                child: _AppLockScreenOverlay(),
+              );
             },
           ),
         ],
@@ -150,38 +159,40 @@ class _AppLockScreenOverlayState extends State<_AppLockScreenOverlay> {
     return Material(
       color: Colors.transparent,
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Blurred background
+          // Blurred background overlay
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+                color: const Color(0xFF0F172A).withValues(alpha: 0.90),
               ),
             ),
           ),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Lock icon with glowing gradient badge
                     Container(
-                      width: 84,
-                      height: 84,
+                      width: 86,
+                      height: 86,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF0D9488), Color(0xFF059669)],
+                          colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.4),
-                            blurRadius: 24,
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.45),
+                            blurRadius: 28,
                             spreadRadius: 4,
                           ),
                         ],
@@ -189,103 +200,124 @@ class _AppLockScreenOverlayState extends State<_AppLockScreenOverlay> {
                       child: const Center(
                         child: Icon(
                           Icons.lock_rounded,
-                          size: 42,
+                          size: 44,
                           color: Colors.white,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 22),
                     const Text(
                       'Session Verrouillée',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 24,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
+                        color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                       ),
-                      child: Text(
-                        _displayName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF34D399),
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.person_rounded, size: 16, color: Color(0xFF818CF8)),
+                          const SizedBox(width: 6),
+                          Text(
+                            _displayName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Pour votre sécurité après 3 minutes d\'inactivité, veuillez entrer votre mot de passe pour déverrouiller.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF94A3B8),
-                        height: 1.4,
+                    const SizedBox(height: 14),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Pour votre sécurité après 3 minutes d\'inactivité, veuillez entrer votre mot de passe pour déverrouiller.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                          height: 1.4,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 28),
 
-                    // Password input field
+                    // Password input field card
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
                       child: TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _unlock(),
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                         decoration: InputDecoration(
-                          hintText: 'Votre mot de passe',
+                          hintText: 'Mot de passe',
                           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                          prefixIcon: const Icon(Icons.password_rounded, color: Color(0xFF0F766E)),
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF6366F1), size: 22),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                               color: const Color(0xFF64748B),
                             ),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
                           ),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         ),
+                        onSubmitted: (_) => _unlock(),
                       ),
                     ),
 
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFECACA)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline_rounded, color: Color(0xFFF87171), size: 18),
+                            const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _errorMessage!,
-                                style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  color: Color(0xFFB91C1C),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -295,27 +327,27 @@ class _AppLockScreenOverlayState extends State<_AppLockScreenOverlay> {
 
                     const SizedBox(height: 20),
 
-                    // Unlock button
+                    // Unlock Button
                     SizedBox(
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
+                        onPressed: _isLoading ? null : _unlock,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D9488),
+                          backgroundColor: const Color(0xFF4F46E5),
                           foregroundColor: Colors.white,
                           elevation: 4,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed: _isLoading ? null : _unlock,
                         child: _isLoading
                             ? const SizedBox(
-                                width: 22,
                                 height: 22,
+                                width: 22,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
                                   color: Colors.white,
+                                  strokeWidth: 2.5,
                                 ),
                               )
                             : const Row(
@@ -326,31 +358,27 @@ class _AppLockScreenOverlayState extends State<_AppLockScreenOverlay> {
                                   Text(
                                     'Déverrouiller',
                                     style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.2,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.3,
                                     ),
                                   ),
                                 ],
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 16),
 
-                    // Logout button
+                    // Logout option
                     TextButton.icon(
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF94A3B8),
-                      ),
                       onPressed: _logout,
-                      icon: const Icon(Icons.logout_rounded, size: 16),
+                      icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFF94A3B8)),
                       label: const Text(
                         'Changer de compte / Se déconnecter',
                         style: TextStyle(
+                          color: Color(0xFF94A3B8),
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),

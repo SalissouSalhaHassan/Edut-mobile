@@ -141,7 +141,10 @@ class SessionManager {
 
   Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    if (token != null && token.isNotEmpty) return true;
+    final email = await getEmail();
+    final role = await getRole();
+    return email != null && email.isNotEmpty && role != null && role.isNotEmpty;
   }
 
   Future<void> clearSession() async {
