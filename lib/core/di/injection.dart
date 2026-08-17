@@ -21,6 +21,7 @@ import '../../features/messaging/data/messaging_repository.dart';
 import '../../features/dashboard/data/dashboard_stats_repository.dart';
 import '../../features/ministry/data/ministry_repository.dart';
 import '../services/push_notification_service.dart';
+import '../services/inactivity_lock_service.dart';
 
 final locator = GetIt.instance;
 
@@ -124,5 +125,9 @@ Future<void> setupLocator() async {
   );
   locator.registerLazySingleton<MobilePushNotificationService>(
     () => MobilePushNotificationService(repository: locator<MessagingRepository>()),
+  );
+
+  locator.registerLazySingleton<InactivityLockService>(
+    () => InactivityLockService(),
   );
 }

@@ -4,6 +4,8 @@ import 'core/api/sync_engine.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/services/inactivity_lock_service.dart';
+import 'features/auth/presentation/inactivity_lock_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +18,9 @@ void main() async {
 
   // Initialize Mobile Push Notifications Service
   await locator<MobilePushNotificationService>().initialize();
+
+  // Initialize Auto-Lock Inactivity Service (3 minutes timeout)
+  await locator<InactivityLockService>().initialize();
 
   runApp(const MyApp());
 }
@@ -30,6 +35,11 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: AppRouter.router,
+      builder: (context, child) {
+        return InactivityLockWrapper(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

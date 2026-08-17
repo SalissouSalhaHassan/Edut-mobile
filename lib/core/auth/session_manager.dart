@@ -117,6 +117,28 @@ class SessionManager {
     return cachedHash == inputHash;
   }
 
+  Future<bool> validateCurrentPassword(String password) async {
+    final cachedHash = await _storage.read(key: _keyPasswordHash);
+    if (cachedHash != null && cachedHash.isNotEmpty) {
+      final inputHash = sha256.convert(utf8.encode(password)).toString();
+      return cachedHash == inputHash;
+    }
+    return false;
+  }
+
+  Future<int> getInactivityTimeoutMinutes() async {
+    final raw = await _storage.read(key: 'auth_inactivity_minutes');
+    if (raw != null) {
+      final parsed = int.tryParse(raw);
+      if (parsed != null && parsed > 0) return parsed;
+    }
+    return 3; // Default 3 minutes as requested
+  }
+
+  Future<void> setInactivityTimeoutMinutes(int minutes) async {
+    await _storage.write(key: 'auth_inactivity_minutes', value: minutes.toString());
+  }
+
   Future<bool> isLoggedIn() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;
