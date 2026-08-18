@@ -24,8 +24,10 @@ import '../../features/attendance/presentation/student_attendance_screen.dart';
 import '../../features/academics/presentation/saisie_notes_screen.dart';
 import '../../features/academics/presentation/gestion_devoirs_screen.dart';
 import '../../features/finance/presentation/finance_dashboard_screen.dart';
+import '../../features/finance/presentation/cashflow_forecast_screen.dart';
 import '../../features/finance/presentation/student_fee_details_screen.dart';
 import '../../features/finance/presentation/record_payment_screen.dart';
+import '../../features/ministry/presentation/benchmarking_screen.dart';
 import '../../features/exams/presentation/exams_dashboard_screen.dart';
 import '../../features/exams/presentation/exam_results_screen.dart';
 import '../../features/exams/presentation/exam_form_screen.dart';
@@ -363,6 +365,21 @@ class AppRouter {
       GoRoute(
         path: '/pedagogie/planification',
         builder: (context, state) => const PlanificationScreen(),
+      ),
+      GoRoute(
+        path: '/finance/forecast',
+        builder: (context, state) => const GuardedScreen(
+          permission: AppPermissions.financeView,
+          child: CashflowForecastScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/ministry/dashboard',
+        builder: (context, state) => const MinistryDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/ministry/benchmarking',
+        builder: (context, state) => const BenchmarkingScreen(),
       ),
       GoRoute(
         path: '/pedagogie/progression',

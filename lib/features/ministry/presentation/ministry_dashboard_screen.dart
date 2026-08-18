@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/widgets/connectivity_widgets.dart';
 import '../../../core/widgets/sync_status_banner.dart';
@@ -401,6 +402,13 @@ class _MinistryDashboardScreenState extends State<MinistryDashboardScreen>
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.leaderboard_rounded, color: Color(0xFFF43F5E)),
+            onPressed: () => context.push('/ministry/benchmarking'),
+            tooltip: "Benchmark & Excellence Inter-Écoles",
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,

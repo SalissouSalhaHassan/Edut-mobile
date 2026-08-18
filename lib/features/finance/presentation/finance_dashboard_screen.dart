@@ -334,6 +334,11 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.analytics_rounded, color: Color(0xFF6366F1)),
+            onPressed: () => context.push('/finance/forecast'),
+            tooltip: "Prévisions de Trésorerie & Cashflow",
+          ),
+          IconButton(
             icon: const Icon(Icons.tune, color: AppColors.primary),
             onPressed: _showSessionSelector,
             tooltip: "Changer de Session",
