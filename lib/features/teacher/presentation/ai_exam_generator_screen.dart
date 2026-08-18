@@ -19,8 +19,8 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
   final _topicController = TextEditingController();
   late TabController _tabController;
 
-  String _selectedClass = '3ème B';
-  String _selectedSubject = 'Mathématiques';
+  String _selectedClass = '';
+  String _selectedSubject = '';
   String _selectedDifficulty = 'Intermédiaire';
   String _selectedDuration = '45 min';
   int _questionCount = 4;
@@ -28,8 +28,10 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
   bool _isGenerating = false;
   Map<String, dynamic>? _generatedExam;
 
-  final List<String> _classes = ['6ème A', '5ème B', '4ème A', '3ème B', '2nde A', '1ère D', 'Tle D'];
-  final List<String> _subjects = ['Mathématiques', 'Physique-Chimie', 'SVT', 'Français', 'Histoire-Géo', 'Anglais', 'Philosophie'];
+  List<String> _classes = [];
+  List<String> _subjects = [];
+  List<Map<String, dynamic>> _rawClassSubjects = [];
+
   final List<String> _difficulties = ['Facile', 'Intermédiaire', 'Examen Officiel / BEPC / BAC', 'Avancé'];
   final List<String> _durations = ['30 min', '45 min', '1 heure', '2 heures'];
 
@@ -37,9 +39,39 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    if (widget.initialClass != null) _selectedClass = widget.initialClass!;
-    if (widget.initialSubject != null) _selectedSubject = widget.initialSubject!;
     _topicController.text = 'Théorème de Pythagore & Trigonométrie';
+    _loadTeacherAssignments();
+  }
+
+  Future<void> _loadTeacherAssignments() async {
+    final list = await _teacherRepo.getTeacherClassesAndSubjects();
+    setState(() {
+      _rawClassSubjects = list;
+      final classNames = <String>{};
+      final subjectNames = <String>{};
+
+      for (final row in list) {
+        final cName = row['school_classes']?['class_name'] ?? row['class_name'];
+        final sName = row['school_subjects']?['subject_name'] ?? row['subject_name'];
+        if (cName != null && cName.toString().isNotEmpty) classNames.add(cName.toString());
+        if (sName != null && sName.toString().isNotEmpty) subjectNames.add(sName.toString());
+      }
+
+      _classes = classNames.isNotEmpty ? classNames.toList() : ['3ème B', '4ème A', 'Terminale D'];
+      _subjects = subjectNames.isNotEmpty ? subjectNames.toList() : ['Mathématiques', 'Physique-Chimie', 'SVT'];
+
+      if (widget.initialClass != null && _classes.contains(widget.initialClass)) {
+        _selectedClass = widget.initialClass!;
+      } else {
+        _selectedClass = _classes.first;
+      }
+
+      if (widget.initialSubject != null && _subjects.contains(widget.initialSubject)) {
+        _selectedSubject = widget.initialSubject!;
+      } else {
+        _selectedSubject = _subjects.first;
+      }
+    });
   }
 
   @override
@@ -165,7 +197,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Classe'),
-                          value: _selectedClass,
+                          value: _classes.contains(_selectedClass) ? _selectedClass : (_classes.isNotEmpty ? _classes.first : null),
                           items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           onChanged: (v) => setState(() => _selectedClass = v ?? _selectedClass),
                         ),
@@ -174,7 +206,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Matière'),
-                          value: _selectedSubject,
+                          value: _subjects.contains(_selectedSubject) ? _selectedSubject : (_subjects.isNotEmpty ? _subjects.first : null),
                           items: _subjects.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() => _selectedSubject = v ?? _selectedSubject),
                         ),

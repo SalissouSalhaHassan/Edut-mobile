@@ -13,16 +13,35 @@ class LiveDisciplineScreen extends StatefulWidget {
 
 class _LiveDisciplineScreenState extends State<LiveDisciplineScreen> {
   final _teacherRepo = locator<TeacherRepository>();
-  String _selectedClass = '3ème B';
+  String _selectedClass = '';
   bool _isLoading = true;
   List<Map<String, dynamic>> _students = [];
 
-  final List<String> _classes = ['6ème A', '5ème B', '4ème A', '3ème B', '2nde A', '1ère D', 'Tle D'];
+  List<String> _classes = [];
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialClass != null) _selectedClass = widget.initialClass!;
+    _initClassesAndStudents();
+  }
+
+  Future<void> _initClassesAndStudents() async {
+    final list = await _teacherRepo.getTeacherClassesAndSubjects();
+    final classNames = <String>{};
+    for (final row in list) {
+      final cName = row['school_classes']?['class_name'] ?? row['class_name'];
+      if (cName != null && cName.toString().isNotEmpty) classNames.add(cName.toString());
+    }
+
+    setState(() {
+      _classes = classNames.isNotEmpty ? classNames.toList() : ['3ème B', '4ème A', 'Terminale D'];
+      if (widget.initialClass != null && _classes.contains(widget.initialClass)) {
+        _selectedClass = widget.initialClass!;
+      } else {
+        _selectedClass = _classes.first;
+      }
+    });
+
     _loadStudents();
   }
 

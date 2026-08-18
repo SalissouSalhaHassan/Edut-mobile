@@ -22,24 +22,53 @@ class _AiFichePedagogiqueScreenState extends State<AiFichePedagogiqueScreen> {
   final _chapController = TextEditingController();
   final _lessonController = TextEditingController();
 
-  String _selectedClass = '3ème B';
-  String _selectedSubject = 'Mathématiques';
+  String _selectedClass = '';
+  String _selectedSubject = '';
   String _selectedDuration = '55 min';
 
   bool _isGenerating = false;
   bool _isSavingPlan = false;
   Map<String, dynamic>? _ficheData;
 
-  final List<String> _classes = ['6ème A', '5ème B', '4ème A', '3ème B', '2nde A', '1ère D', 'Tle D'];
-  final List<String> _subjects = ['Mathématiques', 'Physique-Chimie', 'SVT', 'Français', 'Histoire-Géo', 'Anglais', 'Philosophie'];
+  List<String> _classes = [];
+  List<String> _subjects = [];
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialClass != null) _selectedClass = widget.initialClass!;
-    if (widget.initialSubject != null) _selectedSubject = widget.initialSubject!;
     _chapController.text = 'Géométrie dans l\'Espace';
     _lessonController.text = widget.initialLesson ?? 'Sections planes de pyramides et de cônes';
+    _loadTeacherAssignments();
+  }
+
+  Future<void> _loadTeacherAssignments() async {
+    final list = await _teacherRepo.getTeacherClassesAndSubjects();
+    setState(() {
+      final classNames = <String>{};
+      final subjectNames = <String>{};
+
+      for (final row in list) {
+        final cName = row['school_classes']?['class_name'] ?? row['class_name'];
+        final sName = row['school_subjects']?['subject_name'] ?? row['subject_name'];
+        if (cName != null && cName.toString().isNotEmpty) classNames.add(cName.toString());
+        if (sName != null && sName.toString().isNotEmpty) subjectNames.add(sName.toString());
+      }
+
+      _classes = classNames.isNotEmpty ? classNames.toList() : ['3ème B', '4ème A', 'Terminale D'];
+      _subjects = subjectNames.isNotEmpty ? subjectNames.toList() : ['Mathématiques', 'Physique-Chimie', 'SVT'];
+
+      if (widget.initialClass != null && _classes.contains(widget.initialClass)) {
+        _selectedClass = widget.initialClass!;
+      } else {
+        _selectedClass = _classes.first;
+      }
+
+      if (widget.initialSubject != null && _subjects.contains(widget.initialSubject)) {
+        _selectedSubject = widget.initialSubject!;
+      } else {
+        _selectedSubject = _subjects.first;
+      }
+    });
   }
 
   @override
@@ -185,7 +214,7 @@ class _AiFichePedagogiqueScreenState extends State<AiFichePedagogiqueScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Classe'),
-                          value: _selectedClass,
+                          value: _classes.contains(_selectedClass) ? _selectedClass : (_classes.isNotEmpty ? _classes.first : null),
                           items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           onChanged: (v) => setState(() => _selectedClass = v ?? _selectedClass),
                         ),
@@ -194,7 +223,7 @@ class _AiFichePedagogiqueScreenState extends State<AiFichePedagogiqueScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Matière'),
-                          value: _selectedSubject,
+                          value: _subjects.contains(_selectedSubject) ? _selectedSubject : (_subjects.isNotEmpty ? _subjects.first : null),
                           items: _subjects.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() => _selectedSubject = v ?? _selectedSubject),
                         ),

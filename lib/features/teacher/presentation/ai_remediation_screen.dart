@@ -17,21 +17,51 @@ class _AiRemediationScreenState extends State<AiRemediationScreen> {
   final _teacherRepo = locator<TeacherRepository>();
   final _topicController = TextEditingController();
 
-  String _selectedClass = '3ème B';
-  String _selectedSubject = 'Mathématiques';
+  String _selectedClass = '';
+  String _selectedSubject = '';
 
   bool _isAnalyzing = false;
   Map<String, dynamic>? _diagnosticData;
 
-  final List<String> _classes = ['6ème A', '5ème B', '4ème A', '3ème B', '2nde A', '1ère D', 'Tle D'];
-  final List<String> _subjects = ['Mathématiques', 'Physique-Chimie', 'SVT', 'Français', 'Histoire-Géo', 'Anglais', 'Philosophie'];
+  List<String> _classes = [];
+  List<String> _subjects = [];
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialClass != null) _selectedClass = widget.initialClass!;
-    if (widget.initialSubject != null) _selectedSubject = widget.initialSubject!;
     _topicController.text = 'Théorème de Thalès & Équations';
+    _loadTeacherAssignments();
+  }
+
+  Future<void> _loadTeacherAssignments() async {
+    final list = await _teacherRepo.getTeacherClassesAndSubjects();
+    setState(() {
+      final classNames = <String>{};
+      final subjectNames = <String>{};
+
+      for (final row in list) {
+        final cName = row['school_classes']?['class_name'] ?? row['class_name'];
+        final sName = row['school_subjects']?['subject_name'] ?? row['subject_name'];
+        if (cName != null && cName.toString().isNotEmpty) classNames.add(cName.toString());
+        if (sName != null && sName.toString().isNotEmpty) subjectNames.add(sName.toString());
+      }
+
+      _classes = classNames.isNotEmpty ? classNames.toList() : ['3ème B', '4ème A', 'Terminale D'];
+      _subjects = subjectNames.isNotEmpty ? subjectNames.toList() : ['Mathématiques', 'Physique-Chimie', 'SVT'];
+
+      if (widget.initialClass != null && _classes.contains(widget.initialClass)) {
+        _selectedClass = widget.initialClass!;
+      } else {
+        _selectedClass = _classes.first;
+      }
+
+      if (widget.initialSubject != null && _subjects.contains(widget.initialSubject)) {
+        _selectedSubject = widget.initialSubject!;
+      } else {
+        _selectedSubject = _subjects.first;
+      }
+    });
+
     _runDiagnostic();
   }
 
@@ -42,6 +72,7 @@ class _AiRemediationScreenState extends State<AiRemediationScreen> {
   }
 
   Future<void> _runDiagnostic() async {
+    if (_selectedClass.isEmpty) return;
     setState(() => _isAnalyzing = true);
     try {
       final diag = await _teacherRepo.generateAiRemediation(

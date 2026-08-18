@@ -424,15 +424,24 @@ class AppRouter {
       ),
       GoRoute(
         path: '/teacher/ai-exam-generator',
-        builder: (context, state) => const AiExamGeneratorScreen(),
+        builder: (context, state) => AiExamGeneratorScreen(
+          initialClass: state.uri.queryParameters['class'],
+          initialSubject: state.uri.queryParameters['subject'],
+        ),
       ),
       GoRoute(
         path: '/teacher/ai-fiche-pedagogique',
-        builder: (context, state) => const AiFichePedagogiqueScreen(),
+        builder: (context, state) => AiFichePedagogiqueScreen(
+          initialClass: state.uri.queryParameters['class'],
+          initialSubject: state.uri.queryParameters['subject'],
+        ),
       ),
       GoRoute(
         path: '/teacher/ai-remediation',
-        builder: (context, state) => const AiRemediationScreen(),
+        builder: (context, state) => AiRemediationScreen(
+          initialClass: state.uri.queryParameters['class'],
+          initialSubject: state.uri.queryParameters['subject'],
+        ),
       ),
       GoRoute(
         path: '/teacher/live-discipline',
