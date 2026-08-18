@@ -751,6 +751,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (_isTeacher || _isSuperAdmin)
                   ListTile(
                     leading: const Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFF10B981),
+                    ),
+                    title: const Text('Live Discipline & Mérites'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/teacher/live-discipline');
+                    },
+                  ),
+                if (_isTeacher || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.badge_outlined,
+                      color: Color(0xFF0F766E),
+                    ),
+                    title: const Text('Mon Espace RH & Paie'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/teacher/self-service-hr');
+                    },
+                  ),
+                if (_isTeacher || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.shield_outlined,
+                      color: Color(0xFF334155),
+                    ),
+                    title: const Text('Protection DND & Réponses'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/teacher/comm-protection');
+                    },
+                  ),
+                if (_isTeacher || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
                       Icons.menu_book,
                       color: Color(0xFF0D9488),
                     ),

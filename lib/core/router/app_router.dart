@@ -56,6 +56,9 @@ import '../../features/teacher/presentation/teacher_cockpit_screen.dart';
 import '../../features/teacher/presentation/ai_exam_generator_screen.dart';
 import '../../features/teacher/presentation/ai_fiche_pedagogique_screen.dart';
 import '../../features/teacher/presentation/ai_remediation_screen.dart';
+import '../../features/teacher/presentation/live_discipline_screen.dart';
+import '../../features/teacher/presentation/teacher_self_service_hr_screen.dart';
+import '../../features/teacher/presentation/teacher_comm_protection_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -430,6 +433,21 @@ class AppRouter {
       GoRoute(
         path: '/teacher/ai-remediation',
         builder: (context, state) => const AiRemediationScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/live-discipline',
+        builder: (context, state) {
+          final cls = state.uri.queryParameters['class'];
+          return LiveDisciplineScreen(initialClass: cls);
+        },
+      ),
+      GoRoute(
+        path: '/teacher/self-service-hr',
+        builder: (context, state) => const TeacherSelfServiceHrScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/comm-protection',
+        builder: (context, state) => const TeacherCommProtectionScreen(),
       ),
     ],
   );
