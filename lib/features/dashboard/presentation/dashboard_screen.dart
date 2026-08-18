@@ -689,6 +689,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context.push('/hostel');
                     },
                   ),
+                if (_hasHrAccess || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.admin_panel_settings_rounded,
+                      color: Color(0xFF1E293B),
+                    ),
+                    title: const Text('QG Direction & Approbations', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Validation demandes & Suivi bida', style: TextStyle(fontSize: 11)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/admin/director-cockpit');
+                    },
+                  ),
                 if (_hasHrAccess)
                   ListTile(
                     leading: const Icon(

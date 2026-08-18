@@ -59,6 +59,7 @@ import '../../features/teacher/presentation/ai_remediation_screen.dart';
 import '../../features/teacher/presentation/live_discipline_screen.dart';
 import '../../features/teacher/presentation/teacher_self_service_hr_screen.dart';
 import '../../features/teacher/presentation/teacher_comm_protection_screen.dart';
+import '../../features/hr/presentation/director_cockpit_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -493,6 +494,14 @@ class AppRouter {
       GoRoute(
         path: '/teacher/comm-protection',
         builder: (context, state) => const TeacherCommProtectionScreen(),
+      ),
+      GoRoute(
+        path: '/admin/director-cockpit',
+        builder: (context, state) => const DirectorCockpitScreen(),
+      ),
+      GoRoute(
+        path: '/director/cockpit',
+        builder: (context, state) => const DirectorCockpitScreen(),
       ),
     ],
   );

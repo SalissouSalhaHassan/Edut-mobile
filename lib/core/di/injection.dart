@@ -16,6 +16,7 @@ import '../../features/exams/data/exams_repository.dart';
 import '../../features/students/data/students_repository.dart';
 import '../../features/hostel/data/hostel_repository.dart';
 import '../../features/hr/data/hr_repository.dart';
+import '../../features/hr/data/director_repository.dart';
 import '../../features/owner/data/owner_repository.dart';
 import '../../features/messaging/data/messaging_repository.dart';
 import '../../features/dashboard/data/dashboard_stats_repository.dart';
@@ -134,6 +135,10 @@ Future<void> setupLocator() async {
 
   locator.registerLazySingleton<TeacherRepository>(
     () => TeacherRepository(apiClient: locator<MobileApiClient>()),
+  );
+
+  locator.registerLazySingleton<DirectorRepository>(
+    () => DirectorRepository(apiClient: locator<MobileApiClient>()),
   );
 
   locator.registerLazySingleton<PedagogieRepository>(
