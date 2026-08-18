@@ -16,6 +16,8 @@ import '../../messaging/data/messaging_repository.dart';
 import '../../ai/data/ai_repository.dart';
 import '../../ai/presentation/early_warning_card.dart';
 import 'voice_note_player_card.dart';
+import 'student_health_profile_sheet.dart';
+import 'sms_inquiry_helper_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
 import '../../academics/utils/timetable_pdf_generator.dart';
 import 'package:pdf/pdf.dart';
@@ -606,7 +608,44 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           _buildHeroCard(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          // Quick Service Shortcuts
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildQuickActionChip(
+                  label: "Santé & Infirmerie",
+                  icon: Icons.local_hospital_rounded,
+                  color: const Color(0xFFEF4444),
+                  onTap: () => StudentHealthProfileSheet.show(
+                    context,
+                    studentId: _student['id'] as int? ?? 1,
+                    studentName: _student['nom_etudiant'] as String? ?? 'Élève',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Annales BEPC / BAC",
+                  icon: Icons.menu_book_rounded,
+                  color: const Color(0xFF2563EB),
+                  onTap: () => context.push('/library/past-exams'),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Interroger par SMS",
+                  icon: Icons.sms_rounded,
+                  color: const Color(0xFF10B981),
+                  onTap: () => SmsInquiryHelperDialog.show(
+                    context,
+                    matricule: _student['num_admission'] as String? ?? 'MAT-2025',
+                    studentName: _student['nom_etudiant'] as String? ?? 'Élève',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -729,6 +768,41 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionChip({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

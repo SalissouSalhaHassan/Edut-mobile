@@ -50,6 +50,8 @@ import '../auth/session_manager.dart';
 import '../../features/pedagogie/presentation/cahier_textes_screen.dart';
 import '../../features/pedagogie/presentation/planification_screen.dart';
 import '../../features/pedagogie/presentation/progression_screen.dart';
+import '../../features/health/presentation/school_clinic_screen.dart';
+import '../../features/library/presentation/past_exams_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -280,6 +282,14 @@ class AppRouter {
             studentName: studentName,
           );
         },
+      ),
+      GoRoute(
+        path: '/health/clinic',
+        builder: (context, state) => const SchoolClinicScreen(),
+      ),
+      GoRoute(
+        path: '/library/past-exams',
+        builder: (context, state) => const PastExamsScreen(),
       ),
       GoRoute(
         path: '/finance/dashboard',

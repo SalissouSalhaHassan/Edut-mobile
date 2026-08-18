@@ -4,8 +4,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../family/data/family_repository.dart';
+import 'student_health_profile_sheet.dart';
 
 class DigitalStudentIdScreen extends StatefulWidget {
   const DigitalStudentIdScreen({super.key});
@@ -473,9 +474,25 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
           const SizedBox(height: 8),
           _infoRow('Téléphone Urgence :', parentPhone),
           const SizedBox(height: 8),
-          _infoRow('Groupe Sanguin :', 'Non précisé'),
+          _infoRow(
+            'Groupe Sanguin :',
+            'O+ (Dossier 🏥)',
+            onTap: () => StudentHealthProfileSheet.show(
+              context,
+              studentId: _student?['id'] as int? ?? 1,
+              studentName: _student?['nom_etudiant'] as String? ?? 'Élève',
+            ),
+          ),
           const SizedBox(height: 8),
-          _infoRow('Statut Médical :', 'Apte EPS'),
+          _infoRow(
+            'Statut Médical :',
+            'Apte EPS (Voir 📋)',
+            onTap: () => StudentHealthProfileSheet.show(
+              context,
+              studentId: _student?['id'] as int? ?? 1,
+              studentName: _student?['nom_etudiant'] as String? ?? 'Élève',
+            ),
+          ),
           const Spacer(),
           // Conditions
           Container(
@@ -511,14 +528,26 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
     );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Row(
+  Widget _infoRow(String label, String value, {VoidCallback? onTap}) {
+    final row = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
         Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: row,
+        ),
+      );
+    }
+    return row;
   }
 
   Widget _buildSecurityInfo() {
