@@ -374,6 +374,16 @@ class AuthRepository {
           "DEBUG LOGIN: Session resolved through Edut web API -> Role: ${canonicalProfile.role}, SchoolId: ${canonicalProfile.schoolId}",
         );
         return const LoginResult.success();
+      } on MobileApiException catch (apiErr) {
+        if (apiErr.message.contains("Compte non relié") || apiErr.message.contains("supprimé")) {
+          debugPrint("DEBUG LOGIN: Account is deleted/unlinked on server. Blocking login: $apiErr");
+          await _client.auth.signOut();
+          await _sessionManager.clearSession();
+          return const LoginResult.failure(
+            'Ce compte a été supprimé ou désactivé. Veuillez contacter l\'administrateur.',
+          );
+        }
+        debugPrint("DEBUG LOGIN: Mobile API warning: $apiErr");
       } catch (e, stack) {
         debugPrint(
           "DEBUG LOGIN: Edut web API profile unavailable, using fast Supabase fallback: $e\n$stack",
@@ -484,8 +494,9 @@ class AuthRepository {
 
       // 2. Query employees table to get employee ID
       String employeeId = '';
+      Map<String, dynamic>? employeeData;
       try {
-        final employeeData = await _client
+        employeeData = await _client
             .from('employees')
             .select('id, school_id')
             .eq('email', effectiveLoginEmail)
@@ -516,6 +527,16 @@ class AuthRepository {
         userData: userData,
       );
 
+      // CRITICAL CHECK: If user does not exist in users table AND not in employees AND not in students
+      if (userData == null && employeeData == null && studentProfile == null) {
+        debugPrint("DEBUG LOGIN: Account is deleted (no record in users, employees, or students). Rejecting login.");
+        await _client.auth.signOut();
+        await _sessionManager.clearSession();
+        return const LoginResult.failure(
+          'Ce compte a été supprimé ou n\'existe plus. Veuillez contacter l\'administrateur.',
+        );
+      }
+
       if ((role == 'student' || role == 'parent') && studentProfile == null) {
         debugPrint(
           "WARNING: $role account logged in but no linked student record was found.",
@@ -524,17 +545,6 @@ class AuthRepository {
 
       if (studentProfile != null && schoolIdStr == null) {
         schoolIdStr = studentProfile['school_id']?.toString();
-      }
-
-      if (role == 'staff') {
-        debugPrint(
-          "WARNING: User logged in but no specific role was found (defaults to 'staff').",
-        );
-        debugPrint("Full Auth Response - User ID: ${response.user?.id}");
-        debugPrint("Full Auth Response - User Email: ${response.user?.email}");
-        debugPrint(
-          "Full Auth Response - User Metadata: ${response.user?.userMetadata}",
-        );
       }
 
       debugPrint(
@@ -566,21 +576,17 @@ class AuthRepository {
           'Veuillez confirmer cet email avant de vous connecter.',
         );
       }
-      final isOfflineValid = await _sessionManager.validateOfflineCredentials(email, password);
-      if (isOfflineValid) {
-        debugPrint("DEBUG LOGIN: Offline login validation succeeded!");
-        return const LoginResult.success();
-      }
       return LoginResult.failure('Erreur d\'authentification: ${e.message}');
     } catch (e, stack) {
-      debugPrint("DEBUG LOGIN: Unexpected error during login: $e\n$stack");
+      debugPrint("DEBUG LOGIN: Network or unexpected error during login: $e\n$stack");
+      // Only fallback to offline cache if this is truly a network/connectivity error
       final isOfflineValid = await _sessionManager.validateOfflineCredentials(email, password);
       if (isOfflineValid) {
         debugPrint("DEBUG LOGIN: Offline login validation succeeded after network error!");
         return const LoginResult.success();
       }
       return const LoginResult.failure(
-        'Mode hors-ligne: Aucun compte valide trouvé en cache pour ces identifiants.',
+        'Impossible de se connecter. Vérifiez votre connexion Internet ou vos identifiants.',
       );
     }
   }

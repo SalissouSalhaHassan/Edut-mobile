@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
+import '../api/mobile_api_client.dart';
 import '../auth/role_redirect.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
@@ -373,8 +374,43 @@ class _SplashScreenState extends State<SplashScreen> {
     final isLoggedIn = await sessionManager.isLoggedIn();
     if (!mounted) return;
     if (isLoggedIn) {
-      final role = await sessionManager.getRole() ?? 'staff';
+      // Proactively verify if the user account is still valid and not deleted
+      try {
+        final token = await sessionManager.getToken();
+        if (token != null && token.isNotEmpty) {
+          final profile = await locator<MobileApiClient>()
+              .getCurrentProfile(accessToken: token)
+              .timeout(const Duration(seconds: 3));
+
+          await sessionManager.saveSession(
+            token: token,
+            email: profile.email,
+            role: profile.role,
+            employeeId: profile.employeeId ?? '',
+            userId: profile.userId,
+            schoolId: profile.schoolId,
+            studentId: profile.studentId,
+            studentName: profile.studentName,
+            studentClass: profile.studentClass,
+            permissions: profile.permissions,
+          );
+        }
+      } on MobileApiException catch (e) {
+        if (e.message.contains("Compte non relié") ||
+            e.message.contains("supprimé") ||
+            e.message.contains("invalide")) {
+          debugPrint("[SplashScreen] User account was deleted on server. Clearing session.");
+          await sessionManager.clearSession();
+          if (!mounted) return;
+          context.go('/login');
+          return;
+        }
+      } catch (e) {
+        debugPrint("[SplashScreen] Background profile verification: $e");
+      }
+
       if (!mounted) return;
+      final role = await sessionManager.getRole() ?? 'staff';
       context.go(getHomeRouteForRole(role));
     } else {
       context.go('/login');
