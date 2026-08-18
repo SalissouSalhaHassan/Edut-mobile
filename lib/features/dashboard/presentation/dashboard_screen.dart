@@ -845,6 +845,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context.push('/finance/dashboard');
                     },
                   ),
+                if (_hasFinanceAccess || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.mark_chat_unread_rounded,
+                      color: Color(0xFF0F766E),
+                    ),
+                    title: const Text('Relances Frais WhatsApp & SMS', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Rappels impayés multilingues', style: TextStyle(fontSize: 11)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/finance/fee-reminders');
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(
                     Icons.insert_chart,

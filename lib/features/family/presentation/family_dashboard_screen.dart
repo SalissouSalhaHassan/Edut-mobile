@@ -633,6 +633,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 ),
                 const SizedBox(width: 8),
                 _buildQuickActionChip(
+                  label: "Suivi Bus GPS",
+                  icon: Icons.directions_bus_filled_rounded,
+                  color: const Color(0xFF2563EB),
+                  onTap: () => context.push('/family/transport'),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
                   label: "Prédicteur BEPC / BAC",
                   icon: Icons.auto_awesome_rounded,
                   color: const Color(0xFF6D28D9),

@@ -61,6 +61,8 @@ import '../../features/teacher/presentation/teacher_self_service_hr_screen.dart'
 import '../../features/teacher/presentation/teacher_comm_protection_screen.dart';
 import '../../features/hr/presentation/director_cockpit_screen.dart';
 import '../../features/ai/presentation/exam_predictor_screen.dart';
+import '../../features/family/presentation/family_transport_screen.dart';
+import '../../features/finance/presentation/smart_fee_reminders_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -531,6 +533,22 @@ class AppRouter {
             studentClass: sClass,
           );
         },
+      ),
+      GoRoute(
+        path: '/family/transport',
+        builder: (context, state) => const FamilyTransportScreen(),
+      ),
+      GoRoute(
+        path: '/transport',
+        builder: (context, state) => const FamilyTransportScreen(),
+      ),
+      GoRoute(
+        path: '/finance/fee-reminders',
+        builder: (context, state) => const SmartFeeRemindersScreen(),
+      ),
+      GoRoute(
+        path: '/admin/fee-reminders',
+        builder: (context, state) => const SmartFeeRemindersScreen(),
       ),
     ],
   );
