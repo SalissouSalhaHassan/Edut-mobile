@@ -361,6 +361,50 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     return items;
   }
 
+  double _extractNormalizedScoreOn20(Map<String, dynamic> row) {
+    final rawTotal = (row['total_score'] as num?)?.toDouble();
+    final classWork = (row['class_work_score'] as num?)?.toDouble();
+    final exam = (row['exam_score'] as num?)?.toDouble();
+    final coef = ((row['coefficient'] as num?)?.toDouble() ?? 1.0).clamp(0.5, 20.0);
+
+    double? score;
+
+    // 1. If classWork & exam exist with standard note <= 20
+    if (classWork != null && exam != null && classWork > 0 && exam > 0) {
+      if (classWork <= 20.0 && exam <= 20.0) {
+        score = (classWork + exam) / 2.0;
+      }
+    }
+
+    // 2. Check raw total
+    if (score == null && rawTotal != null && rawTotal > 0) {
+      if (rawTotal <= 20.0) {
+        score = rawTotal;
+      } else if (coef > 1.0 && (rawTotal / coef) <= 20.0) {
+        // rawTotal was weighted score (score * coef)
+        score = rawTotal / coef;
+      } else if (rawTotal <= 40.0) {
+        // rawTotal was sum of 2 grades out of 20 (sum = 40)
+        score = rawTotal / 2.0;
+      } else if (rawTotal <= 100.0) {
+        // rawTotal was percentage out of 100
+        score = (rawTotal / 100.0) * 20.0;
+      } else {
+        score = 20.0;
+      }
+    } else if (score == null) {
+      if (exam != null && exam > 0) {
+        score = exam <= 20.0 ? exam : (exam <= 100.0 ? (exam / 100.0) * 20.0 : 20.0);
+      } else if (classWork != null && classWork > 0) {
+        score = classWork <= 20.0 ? classWork : (classWork <= 100.0 ? (classWork / 100.0) * 20.0 : 20.0);
+      } else {
+        score = 0.0;
+      }
+    }
+
+    return score.clamp(0.0, 20.0);
+  }
+
   Map<String, double> get _gradeSummary {
     final list = _selectedPeriod == null 
         ? _grades 
@@ -368,18 +412,22 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     if (list.isEmpty) {
       return {'average': 0, 'best': 0, 'risk': 0};
     }
-    double total = 0;
+    double totalPoints = 0;
+    double totalCoef = 0;
     double best = 0;
     int risk = 0;
     for (final row in list) {
-      final score = (row['total_score'] as num?)?.toDouble() ?? 0;
-      total += score;
+      final score = _extractNormalizedScoreOn20(row);
+      final coef = ((row['coefficient'] as num?)?.toDouble() ?? 1.0).clamp(0.5, 20.0);
+      totalPoints += score * coef;
+      totalCoef += coef;
       if (score > best) best = score;
       if (score < 10) risk++;
     }
+    final avg = totalCoef > 0 ? (totalPoints / totalCoef) : (totalPoints / list.length);
     return {
-      'average': total / list.length,
-      'best': best,
+      'average': avg.clamp(0.0, 20.0),
+      'best': best.clamp(0.0, 20.0),
       'risk': risk.toDouble(),
     };
   }
@@ -1129,7 +1177,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   Widget _buildLineChartCard(List<Map<String, dynamic>> filteredGrades) {
     final bars = <FlSpot>[];
     for (var i = 0; i < filteredGrades.length; i++) {
-      final score = (filteredGrades[i]['total_score'] as num?)?.toDouble() ?? 0;
+      final score = _extractNormalizedScoreOn20(filteredGrades[i]);
       bars.add(FlSpot(i.toDouble(), score));
     }
 
@@ -1473,7 +1521,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     final subject = row['school_subjects']?['subject_name'] ?? 'Matière';
     final devoir = (row['class_work_score'] as num?)?.toDouble() ?? 0;
     final exam = (row['exam_score'] as num?)?.toDouble() ?? 0;
-    final total = (row['total_score'] as num?)?.toDouble() ?? 0;
+    final total = _extractNormalizedScoreOn20(row);
     final appreciation = row['appreciation'] ?? '-';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

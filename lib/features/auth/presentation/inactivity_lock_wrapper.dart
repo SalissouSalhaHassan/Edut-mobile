@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/services/inactivity_lock_service.dart';
 import '../data/auth_repository.dart';
 
@@ -146,12 +147,22 @@ class _AppLockScreenOverlayState extends State<_AppLockScreenOverlay> {
   }
 
   Future<void> _logout() async {
-    locator<InactivityLockService>().unlock();
-    await locator<AuthRepository>().logout();
-    if (!mounted) return;
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
     try {
-      GoRouter.of(context).go('/login');
+      await locator<AuthRepository>().logout();
     } catch (_) {}
+    locator<InactivityLockService>().unlock();
+    try {
+      AppRouter.router.go('/login');
+    } catch (_) {
+      if (mounted) {
+        GoRouter.of(context).go('/login');
+      }
+    }
   }
 
   @override
