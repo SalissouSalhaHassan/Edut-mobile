@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../data/payment_gateway_service.dart';
@@ -313,7 +316,21 @@ class _MobileMoneyPaymentDialogState extends State<MobileMoneyPaymentDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
+
+        // PDF Receipt Button
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF0F766E),
+            side: const BorderSide(color: Color(0xFF0D9488), width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          onPressed: () => _printOfficialReceiptPdf(res, formattedDate),
+          icon: const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Color(0xFF0D9488)),
+          label: const Text('Télécharger Reçu Officiel PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+        const SizedBox(height: 12),
 
         SizedBox(
           width: double.infinity,
@@ -330,6 +347,154 @@ class _MobileMoneyPaymentDialogState extends State<MobileMoneyPaymentDialog> {
         ),
       ],
     );
+  }
+
+  Future<void> _printOfficialReceiptPdf(MobileMoneyPaymentResult res, String formattedDate) async {
+    try {
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('RÉPUBLIQUE DU NIGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        pw.Text('MINISTÈRE DE L\'ÉDUCATION NATIONALE', style: const pw.TextStyle(fontSize: 8)),
+                        pw.SizedBox(height: 4),
+                        pw.Text('COMPLEXE SCOLAIRE PRIVÉ EDUT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.teal800)),
+                        pw.Text('Caisse Numérique & Paiements Mobile Money', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      ],
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.teal800, width: 1.5),
+                        borderRadius: pw.BorderRadius.circular(6),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text('QUITTANCE DE PAIEMENT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.teal900)),
+                          pw.Text('Réf: ${res.reference}', style: const pw.TextStyle(fontSize: 8.5)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 14),
+                pw.Divider(thickness: 1, color: PdfColors.teal800),
+                pw.SizedBox(height: 10),
+
+                // Payment Info Box
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.grey100,
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColors.grey300),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Élève Bénéficiaire : ${widget.studentName}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Motif / Rubrique : ${res.purpose}', style: const pw.TextStyle(fontSize: 10)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Opérateur : ${res.providerName}', style: const pw.TextStyle(fontSize: 10)),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text('Date & Heure : $formattedDate', style: const pw.TextStyle(fontSize: 9.5)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Statut : Payé & Validé', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.teal800)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Amount Box
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(14),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.teal50,
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColors.teal700, width: 1.5),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('MONTANT TOTAL REÇU :', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.teal900)),
+                      pw.Text('${res.amount.toStringAsFixed(0)} FCFA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18, color: PdfColors.teal900)),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 35),
+
+                // Signatures & Stamp
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text('Le Payeur / Tuteur', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                        pw.SizedBox(height: 30),
+                        pw.Text('Reçu électronique', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text('Pour la Direction de l\'Établissement', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                        pw.SizedBox(height: 6),
+                        pw.Container(
+                          width: 85,
+                          height: 35,
+                          alignment: pw.Alignment.center,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.teal700, style: pw.BorderStyle.dashed),
+                            borderRadius: pw.BorderRadius.circular(4),
+                          ),
+                          child: pw.Text('[ Cachet Numérique & QR ]', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.teal800)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Quittance_Paiement_${res.reference}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur génération reçu: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _receiptRow(String label, String value) {

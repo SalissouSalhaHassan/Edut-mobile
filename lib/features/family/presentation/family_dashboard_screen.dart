@@ -18,6 +18,7 @@ import '../../ai/presentation/early_warning_card.dart';
 import 'voice_note_player_card.dart';
 import 'student_health_profile_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
+import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
 import '../../academics/utils/timetable_pdf_generator.dart';
 import 'package:pdf/pdf.dart';
@@ -615,6 +616,34 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             child: Row(
               children: [
                 _buildQuickActionChip(
+                  label: "Payer (Mobile Money)",
+                  icon: Icons.account_balance_wallet_rounded,
+                  color: const Color(0xFF0D9488),
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (ctx) => MobileMoneyPaymentDialog(
+                      studentId: _student['id'] as int? ?? _studentId ?? 1,
+                      studentName: _student['nom_etudiant'] as String? ?? _studentName,
+                      defaultAmount: 25000,
+                      onPaymentSuccess: (res) {
+                        _loadData();
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Prédicteur BEPC / BAC",
+                  icon: Icons.auto_awesome_rounded,
+                  color: const Color(0xFF6D28D9),
+                  onTap: () => context.push('/family/exam-predictor', extra: {
+                    'studentId': _student['id'] as int? ?? _studentId ?? 1,
+                    'studentName': _student['nom_etudiant'] as String? ?? _studentName,
+                    'studentClass': _studentClass,
+                  }),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
                   label: "Santé & Infirmerie",
                   icon: Icons.local_hospital_rounded,
                   color: const Color(0xFFEF4444),
@@ -646,6 +675,11 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // Teacher Voice Notes Player Card (Hausa, Zarma, Français, Arabe)
+          VoiceNotePlayerCard(studentId: _student['id'] as int? ?? _studentId ?? 1),
+
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

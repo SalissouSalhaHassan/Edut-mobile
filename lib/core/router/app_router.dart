@@ -60,6 +60,7 @@ import '../../features/teacher/presentation/live_discipline_screen.dart';
 import '../../features/teacher/presentation/teacher_self_service_hr_screen.dart';
 import '../../features/teacher/presentation/teacher_comm_protection_screen.dart';
 import '../../features/hr/presentation/director_cockpit_screen.dart';
+import '../../features/ai/presentation/exam_predictor_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -502,6 +503,34 @@ class AppRouter {
       GoRoute(
         path: '/director/cockpit',
         builder: (context, state) => const DirectorCockpitScreen(),
+      ),
+      GoRoute(
+        path: '/family/exam-predictor',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final sId = extra['studentId'] as int? ?? int.tryParse(state.uri.queryParameters['studentId'] ?? '');
+          final sName = extra['studentName'] as String? ?? state.uri.queryParameters['studentName'];
+          final sClass = extra['studentClass'] as String? ?? state.uri.queryParameters['studentClass'];
+          return ExamPredictorScreen(
+            studentId: sId,
+            studentName: sName,
+            studentClass: sClass,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/ai/exam-predictor',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final sId = extra['studentId'] as int? ?? int.tryParse(state.uri.queryParameters['studentId'] ?? '');
+          final sName = extra['studentName'] as String? ?? state.uri.queryParameters['studentName'];
+          final sClass = extra['studentClass'] as String? ?? state.uri.queryParameters['studentClass'];
+          return ExamPredictorScreen(
+            studentId: sId,
+            studentName: sName,
+            studentClass: sClass,
+          );
+        },
       ),
     ],
   );
