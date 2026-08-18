@@ -72,6 +72,11 @@ class SessionManager {
       await _storage.read(key: _keyStudentId);
   Future<String?> getStudentName() async =>
       await _storage.read(key: _keyStudentName);
+  Future<String?> getUserName() async {
+    final name = await getStudentName();
+    if (name != null && name.isNotEmpty) return name;
+    return await getEmail();
+  }
   Future<String?> getStudentClass() async =>
       await _storage.read(key: _keyStudentClass);
 

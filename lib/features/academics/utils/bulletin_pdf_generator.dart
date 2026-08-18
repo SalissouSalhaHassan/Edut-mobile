@@ -616,7 +616,7 @@ class OfficialBulletinPdfGenerator {
               pw.Center(
                 child: pw.Text(
                   'Il ne sera pas délivré de duplicata de ce relevé. Il vous appartient d\'en faire des copies et de les faire certifier conformes.',
-                  style: const pw.TextStyle(fontSize: 6.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700),
+                  style: pw.TextStyle(fontSize: 6.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700),
                 ),
               ),
             ],
