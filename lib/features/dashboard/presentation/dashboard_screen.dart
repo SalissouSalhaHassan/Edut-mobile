@@ -15,6 +15,8 @@ import '../../academics/data/academics_repository.dart';
 import '../../exams/data/exams_repository.dart';
 import '../data/dashboard_stats_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
+import '../../teacher/presentation/teacher_cockpit_widget.dart';
+import '../../teacher/presentation/classroom_tools_modal.dart';
 import 'dart:async';
 import '../../../core/services/push_notification_service.dart';
 
@@ -713,6 +715,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (_isTeacher || _isSuperAdmin)
                   ListTile(
                     leading: const Icon(
+                      Icons.auto_awesome,
+                      color: Color(0xFF2563EB),
+                    ),
+                    title: const Text('Générateur d\'Examens IA'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/teacher/ai-exam-generator');
+                    },
+                  ),
+                if (_isTeacher || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.assignment_turned_in,
+                      color: Color(0xFF0D9488),
+                    ),
+                    title: const Text('Fiche Pédagogique APC (IA)'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/teacher/ai-fiche-pedagogique');
+                    },
+                  ),
+                if (_isTeacher || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.analytics,
+                      color: Color(0xFF4F46E5),
+                    ),
+                    title: const Text('Diagnostic & Remédiation IA'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/teacher/ai-remediation');
+                    },
+                  ),
+                if (_isTeacher || _isSuperAdmin)
+                  ListTile(
+                    leading: const Icon(
                       Icons.menu_book,
                       color: Color(0xFF0D9488),
                     ),
@@ -1107,10 +1145,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           const CacheStatusChip(),
           const SizedBox(height: 12),
-          _buildWelcomeCard(),
-          const SizedBox(height: 28),
+          if (isTeacher) ...[
+            const TeacherCockpitWidget(),
+            const SizedBox(height: 28),
+          ] else ...[
+            _buildWelcomeCard(),
+            const SizedBox(height: 28),
+          ],
 
-          _buildSectionTitle('Actions rapides', Icons.grid_view_rounded),
+          _buildSectionTitle('Actions & Outils', Icons.grid_view_rounded),
           const SizedBox(height: 16),
 
           _buildQuickActionsGrid(isTeacher),
@@ -1128,6 +1171,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildQuickActionsGrid(bool isTeacher) {
     final List<Widget> quickActions = [
+      if (isTeacher) ...[
+        _buildQuickActionCard(
+          title: 'Examens IA',
+          description: 'Génération quiz & devoirs',
+          icon: Icons.auto_awesome_rounded,
+          color: const Color(0xFF2563EB),
+          onTap: () => context.push('/teacher/ai-exam-generator'),
+        ),
+        _buildQuickActionCard(
+          title: 'Fiche APC IA',
+          description: 'Préparation de leçon',
+          icon: Icons.assignment_turned_in_rounded,
+          color: const Color(0xFF0D9488),
+          onTap: () => context.push('/teacher/ai-fiche-pedagogique'),
+        ),
+        _buildQuickActionCard(
+          title: 'Diagnostic IA',
+          description: 'Remédiation élèves',
+          icon: Icons.analytics_rounded,
+          color: const Color(0xFF4F46E5),
+          onTap: () => context.push('/teacher/ai-remediation'),
+        ),
+        _buildQuickActionCard(
+          title: 'Outils Classe',
+          description: 'Tirage & Chronomètre',
+          icon: Icons.casino_rounded,
+          color: const Color(0xFF6D28D9),
+          onTap: () => ClassroomToolsModal.show(context),
+        ),
+      ],
       if (_hasStudentsAccess)
         _buildQuickActionCard(
           title: 'Etudiants',

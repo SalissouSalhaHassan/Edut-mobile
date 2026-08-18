@@ -52,6 +52,10 @@ import '../../features/pedagogie/presentation/planification_screen.dart';
 import '../../features/pedagogie/presentation/progression_screen.dart';
 import '../../features/health/presentation/school_clinic_screen.dart';
 import '../../features/library/presentation/past_exams_screen.dart';
+import '../../features/teacher/presentation/teacher_cockpit_screen.dart';
+import '../../features/teacher/presentation/ai_exam_generator_screen.dart';
+import '../../features/teacher/presentation/ai_fiche_pedagogique_screen.dart';
+import '../../features/teacher/presentation/ai_remediation_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -410,6 +414,22 @@ class AppRouter {
       GoRoute(
         path: '/pedagogie/progression',
         builder: (context, state) => const ProgressionScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/cockpit',
+        builder: (context, state) => const TeacherCockpitScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/ai-exam-generator',
+        builder: (context, state) => const AiExamGeneratorScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/ai-fiche-pedagogique',
+        builder: (context, state) => const AiFichePedagogiqueScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/ai-remediation',
+        builder: (context, state) => const AiRemediationScreen(),
       ),
     ],
   );

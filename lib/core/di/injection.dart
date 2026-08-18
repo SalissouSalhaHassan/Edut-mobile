@@ -21,6 +21,9 @@ import '../../features/messaging/data/messaging_repository.dart';
 import '../../features/dashboard/data/dashboard_stats_repository.dart';
 import '../../features/ministry/data/ministry_repository.dart';
 import '../../features/ai/data/ai_repository.dart';
+import '../../features/teacher/data/teacher_repository.dart';
+import '../../features/pedagogie/data/pedagogie_repository.dart';
+import '../../features/pedagogie/data/planification_repository.dart';
 import '../services/push_notification_service.dart';
 import '../services/inactivity_lock_service.dart';
 
@@ -127,6 +130,18 @@ Future<void> setupLocator() async {
 
   locator.registerLazySingleton<AiRepository>(
     () => AiRepository(apiClient: locator<MobileApiClient>()),
+  );
+
+  locator.registerLazySingleton<TeacherRepository>(
+    () => TeacherRepository(apiClient: locator<MobileApiClient>()),
+  );
+
+  locator.registerLazySingleton<PedagogieRepository>(
+    () => PedagogieRepository(client: supabaseManager.client, apiClient: locator<MobileApiClient>()),
+  );
+
+  locator.registerLazySingleton<PlanificationRepository>(
+    () => PlanificationRepository(client: supabaseManager.client, apiClient: locator<MobileApiClient>()),
   );
 
   locator.registerLazySingleton<MobilePushNotificationService>(

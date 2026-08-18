@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/auth/session_manager.dart';
-import '../../../core/di/injection';
+import '../../../core/di/injection.dart';
 import '../data/planification_repository.dart';
 
 const _typeOptions = ['Annuel', 'Mensuel', 'Hebdomadaire', 'Officiel'];
