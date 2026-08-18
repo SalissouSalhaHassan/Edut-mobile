@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/api/supabase_client.dart';
 import '../data/academics_repository.dart';
+import '../../ai/data/ai_repository.dart';
 
 class GestionDevoirsScreen extends StatefulWidget {
   final int classId;
@@ -361,6 +362,130 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     );
   }
 
+  void _showAiQuizGeneratorDialog() {
+    final lessonController = TextEditingController(text: 'Évaluation formative');
+    bool isGenerating = false;
+    List<Map<String, dynamic>> generatedQuestions = [];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1)),
+                  SizedBox(width: 8),
+                  Text("Générateur de Quiz IA", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Matière : ${widget.subjectName} • Classe : ${widget.className}",
+                        style: const TextStyle(fontSize: 12, color: AppColors.slate600, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: lessonController,
+                        decoration: const InputDecoration(
+                          labelText: "Titre de la leçon / Thème",
+                          hintText: "Ex: Les équations du second degré...",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: isGenerating
+                            ? null
+                            : () async {
+                                setDialogState(() {
+                                  isGenerating = true;
+                                  generatedQuestions = [];
+                                });
+                                final questions = await locator<AiRepository>().generateQuizQuestions(
+                                  lessonTitle: lessonController.text.trim(),
+                                  subjectName: widget.subjectName,
+                                  className: widget.className,
+                                  count: 3,
+                                );
+                                setDialogState(() {
+                                  isGenerating = false;
+                                  generatedQuestions = questions;
+                                });
+                              },
+                        icon: isGenerating
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.flash_on_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          isGenerating ? 'Génération en cours...' : 'Générer les questions ✨',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          minimumSize: const Size(double.infinity, 44),
+                        ),
+                      ),
+                      if (generatedQuestions.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        const Text(
+                          "Questions générées :",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.slate900),
+                        ),
+                        const SizedBox(height: 8),
+                        ...generatedQuestions.map((q) => Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Q${q['id'] ?? '•'} : ${q['question']}",
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  if (q['hint'] != null)
+                                    Text(
+                                      "Indice : ${q['hint']}",
+                                      style: const TextStyle(fontSize: 10.5, color: AppColors.slate500),
+                                    ),
+                                ],
+                              ),
+                            )),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Fermer"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showPeriodSelector() {
     showModalBottomSheet(
       context: context,
@@ -470,6 +595,11 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         foregroundColor: AppColors.slate900,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1)),
+            onPressed: _showAiQuizGeneratorDialog,
+            tooltip: 'Générateur de questions IA',
+          ),
           IconButton(
             icon: const Icon(Icons.tune, color: AppColors.primary),
             onPressed: _showPeriodSelector,

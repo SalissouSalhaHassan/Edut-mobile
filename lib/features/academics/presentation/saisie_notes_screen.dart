@@ -7,6 +7,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/api/supabase_client.dart';
 import '../data/academics_repository.dart';
 import '../utils/calculations.dart';
+import '../../ai/data/ai_repository.dart';
 
 class SaisieNotesScreen extends StatefulWidget {
   final int classId;
@@ -576,39 +577,99 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
 
   void _showObservationDialog(int studentId, String studentName) {
     final controller = TextEditingController(text: _observations[studentId] ?? '');
+    bool isGenerating = false;
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text("Observation : $studentName", style: AppTextStyles.heading3),
-          content: TextField(
-            controller: controller,
-            enabled: _canManageAcademics,
-            decoration: const InputDecoration(
-              hintText: "Saisir une remarque...",
-              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-            ),
-            maxLines: 3,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Annuler", style: TextStyle(color: AppColors.slate500)),
-            ),
-            ElevatedButton(
-              onPressed: !_canManageAcademics
-                  ? null
-                  : () {
-                setState(() {
-                  _observations[studentId] = controller.text.trim();
-                });
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text("Enregistrer", style: TextStyle(color: Colors.white)),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text("Observation : $studentName", style: AppTextStyles.heading3),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: controller,
+                    enabled: _canManageAcademics && !isGenerating,
+                    decoration: const InputDecoration(
+                      hintText: "Saisir une remarque...",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 8),
+                  if (_canManageAcademics)
+                    InkWell(
+                      onTap: isGenerating
+                          ? null
+                          : () async {
+                              setDialogState(() => isGenerating = true);
+                              final cw = double.tryParse(_classWorkControllers[studentId]?.text ?? '') ?? 12.0;
+                              final ex = double.tryParse(_examControllers[studentId]?.text ?? '') ?? cw;
+                              final score = ((cw + ex) / 2.0).clamp(0.0, 20.0);
+                              final app = await locator<AiRepository>().generateGradeAppreciation(
+                                studentName: studentName,
+                                subjectName: widget.subjectName,
+                                score: score,
+                                className: widget.className,
+                              );
+                              setDialogState(() {
+                                isGenerating = false;
+                                controller.text = app;
+                              });
+                            },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isGenerating)
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1)),
+                              )
+                            else
+                              const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1), size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              isGenerating ? 'Génération IA...' : 'Suggérer une appréciation IA ✨',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6366F1),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Annuler", style: TextStyle(color: AppColors.slate500)),
+                ),
+                ElevatedButton(
+                  onPressed: !_canManageAcademics || isGenerating
+                      ? null
+                      : () {
+                          setState(() {
+                            _observations[studentId] = controller.text.trim();
+                          });
+                          Navigator.pop(context);
+                        },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                  child: const Text("Enregistrer", style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
         );
       },
     );

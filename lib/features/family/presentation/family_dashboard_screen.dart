@@ -13,6 +13,8 @@ import '../../../core/widgets/sync_status_banner.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/family_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
+import '../../ai/data/ai_repository.dart';
+import '../../ai/presentation/early_warning_card.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
 import '../../academics/utils/timetable_pdf_generator.dart';
 import 'package:pdf/pdf.dart';
@@ -53,6 +55,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   String? _selectedPeriod;
   List<Map<String, dynamic>> _attendance = [];
   List<Map<String, dynamic>> _homework = [];
+  Map<String, dynamic>? _aiWarningData;
 
   @override
   void initState() {
@@ -236,6 +239,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         _loadGrades().catchError((e) => _appendError("Grades", e)),
         _loadAttendance().catchError((e) => _appendError("Attendance", e)),
         _loadHomework().catchError((e) => _appendError("Homework", e)),
+        _loadAiWarning().catchError((e) => debugPrint("AI warning load error: $e")),
       ]);
 
       if (mounted) {
@@ -300,6 +304,16 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     if (mounted) {
       setState(() {
         _homework = res;
+      });
+    }
+  }
+
+  Future<void> _loadAiWarning() async {
+    if (_studentId == null) return;
+    final res = await locator<AiRepository>().getEarlyWarningAnalysis(studentId: _studentId!);
+    if (mounted && res != null) {
+      setState(() {
+        _aiWarningData = res;
       });
     }
   }
@@ -623,6 +637,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           else
             ...todayCourses.map(_buildTimetableCard),
           const SizedBox(height: 24),
+          if (_aiWarningData != null) ...[
+            EarlyWarningCard(
+              data: _aiWarningData!,
+              onOpenTutor: () => context.push('/ai/tutor'),
+            ),
+            const SizedBox(height: 16),
+          ],
           _buildSectionTitle('Aperçu rapide', Icons.insights),
           const SizedBox(height: 12),
           Row(
@@ -645,7 +666,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          _buildSectionTitle('Services scolaires', Icons.dashboard_customize),
+          _buildSectionTitle('Services scolaires & IA', Icons.dashboard_customize),
           const SizedBox(height: 12),
           GridView.count(
             shrinkWrap: true,
@@ -656,36 +677,50 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             childAspectRatio: 1.15,
             children: [
               _buildServiceCard(
+                title: 'Tuteur IA',
+                subtitle: 'Assistance & révisions 24/7',
+                icon: Icons.auto_awesome_rounded,
+                color: const Color(0xFF6366F1),
+                onTap: () => context.push('/ai/tutor'),
+              ),
+              _buildServiceCard(
+                title: 'Carte Scolaire',
+                subtitle: 'Badge QR code dynamique',
+                icon: Icons.badge_rounded,
+                color: const Color(0xFF0284C7),
+                onTap: () => context.push('/family/student-id'),
+              ),
+              _buildServiceCard(
                 title: 'Finance',
-                subtitle: 'Frais, paiements et recus PDF',
+                subtitle: 'Frais, paiements et reçus PDF',
                 icon: Icons.account_balance_wallet_rounded,
                 color: const Color(0xFF0F766E),
                 onTap: () => context.push('/family/finance'),
               ),
               _buildServiceCard(
                 title: 'Transport',
-                subtitle: 'Bus, GPS et ramassage',
+                subtitle: 'Bus GPS & suivi direct',
                 icon: Icons.directions_bus_rounded,
                 color: const Color(0xFF2563EB),
                 onTap: () => context.push('/family/transport'),
               ),
               _buildServiceCard(
-                title: 'Bibliotheque',
-                subtitle: 'Livres, reservations et retours',
+                title: 'Bibliothèque',
+                subtitle: 'Livres, emprunts & retours',
                 icon: Icons.local_library_rounded,
                 color: const Color(0xFF7C3AED),
                 onTap: () => context.push('/family/library'),
               ),
               _buildServiceCard(
                 title: 'Internat',
-                subtitle: 'Chambre, batiment et dortoir',
+                subtitle: 'Chambre, bâtiment & dortoir',
                 icon: Icons.hotel_rounded,
                 color: const Color(0xFFD97706),
                 onTap: () => context.push('/family/hostel'),
               ),
               _buildServiceCard(
                 title: 'Notifications',
-                subtitle: 'Messages de l ecole',
+                subtitle: 'Messages de l\'école',
                 icon: Icons.notifications_active_rounded,
                 color: const Color(0xFFF43F5E),
                 onTap: () => context.push('/notifications'),

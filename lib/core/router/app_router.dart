@@ -12,6 +12,8 @@ import '../../features/family/presentation/family_finance_screen.dart';
 import '../../features/family/presentation/family_library_screen.dart';
 import '../../features/family/presentation/family_transport_screen.dart';
 import '../../features/family/presentation/family_hostel_screen.dart';
+import '../../features/family/presentation/digital_student_id_screen.dart';
+import '../../features/ai/presentation/ai_tutor_screen.dart';
 import '../../features/students/presentation/students_management_screen.dart';
 import '../../features/students/presentation/student_details_screen.dart';
 import '../../features/students/presentation/student_form_screen.dart';
@@ -141,6 +143,14 @@ class AppRouter {
       GoRoute(
         path: '/family/hostel',
         builder: (context, state) => const FamilyHostelScreen(),
+      ),
+      GoRoute(
+        path: '/family/student-id',
+        builder: (context, state) => const DigitalStudentIdScreen(),
+      ),
+      GoRoute(
+        path: '/ai/tutor',
+        builder: (context, state) => const AiTutorScreen(),
       ),
       GoRoute(
         path: '/students',

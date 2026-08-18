@@ -34,12 +34,13 @@ class _MobileMoneyPaymentDialogState extends State<MobileMoneyPaymentDialog> {
   MobileMoneyPaymentResult? _successResult;
 
   final List<Map<String, String>> _providers = [
-    {'id': 'AIRTEL_MONEY', 'name': 'Airtel Money 🇳🇪', 'sub': 'Niger (Airtel)'},
+    {'id': 'AIRTEL_MONEY', 'name': 'Airtel Money 🇳🇪', 'sub': 'Paiement direct Airtel'},
+    {'id': 'ORANGE_MONEY', 'name': 'Orange Money 🌍', 'sub': 'Paiement Mobile Orange'},
+    {'id': 'AMANA', 'name': 'Amana Ta Tsabta 🇳🇪', 'sub': 'Transfert express Niger'},
+    {'id': 'NITA', 'name': 'Nita / Al-Izza 🇳🇪', 'sub': 'Transfert national instantané'},
+    {'id': 'WAVE', 'name': 'Wave Mobile 🌊', 'sub': 'Transfert direct sans frais'},
     {'id': 'MOOV_MONEY', 'name': 'Moov / Flooz 🇳🇪', 'sub': 'Niger (Moov)'},
-    {'id': 'ORANGE_MONEY', 'name': 'Orange Money', 'sub': 'Afrique de l\'Ouest'},
-    {'id': 'WAVE', 'name': 'Wave Mobile', 'sub': 'Transfert direct'},
-    {'id': 'NITA', 'name': 'Nita / Al-Izza 🇳🇪', 'sub': 'Transfert national'},
-    {'id': 'BANK_CARD', 'name': 'Carte Bancaire', 'sub': 'Visa / Mastercard'},
+    {'id': 'BANK_CARD', 'name': 'Carte Bancaire 💳', 'sub': 'Visa / Mastercard'},
   ];
 
   @override
