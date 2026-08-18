@@ -197,6 +197,18 @@ class MobileApiClient {
     return _parseBody(response.data);
   }
 
+  Future<Map<String, dynamic>> putJson(
+    String path,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _dio.put<Map<String, dynamic>>(
+      path,
+      data: data,
+      options: await _authOptions(),
+    );
+    return _parseBody(response.data);
+  }
+
   Future<Map<String, dynamic>> patchJson(
     String path, [
     Map<String, dynamic>? data,

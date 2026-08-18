@@ -1,14 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/supabase_client.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 
 class PedagogieRepository {
   final SupabaseClient _client;
+  final MobileApiClient _apiClient;
 
-  PedagogieRepository({SupabaseClient? client})
-      : _client = client ?? SupabaseClientManager().client;
+  PedagogieRepository({SupabaseClient? client, MobileApiClient? apiClient})
+      : _client = client ?? SupabaseClientManager().client,
+        _apiClient = apiClient ?? locator<MobileApiClient>();
 
   static const _selectFields =
       'id, class_id, subject_id, employee_id, session_date, heure_debut, heure_fin, '
@@ -24,6 +27,23 @@ class PedagogieRepository {
     String? dateDebut,
     String? dateFin,
   }) async {
+    // 1. Try Backend API
+    try {
+      final queryParams = <String>[];
+      if (classId != null) queryParams.add('classId=$classId');
+      if (subjectId != null) queryParams.add('subjectId=$subjectId');
+      if (statut != null && statut.isNotEmpty) queryParams.add('statut=$statut');
+
+      final url = '/api/mobile/pedagogie/cahier-textes${queryParams.isNotEmpty ? '?${queryParams.join('&')}' : ''}';
+      final res = await _apiClient.getJson(url);
+      if (res['success'] == true && res['data'] != null) {
+        return List<Map<String, dynamic>>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getSeances failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       final session = locator<SessionManager>();
       final employeeIdStr = await session.getEmployeeId();
@@ -34,10 +54,8 @@ class PedagogieRepository {
 
       var q = _client.from('cahier_textes').select(_selectFields);
 
-      // Build conditions list - apply via chained calls
       List<dynamic> result;
 
-      // Teacher scope filter applied as the initial filter
       if (isTeacher) {
         final employeeId = int.tryParse(employeeIdStr ?? '');
         if (employeeId != null) {
@@ -80,30 +98,43 @@ class PedagogieRepository {
     }
   }
 
-  // ─── Get teacher classes for picker ───────────────────────────────────────
+  // ─── Fetch classes & subjects for current teacher ─────────────────────────
   Future<List<Map<String, dynamic>>> getTeacherClassesAndSubjects() async {
     try {
       final session = locator<SessionManager>();
       final employeeIdStr = await session.getEmployeeId();
       final employeeId = int.tryParse(employeeIdStr ?? '');
 
-      if (employeeId == null) return [];
-
-      final List<dynamic> response = await _client
+      var q = _client
           .from('class_subjects')
           .select(
-            'class_id, subject_id, school_classes(class_name), school_subjects(subject_name)',
-          )
-          .eq('employee_id', employeeId);
+            'class_id, subject_id, teacher_id, '
+            'school_classes(id, class_name), '
+            'school_subjects(id, subject_name)',
+          );
 
-      return List<Map<String, dynamic>>.from(response);
+      if (employeeId != null) {
+        final res = await q.eq('teacher_id', employeeId);
+        if ((res as List).isNotEmpty) {
+          return List<Map<String, dynamic>>.from(res);
+        }
+      }
+
+      final allRes = await _client
+          .from('class_subjects')
+          .select(
+            'class_id, subject_id, teacher_id, '
+            'school_classes(id, class_name), '
+            'school_subjects(id, subject_name)',
+          );
+      return List<Map<String, dynamic>>.from(allRes);
     } catch (e) {
       debugPrint('PedagogieRepository.getTeacherClassesAndSubjects error: $e');
       return [];
     }
   }
 
-  // ─── CREATE séance ─────────────────────────────────────────────────────────
+  // ─── CREATE séance ────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> createSeance({
     required int classId,
     required int subjectId,
@@ -119,6 +150,37 @@ class PedagogieRepository {
     String? observation,
     String? anneeScolaire,
   }) async {
+    final payload = <String, dynamic>{
+      'classId': classId,
+      'subjectId': subjectId,
+      'employeeId': employeeId,
+      'sessionDate': sessionDate,
+      'titreLecon': titreLecon,
+      'heureDebut': heureDebut,
+      'heureFin': heureFin,
+      'objectifs': objectifs,
+      'contenuRealise': contenuRealise,
+      'supportsUtilises': supportsUtilises,
+      'devoirDonne': devoirDonne,
+      'observation': observation,
+      'statut': 'Brouillon',
+      'anneeScolaire': anneeScolaire ?? '2025-2026',
+    };
+
+    // 1. Try Backend API (Bypasses Postgres Client RLS)
+    try {
+      final res = await _apiClient.postJson(
+        '/api/mobile/pedagogie/cahier-textes',
+        payload,
+      );
+      if (res['success'] == true && res['data'] != null) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API createSeance failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       final session = locator<SessionManager>();
       final schoolIdStr = await session.getSchoolId();
@@ -134,30 +196,14 @@ class PedagogieRepository {
       };
 
       if (schoolId != null) data['school_id'] = schoolId;
-      if (heureDebut != null && heureDebut.isNotEmpty) {
-        data['heure_debut'] = heureDebut;
-      }
-      if (heureFin != null && heureFin.isNotEmpty) {
-        data['heure_fin'] = heureFin;
-      }
-      if (objectifs != null && objectifs.isNotEmpty) {
-        data['objectifs'] = objectifs;
-      }
-      if (contenuRealise != null && contenuRealise.isNotEmpty) {
-        data['contenu_realise'] = contenuRealise;
-      }
-      if (supportsUtilises != null && supportsUtilises.isNotEmpty) {
-        data['supports_utilises'] = supportsUtilises;
-      }
-      if (devoirDonne != null && devoirDonne.isNotEmpty) {
-        data['devoir_donne'] = devoirDonne;
-      }
-      if (observation != null && observation.isNotEmpty) {
-        data['observation'] = observation;
-      }
-      if (anneeScolaire != null && anneeScolaire.isNotEmpty) {
-        data['annee_scolaire'] = anneeScolaire;
-      }
+      if (heureDebut != null && heureDebut.isNotEmpty) data['heure_debut'] = heureDebut;
+      if (heureFin != null && heureFin.isNotEmpty) data['heure_fin'] = heureFin;
+      if (objectifs != null && objectifs.isNotEmpty) data['objectifs'] = objectifs;
+      if (contenuRealise != null && contenuRealise.isNotEmpty) data['contenu_realise'] = contenuRealise;
+      if (supportsUtilises != null && supportsUtilises.isNotEmpty) data['supports_utilises'] = supportsUtilises;
+      if (devoirDonne != null && devoirDonne.isNotEmpty) data['devoir_donne'] = devoirDonne;
+      if (observation != null && observation.isNotEmpty) data['observation'] = observation;
+      if (anneeScolaire != null && anneeScolaire.isNotEmpty) data['annee_scolaire'] = anneeScolaire;
 
       final List<dynamic> response =
           await _client.from('cahier_textes').insert(data).select();
@@ -183,6 +229,32 @@ class PedagogieRepository {
     String? observation,
     String? statut,
   }) async {
+    final payload = <String, dynamic>{
+      'id': id,
+      if (titreLecon != null) 'titreLecon': titreLecon,
+      if (sessionDate != null) 'sessionDate': sessionDate,
+      if (heureDebut != null) 'heureDebut': heureDebut,
+      if (heureFin != null) 'heureFin': heureFin,
+      if (objectifs != null) 'objectifs': objectifs,
+      if (contenuRealise != null) 'contenuRealise': contenuRealise,
+      if (supportsUtilises != null) 'supportsUtilises': supportsUtilises,
+      if (devoirDonne != null) 'devoirDonne': devoirDonne,
+      if (observation != null) 'observation': observation,
+      if (statut != null) 'statut': statut,
+    };
+
+    // 1. Try Backend API
+    try {
+      final res = await _apiClient.putJson(
+        '/api/mobile/pedagogie/cahier-textes',
+        payload,
+      );
+      if (res['success'] == true) return;
+    } catch (e) {
+      debugPrint('API updateSeance failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       final data = <String, dynamic>{
         'updated_at': DateTime.now().toIso8601String(),
@@ -194,9 +266,7 @@ class PedagogieRepository {
       if (heureFin != null) data['heure_fin'] = heureFin;
       if (objectifs != null) data['objectifs'] = objectifs;
       if (contenuRealise != null) data['contenu_realise'] = contenuRealise;
-      if (supportsUtilises != null) {
-        data['supports_utilises'] = supportsUtilises;
-      }
+      if (supportsUtilises != null) data['supports_utilises'] = supportsUtilises;
       if (devoirDonne != null) data['devoir_donne'] = devoirDonne;
       if (observation != null) data['observation'] = observation;
       if (statut != null) data['statut'] = statut;
@@ -215,6 +285,15 @@ class PedagogieRepository {
 
   // ─── DELETE séance ─────────────────────────────────────────────────────────
   Future<void> deleteSeance(int id) async {
+    // 1. Try Backend API
+    try {
+      final res = await _apiClient.deleteJson('/api/mobile/pedagogie/cahier-textes?id=$id');
+      if (res['success'] == true) return;
+    } catch (e) {
+      debugPrint('API deleteSeance failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       await _client.from('cahier_textes').delete().eq('id', id);
     } catch (e) {
