@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/api/mobile_api_client.dart';
+import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 
 class TeacherRepository {
