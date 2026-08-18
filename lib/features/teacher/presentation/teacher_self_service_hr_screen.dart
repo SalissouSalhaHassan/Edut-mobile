@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/teacher_repository.dart';
 import '../../../core/di/injection.dart';
@@ -376,14 +379,16 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Net à Payer : $net FCFA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F766E))),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('📄 Téléchargement du bulletin de paie PDF...'), backgroundColor: Color(0xFF0D9488)),
-                      );
-                    },
-                    icon: const Icon(Icons.download_rounded, size: 16),
-                    label: const Text('Fiche PDF', style: TextStyle(fontSize: 11.5)),
+                  ElevatedButton.icon(
+                    onPressed: () => _generateAndPrintPayslipPdf(p, _hrData['employee']),
+                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 16, color: Colors.white),
+                    label: const Text('Fiche PDF', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
                   ),
                 ],
               ),
@@ -392,6 +397,234 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
         );
       },
     );
+  }
+
+  Future<void> _generateAndPrintPayslipPdf(Map<String, dynamic> payslip, Map<String, dynamic>? employee) async {
+    try {
+      final pdf = pw.Document();
+      final month = payslip['monthYear'] ?? 'Mois En Cours';
+      final net = (payslip['netSalary'] as num?)?.toInt() ?? 0;
+      final base = (payslip['basicSalary'] as num?)?.toInt() ?? 0;
+      final primes = (payslip['totalAllowance'] as num?)?.toInt() ?? 0;
+      final deductions = (payslip['totalDeduction'] as num?)?.toInt() ?? 0;
+      final status = payslip['status'] ?? 'Payé';
+      final paymentDate = payslip['paymentDate']?.toString().split('T').first ?? DateTime.now().toIso8601String().split('T').first;
+      final paymentMode = payslip['paymentMode'] ?? 'Virement Bancaire';
+
+      final empName = employee?['name'] ?? 'Professeur';
+      final empPoste = employee?['poste'] ?? 'Professeur Titulaire';
+      final empMatricule = employee?['matricule'] ?? 'ENS-2025-042';
+      final empDept = employee?['departement'] ?? 'Sciences Exactes';
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('RÉPUBLIQUE DU NIGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        pw.Text('MINISTÈRE DE L\'ÉDUCATION NATIONALE', style: const pw.TextStyle(fontSize: 8)),
+                        pw.SizedBox(height: 4),
+                        pw.Text('COMPLEXE SCOLAIRE PRIVÉ D\'EXCELLENCE EDUT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.teal800)),
+                        pw.Text('Système Intégré de Gestion Scolaire & RH', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                      ],
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.teal700, width: 1.5),
+                        borderRadius: pw.BorderRadius.circular(6),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text('BULLETIN DE PAIE', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.teal900)),
+                          pw.Text('Période : $month', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 14),
+                pw.Divider(thickness: 1, color: PdfColors.teal700),
+                pw.SizedBox(height: 10),
+
+                // Employee Info Box
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.grey100,
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColors.grey300),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Nom & Prénoms : $empName', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10.5)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Matricule : $empMatricule', style: const pw.TextStyle(fontSize: 9.5)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Emploi / Fonction : $empPoste', style: const pw.TextStyle(fontSize: 9.5)),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Département : $empDept', style: const pw.TextStyle(fontSize: 9.5)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Mode de règlement : $paymentMode', style: const pw.TextStyle(fontSize: 9.5)),
+                          pw.SizedBox(height: 3),
+                          pw.Text('Date de paiement : $paymentDate', style: const pw.TextStyle(fontSize: 9.5)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 18),
+
+                // Earnings & Deductions Table
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.8),
+                  children: [
+                    // Table Header
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.teal800),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Rubrique / Désignation', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Gains (FCFA)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Text('Retenues (FCFA)', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10)),
+                        ),
+                      ],
+                    ),
+                    // Salaire de base
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Salaire de Base Contractuel', style: const pw.TextStyle(fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('$base', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('-', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9.5))),
+                      ],
+                    ),
+                    // Primes
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Indemnités & Primes Pédagogiques', style: const pw.TextStyle(fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('$primes', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('-', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9.5))),
+                      ],
+                    ),
+                    // Cotisations & Deductions
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Retenues Fiscales & Sociales (IUTS / CNSS)', style: const pw.TextStyle(fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('-', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('$deductions', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 9.5))),
+                      ],
+                    ),
+                    // Totaux
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('TOTAL BRUT & DÉDUCTIONS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('${base + primes}', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5))),
+                        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('$deductions', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5))),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 16),
+
+                // Net Pay Box
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.teal50,
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColors.teal700, width: 1.5),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('NET À PAYER AU SALARIÉ :', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.teal900)),
+                          pw.Text('Statut : $status • Quittance certifiée conforme', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700)),
+                        ],
+                      ),
+                      pw.Text('$net FCFA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.teal900)),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 35),
+
+                // Signatures
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text('Le Salarié / Titulaire', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                        pw.SizedBox(height: 35),
+                        pw.Text('Lu et approuvé', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text('Pour l\'Établissement (Direction)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                        pw.SizedBox(height: 8),
+                        pw.Container(
+                          width: 90,
+                          height: 35,
+                          alignment: pw.Alignment.center,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.teal700, style: pw.BorderStyle.dashed),
+                            borderRadius: pw.BorderRadius.circular(4),
+                          ),
+                          child: pw.Text('[ Cachet Numérique & Signature ]', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.teal800)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Bulletin_Paie_${month.replaceAll(' ', '_')}_$empMatricule.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur génération PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildExtraHoursTab(num totalEarned, List<dynamic> extraList) {

@@ -283,7 +283,7 @@ class _TeacherCockpitWidgetState extends State<TeacherCockpitWidget> {
                           children: [
                             const Icon(Icons.meeting_room_rounded, color: Colors.white70, size: 14),
                             const SizedBox(width: 4),
-                            Text('$roomName • $startTime → $endTime', style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+                            Text('${roomName.startsWith("Salle") ? roomName : "Salle $roomName"} • $startTime → $endTime', style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
                           ],
                         ),
                       ],
@@ -301,7 +301,15 @@ class _TeacherCockpitWidgetState extends State<TeacherCockpitWidget> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => context.push('/attendance'),
+                      onPressed: () => context.push(
+                        '/attendance?classId=${session?['classId'] ?? 1}&className=${Uri.encodeComponent(className)}&subjectId=${session?['subjectId'] ?? ''}&subjectName=${Uri.encodeComponent(subjectName)}',
+                        extra: {
+                          'classId': session?['classId'] ?? 1,
+                          'className': className,
+                          'subjectId': session?['subjectId'],
+                          'subjectName': subjectName,
+                        },
+                      ),
                       icon: const Icon(Icons.fact_check_rounded, size: 16, color: Color(0xFF6D28D9)),
                       label: const Text('Faire l\'appel', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF6D28D9))),
                       style: ElevatedButton.styleFrom(

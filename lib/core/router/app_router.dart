@@ -214,14 +214,50 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/attendance',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final classId = extra['classId'] as int? ??
+              int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 1;
+          final className = extra['className'] as String? ??
+              state.uri.queryParameters['className'] ??
+              state.uri.queryParameters['class'] ?? '3ème B';
+          final subjectId = extra['subjectId'] as int? ??
+              int.tryParse(state.uri.queryParameters['subjectId'] ?? '');
+          final subjectName = extra['subjectName'] as String? ??
+              state.uri.queryParameters['subjectName'] ??
+              state.uri.queryParameters['subject'];
+          final initialDateStr = extra['initialDateStr'] as String? ??
+              state.uri.queryParameters['initialDateStr'];
+
+          return GuardedScreen(
+            permission: AppPermissions.attendanceView,
+            child: StudentAttendanceScreen(
+              classId: classId,
+              className: className,
+              subjectId: subjectId,
+              subjectName: subjectName,
+              initialDateStr: initialDateStr,
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: '/attendance/student-roll',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
-          final classId = extra['classId'] as int;
-          final className = extra['className'] as String;
-          final subjectId = extra['subjectId'] as int?;
-          final subjectName = extra['subjectName'] as String?;
-          final initialDateStr = extra['initialDateStr'] as String?;
+          final classId = extra['classId'] as int? ??
+              int.tryParse(state.uri.queryParameters['classId'] ?? '') ?? 1;
+          final className = extra['className'] as String? ??
+              state.uri.queryParameters['className'] ??
+              state.uri.queryParameters['class'] ?? '3ème B';
+          final subjectId = extra['subjectId'] as int? ??
+              int.tryParse(state.uri.queryParameters['subjectId'] ?? '');
+          final subjectName = extra['subjectName'] as String? ??
+              state.uri.queryParameters['subjectName'] ??
+              state.uri.queryParameters['subject'];
+          final initialDateStr = extra['initialDateStr'] as String? ??
+              state.uri.queryParameters['initialDateStr'];
 
           return GuardedScreen(
             permission: AppPermissions.attendanceView,
