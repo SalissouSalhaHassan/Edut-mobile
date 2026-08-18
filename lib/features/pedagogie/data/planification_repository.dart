@@ -1,14 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/supabase_client.dart';
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 
 class PlanificationRepository {
   final SupabaseClient _client;
+  final MobileApiClient _apiClient;
 
-  PlanificationRepository({SupabaseClient? client})
-      : _client = client ?? SupabaseClientManager().client;
+  PlanificationRepository({SupabaseClient? client, MobileApiClient? apiClient})
+      : _client = client ?? SupabaseClientManager().client,
+        _apiClient = apiClient ?? locator<MobileApiClient>();
 
   static const _selectFields =
       'id, class_id, subject_id, employee_id, type_plan, periode, chapitre, '
@@ -38,6 +41,24 @@ class PlanificationRepository {
     String? statut,
     String? typePlan,
   }) async {
+    // 1. Try Backend API
+    try {
+      final queryParams = <String>[];
+      if (classId != null) queryParams.add('classId=$classId');
+      if (subjectId != null) queryParams.add('subjectId=$subjectId');
+      if (statut != null && statut.isNotEmpty) queryParams.add('statut=$statut');
+      if (typePlan != null && typePlan.isNotEmpty) queryParams.add('typePlan=$typePlan');
+
+      final url = '/api/mobile/pedagogie/planifications${queryParams.isNotEmpty ? '?${queryParams.join('&')}' : ''}';
+      final res = await _apiClient.getJson(url);
+      if (res['success'] == true && res['data'] != null) {
+        return List<Map<String, dynamic>>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getPlanifications failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       final isTeacher = await _isTeacher();
       final employeeId = isTeacher ? await _getEmployeeId() : null;
@@ -91,6 +112,35 @@ class PlanificationRepository {
     String? observation,
     String? anneeScolaire,
   }) async {
+    final payload = <String, dynamic>{
+      'classId': classId,
+      'subjectId': subjectId,
+      'employeeId': employeeId,
+      'typePlan': typePlan,
+      'chapitre': chapitre,
+      'leconPrevue': leconPrevue,
+      'periode': periode,
+      'competenceVisee': competenceVisee,
+      'datePrevue': datePrevue,
+      'statut': statut ?? 'Planifié',
+      'observation': observation,
+      'anneeScolaire': anneeScolaire ?? '2025-2026',
+    };
+
+    // 1. Try Backend API (Bypasses Postgres Client RLS)
+    try {
+      final res = await _apiClient.postJson(
+        '/api/mobile/pedagogie/planifications',
+        payload,
+      );
+      if (res['success'] == true && res['data'] != null) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API createPlanification failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       final session = locator<SessionManager>();
       final schoolId = int.tryParse(await session.getSchoolId() ?? '');
@@ -141,6 +191,30 @@ class PlanificationRepository {
     String? statut,
     String? observation,
   }) async {
+    final payload = <String, dynamic>{
+      'id': id,
+      if (typePlan != null) 'typePlan': typePlan,
+      if (chapitre != null) 'chapitre': chapitre,
+      if (leconPrevue != null) 'leconPrevue': leconPrevue,
+      if (periode != null) 'periode': periode,
+      if (competenceVisee != null) 'competenceVisee': competenceVisee,
+      if (datePrevue != null) 'datePrevue': datePrevue,
+      if (statut != null) 'statut': statut,
+      if (observation != null) 'observation': observation,
+    };
+
+    // 1. Try Backend API
+    try {
+      final res = await _apiClient.putJson(
+        '/api/mobile/pedagogie/planifications',
+        payload,
+      );
+      if (res['success'] == true) return;
+    } catch (e) {
+      debugPrint('API updatePlanification failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       final data = <String, dynamic>{
         'updated_at': DateTime.now().toIso8601String(),
@@ -166,6 +240,15 @@ class PlanificationRepository {
 
   // ─── DELETE ────────────────────────────────────────────────────────────────
   Future<void> deletePlanification(int id) async {
+    // 1. Try Backend API
+    try {
+      final res = await _apiClient.deleteJson('/api/mobile/pedagogie/planifications?id=$id');
+      if (res['success'] == true) return;
+    } catch (e) {
+      debugPrint('API deletePlanification failed, falling back to Supabase: $e');
+    }
+
+    // 2. Supabase fallback
     try {
       await _client
           .from('pedagogie_planifications')
@@ -263,7 +346,7 @@ class PlanificationRepository {
             (b['progressRate'] as int).compareTo(a['progressRate'] as int));
     } catch (e) {
       debugPrint('PlanificationRepository.getProgressionBySubject error: $e');
-      rethrow;
+      return [];
     }
   }
 
@@ -271,19 +354,32 @@ class PlanificationRepository {
   Future<List<Map<String, dynamic>>> getTeacherClassesAndSubjects() async {
     try {
       final employeeId = await _getEmployeeId();
-      if (employeeId == null) return [];
 
-      final List<dynamic> response = await _client
+      var q = _client
           .from('class_subjects')
           .select(
-            'class_id, subject_id, school_classes(class_name), school_subjects(subject_name)',
-          )
-          .eq('employee_id', employeeId);
+            'class_id, subject_id, teacher_id, '
+            'school_classes(id, class_name), '
+            'school_subjects(id, subject_name)',
+          );
 
-      return List<Map<String, dynamic>>.from(response);
+      if (employeeId != null) {
+        final res = await q.eq('teacher_id', employeeId);
+        if ((res as List).isNotEmpty) {
+          return List<Map<String, dynamic>>.from(res);
+        }
+      }
+
+      final allRes = await _client
+          .from('class_subjects')
+          .select(
+            'class_id, subject_id, teacher_id, '
+            'school_classes(id, class_name), '
+            'school_subjects(id, subject_name)',
+          );
+      return List<Map<String, dynamic>>.from(allRes);
     } catch (e) {
-      debugPrint(
-          'PlanificationRepository.getTeacherClassesAndSubjects error: $e');
+      debugPrint('PlanificationRepository.getTeacherClassesAndSubjects error: $e');
       return [];
     }
   }

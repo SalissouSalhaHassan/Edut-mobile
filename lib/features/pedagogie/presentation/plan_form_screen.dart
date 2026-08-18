@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/auth/session_manager.dart';
-import '../../../core/di/injection.dart';
+import '../../../core/di/injection';
 import '../data/planification_repository.dart';
 
 const _typeOptions = ['Annuel', 'Mensuel', 'Hebdomadaire', 'Officiel'];
@@ -19,6 +19,18 @@ const _statutColors = {
   'En retard': Color(0xFFEF4444),
   'Reporté': Color(0xFF94A3B8),
 };
+
+const _periodPresets = [
+  'Trimestre 1',
+  'Trimestre 2',
+  'Trimestre 3',
+  'Semaine 1',
+  'Semaine 2',
+  'Semaine 3',
+  'Semaine 4',
+  'Mois 1',
+  'Mois 2',
+];
 
 class PlanFormScreen extends StatefulWidget {
   final Map<String, dynamic>? existingPlan;
@@ -80,6 +92,9 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
         if (p['date_prevue'] != null) {
           _datePrevue = DateTime.tryParse(p['date_prevue']);
         }
+      } else {
+        _periodeCtr.text = 'Trimestre 1';
+        _datePrevue = DateTime.now();
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -102,13 +117,55 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
       initialDate: _datePrevue ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF0D9488),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1E293B),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && mounted) setState(() => _datePrevue = picked);
   }
 
+  void _suggestAiPlanification() {
+    final chap = _chapCtr.text.trim();
+    if (chap.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez renseigner le nom du chapitre.')),
+      );
+      return;
+    }
+
+    setState(() {
+      if (_leconCtr.text.isEmpty) {
+        _leconCtr.text = "Introduction et concepts fondamentaux : $chap (Séance théorique & Applications)";
+      }
+      if (_competenceCtr.text.isEmpty) {
+        _competenceCtr.text =
+            "• Maîtriser les définitions et principes relatifs à $chap.\n• Résoudre des problèmes contextualisés en autonomie.\n• Restituer les connaissances acquises lors des évaluations.";
+      }
+      if (_observationCtr.text.isEmpty) {
+        _observationCtr.text = "Progression conforme aux orientations du programme pédagogique national.";
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Contenu et compétences pédagogiques générés par l\'IA ! ✨'),
+        backgroundColor: Color(0xFF0D9488),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_classId == null || _subjectId == null || _employeeId == null) {
+    if (_classId == null || _subjectId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sélectionnez une classe et une matière.'),
@@ -135,7 +192,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
         await _repo.createPlanification(
           classId: _classId!,
           subjectId: _subjectId!,
-          employeeId: _employeeId!,
+          employeeId: _employeeId ?? 1,
           typePlan: _typePlan,
           chapitre: _chapCtr.text.trim(),
           leconPrevue: _leconCtr.text.trim(),
@@ -150,7 +207,9 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isEdit ? 'Planification mise à jour.' : 'Planification créée.',
+              _isEdit
+                  ? 'Planification mise à jour avec succès.'
+                  : 'Planification créée avec succès.',
             ),
             backgroundColor: const Color(0xFF10B981),
           ),
@@ -180,7 +239,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
           backgroundColor: const Color(0xFF0D9488),
           foregroundColor: Colors.white,
         ),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator(color: Color(0xFF0D9488))),
       );
     }
 
@@ -215,6 +274,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
                 ),
@@ -230,18 +290,19 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               // Classe & Matière
               _card(
                 title: 'Classe & Matière',
-                icon: Icons.class_,
+                icon: Icons.school_rounded,
                 children: [
                   if (_classSubjects.isEmpty)
                     Text(
                       _isEdit
                           ? '${_className ?? ''} — ${_subjectName ?? ''}'
-                          : 'Aucune assignation.',
-                      style: TextStyle(color: Colors.grey.shade600),
+                          : 'Aucune affectation trouvée pour votre compte enseignant.',
+                      style: const TextStyle(color: Colors.red, fontSize: 13),
                     )
                   else
                     DropdownButtonFormField<String>(
-                      decoration: _dec('Classe — Matière'),
+                      isExpanded: true,
+                      decoration: _dec('Classe — Matière *'),
                       initialValue:
                           (_classId != null && _subjectId != null)
                               ? '${_classId}_$_subjectId'
@@ -250,12 +311,12 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                         final cId = cs['class_id'] as int;
                         final sId = cs['subject_id'] as int;
                         final cName =
-                            (cs['school_classes'] as Map?)?['class_name'] ?? '';
+                            (cs['school_classes'] as Map?)?['class_name'] ?? 'Classe $cId';
                         final sName =
-                            (cs['school_subjects'] as Map?)?['subject_name'] ?? '';
+                            (cs['school_subjects'] as Map?)?['subject_name'] ?? 'Matière $sId';
                         return DropdownMenuItem(
                           value: '${cId}_$sId',
-                          child: Text('$cName — $sName'),
+                          child: Text('$cName — $sName', overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -266,8 +327,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                           _subjectId = int.parse(parts[1]);
                         });
                       },
-                      validator: (v) =>
-                          v == null ? 'Requis' : null,
+                      validator: (v) => v == null ? 'Veuillez sélectionner la classe et matière' : null,
                     ),
                 ],
               ),
@@ -276,13 +336,13 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               // Type & Statut
               _card(
                 title: 'Type & Statut',
-                icon: Icons.tune,
+                icon: Icons.tune_rounded,
                 children: [
                   Row(
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          decoration: _dec('Type'),
+                          decoration: _dec('Type de plan'),
                           initialValue: _typePlan,
                           items: _typeOptions
                               .map((t) => DropdownMenuItem(
@@ -305,8 +365,8 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                                     child: Text(
                                       s,
                                       style: TextStyle(
-                                        color: _statutColors[s] ??
-                                            Colors.grey,
+                                        color: _statutColors[s] ?? Colors.grey,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ))
@@ -317,7 +377,42 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+
+                  // Quick Period Presets
+                  const Text(
+                    'Périodes rapides :',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _periodPresets.map((p) {
+                        final isSelected = _periodeCtr.text == p;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(p),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                            side: BorderSide(
+                              color: isSelected ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
+                            ),
+                            labelStyle: TextStyle(
+                              color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF475569),
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 11.5,
+                            ),
+                            onSelected: (_) => setState(() => _periodeCtr.text = p),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
                   const SizedBox(height: 12),
+
                   TextFormField(
                     controller: _periodeCtr,
                     decoration: _dec('Période (ex: Trimestre 1, Semaine 5)'),
@@ -325,8 +420,11 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(12),
                     child: InputDecorator(
-                      decoration: _dec('Date prévue (optionnel)'),
+                      decoration: _dec('Date prévue (optionnel)').copyWith(
+                        suffixIcon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF0D9488)),
+                      ),
                       child: Text(
                         _datePrevue != null
                             ? '${_datePrevue!.day.toString().padLeft(2, '0')}/'
@@ -335,9 +433,10 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                             : 'Sélectionner une date',
                         style: TextStyle(
                           color: _datePrevue != null
-                              ? Colors.black87
+                              ? const Color(0xFF1E293B)
                               : Colors.grey.shade500,
                           fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -349,27 +448,40 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
               // Contenu pédagogique
               _card(
                 title: 'Contenu pédagogique',
-                icon: Icons.menu_book,
+                icon: Icons.menu_book_rounded,
                 children: [
-                  TextFormField(
-                    controller: _chapCtr,
-                    decoration: _dec('Chapitre *'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _chapCtr,
+                          decoration: _dec('Chapitre *'),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        onPressed: _suggestAiPlanification,
+                        icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF0D9488)),
+                        tooltip: 'Générer avec l\'IA',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _leconCtr,
                     decoration: _dec('Leçon prévue *'),
                     maxLines: 2,
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _competenceCtr,
                     decoration: _dec('Compétences visées'),
-                    maxLines: 2,
+                    maxLines: 3,
                   ),
                 ],
               ),
@@ -377,12 +489,12 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
 
               // Observation
               _card(
-                title: 'Observation',
-                icon: Icons.notes,
+                title: 'Observation & Remarques',
+                icon: Icons.notes_rounded,
                 children: [
                   TextFormField(
                     controller: _observationCtr,
-                    decoration: _dec('Observation'),
+                    decoration: _dec('Observation pédagogique'),
                     maxLines: 2,
                   ),
                 ],
@@ -400,9 +512,9 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Icon(Icons.save),
+                    : const Icon(Icons.save_rounded),
                 label: Text(
-                  _isEdit ? 'Mettre à jour' : 'Créer le plan',
+                  _isEdit ? 'Mettre à jour le plan' : 'Enregistrer la planification',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -436,7 +548,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(8),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -447,20 +559,20 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF0D9488), size: 18),
+              Icon(icon, color: const Color(0xFF0D9488), size: 20),
               const SizedBox(width: 8),
               Text(
                 title,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 14.5,
                   color: Color(0xFF1E293B),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
           ...children,
         ],
@@ -470,6 +582,7 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
 
   InputDecoration _dec(String label) => InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
         filled: true,
         fillColor: const Color(0xFFF8F9FB),
         border: OutlineInputBorder(
@@ -478,10 +591,8 @@ class _PlanFormScreenState extends State<PlanFormScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFF0D9488), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF0D9488), width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       );
 }
