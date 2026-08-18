@@ -15,6 +15,7 @@ import '../data/family_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
 import '../../ai/data/ai_repository.dart';
 import '../../ai/presentation/early_warning_card.dart';
+import 'voice_note_player_card.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
 import '../../academics/utils/timetable_pdf_generator.dart';
 import 'package:pdf/pdf.dart';
@@ -894,6 +895,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        VoiceNotePlayerCard(studentId: _student['id'] as int? ?? 1),
         _buildSectionTitle('Résultats & bulletins', Icons.bar_chart_rounded),
         const SizedBox(height: 12),
         if (periods.length > 1) _buildPeriodSelector(periods),

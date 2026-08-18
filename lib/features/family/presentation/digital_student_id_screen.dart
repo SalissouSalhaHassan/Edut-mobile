@@ -21,6 +21,8 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
   String? _errorMessage;
 
   Map<String, dynamic>? _student;
+  List<Map<String, dynamic>> _badges = [];
+  int _meritPoints = 0;
   late AnimationController _flipController;
   late Animation<double> _flipAnimation;
   bool _isBack = false;
@@ -59,6 +61,14 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
       if (snapshot != null && snapshot['student'] != null) {
         _student = Map<String, dynamic>.from(snapshot['student']);
       }
+
+      try {
+        final badgeRes = await locator<MobileApiClient>().getJson('/api/mobile/badges?studentId=$studentId');
+        if (badgeRes['success'] == true && badgeRes['data'] != null) {
+          _badges = List<Map<String, dynamic>>.from(badgeRes['data']['earnedBadges'] ?? []);
+          _meritPoints = (badgeRes['data']['totalMeritPoints'] as num?)?.toInt() ?? 0;
+        }
+      } catch (_) {}
     } catch (e) {
       _errorMessage = "Erreur: $e";
     } finally {
@@ -156,12 +166,87 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 32),
+                      if (_badges.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _buildBadgesRibbon(),
+                      ],
+                      const SizedBox(height: 24),
                       // Security & Info features
                       _buildSecurityInfo(),
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildBadgesRibbon() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.military_tech_rounded, color: Color(0xFFF59E0B), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Écussons d\'Honneur & Mérite',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_meritPoints pts',
+                  style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _badges.map((b) {
+                final icon = b['icon'] ?? '🌟';
+                final title = b['title'] ?? 'Badge';
+                return Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(icon, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 6),
+                      Text(
+                        title,
+                        style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

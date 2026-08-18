@@ -23,6 +23,7 @@ import '../../features/attendance/presentation/teacher_attendance_screen.dart';
 import '../../features/attendance/presentation/student_attendance_screen.dart';
 import '../../features/academics/presentation/saisie_notes_screen.dart';
 import '../../features/academics/presentation/gestion_devoirs_screen.dart';
+import '../../features/academics/presentation/qcm_scanner_screen.dart';
 import '../../features/finance/presentation/finance_dashboard_screen.dart';
 import '../../features/finance/presentation/cashflow_forecast_screen.dart';
 import '../../features/finance/presentation/student_fee_details_screen.dart';
@@ -262,6 +263,21 @@ class AppRouter {
               subjectId: subjectId,
               subjectName: subjectName,
             ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/academics/qcm-scanner',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final subjectName = extra['subjectName'] as String? ?? 'Évaluation';
+          final className = extra['className'] as String? ?? 'Classe';
+          final studentName = extra['studentName'] as String?;
+
+          return QcmScannerScreen(
+            subjectName: subjectName,
+            className: className,
+            studentName: studentName,
           );
         },
       ),

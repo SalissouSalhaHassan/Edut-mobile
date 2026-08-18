@@ -8,6 +8,9 @@ import '../../../core/api/supabase_client.dart';
 import '../data/academics_repository.dart';
 import '../utils/calculations.dart';
 import '../../ai/data/ai_repository.dart';
+import 'voice_note_recorder_dialog.dart';
+import '../../students/presentation/award_badge_dialog.dart';
+import 'qcm_scanner_screen.dart';
 
 class SaisieNotesScreen extends StatefulWidget {
   final int classId;
@@ -1002,14 +1005,26 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                Row(
                   children: [
-                    Text(
-                      formatRank(rank),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.warning),
+                    IconButton(
+                      icon: const Icon(Icons.military_tech_rounded, color: Color(0xFFF59E0B), size: 22),
+                      onPressed: () => AwardBadgeDialog.show(context, studentId: studentId, studentName: name),
+                      tooltip: "Décerner un écusson d'honneur",
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
-                    const Text("Rang", style: TextStyle(fontSize: 10, color: AppColors.slate400)),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          formatRank(rank),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.warning),
+                        ),
+                        const Text("Rang", style: TextStyle(fontSize: 10, color: AppColors.slate400)),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -1069,6 +1084,28 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                           fillColor: AppColors.slate50,
                           filled: true,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.document_scanner_rounded, size: 18, color: Color(0xFF10B981)),
+                            tooltip: "Scanner QCM IA",
+                            onPressed: !_canManageAcademics || !_isEditable
+                                ? null
+                                : () async {
+                                    final scannedScore = await Navigator.push<double>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => QcmScannerScreen(
+                                          subjectName: widget.subjectName,
+                                          className: widget.className,
+                                          studentName: name,
+                                        ),
+                                      ),
+                                    );
+                                    if (scannedScore != null) {
+                                      _examControllers[studentId]?.text = scannedScore.toStringAsFixed(2);
+                                      setState(() {});
+                                    }
+                                  },
+                          ),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         ),
                         onChanged: !_canManageAcademics
@@ -1122,26 +1159,46 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                     ),
                   ],
                 ),
-                TextButton.icon(
-                  onPressed: _canManageAcademics && _isEditable
-                      ? () => _showObservationDialog(studentId, name)
-                      : null,
-                  icon: Icon(
-                    _observations[studentId]?.isNotEmpty == true ? Icons.comment : Icons.comment_outlined,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                  label: Text(
-                    _observations[studentId]?.isNotEmpty == true ? "Obs: ${_observations[studentId]}" : "Ajouter Obs.",
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(50, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.mic_rounded, size: 18, color: Color(0xFFEF4444)),
+                      tooltip: "Note vocale multilingue",
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: !_canManageAcademics || !_isEditable
+                          ? null
+                          : () => VoiceNoteRecorderDialog.show(
+                                context,
+                                studentId: studentId,
+                                studentName: name,
+                                subjectName: widget.subjectName,
+                                className: widget.className,
+                              ),
+                    ),
+                    const SizedBox(width: 10),
+                    TextButton.icon(
+                      onPressed: _canManageAcademics && _isEditable
+                          ? () => _showObservationDialog(studentId, name)
+                          : null,
+                      icon: Icon(
+                        _observations[studentId]?.isNotEmpty == true ? Icons.comment : Icons.comment_outlined,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      label: Text(
+                        _observations[studentId]?.isNotEmpty == true ? "Obs: ${_observations[studentId]}" : "Ajouter Obs.",
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
