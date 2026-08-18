@@ -869,6 +869,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     context.push('/attendance/teacher-reports');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.sync_lock_rounded,
+                    color: Color(0xFF0284C7),
+                  ),
+                  title: const Text('Mode Hors-Ligne & Synchro', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Gestion du cache et file d\'attente', style: TextStyle(fontSize: 11)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/offline-sync');
+                  },
+                ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.logout, color: AppColors.danger),

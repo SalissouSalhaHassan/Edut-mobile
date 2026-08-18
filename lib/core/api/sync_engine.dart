@@ -11,6 +11,7 @@ import '../../features/academics/data/academics_repository.dart';
 import '../../features/finance/data/finance_repository.dart';
 import '../../features/students/data/students_repository.dart';
 import '../../features/dashboard/data/dashboard_stats_repository.dart';
+import '../../features/pedagogie/data/pedagogie_repository.dart';
 
 class SyncEngine {
   final SupabaseClient _client;
@@ -83,6 +84,8 @@ class SyncEngine {
         locator<AcademicsRepository>().getPeriods(1, 1).catchError((_) => <Map<String, dynamic>>[]),
         locator<AcademicsRepository>().getAllClassesAndSubjects(1).catchError((_) => <Map<String, dynamic>>[]),
         locator<FinanceRepository>().getStudentFeesList(schoolId: 1, sessionId: 1).catchError((_) => <Map<String, dynamic>>[]),
+        locator<PedagogieRepository>().getTeacherClassesAndSubjects().catchError((_) => <Map<String, dynamic>>[]),
+        locator<PedagogieRepository>().getSeances().catchError((_) => <Map<String, dynamic>>[]),
       ]);
       await updateLastSyncTime();
       debugPrint("✅ SyncEngine: Offline cache hydrated successfully.");
@@ -151,7 +154,6 @@ class SyncEngine {
               failedCount++;
               debugPrint("⚠️ SyncEngine: Operation ${op.id} failed (retry ${op.retryCount + 1}/${OfflineOperation.maxRetries}). Continuing with next.");
             }
-            // ✅ Do NOT break — continue processing the remaining operations
           }
         } catch (opError) {
           debugPrint("❌ SyncEngine: Exception replaying operation ${op.id}: $opError");
@@ -161,7 +163,6 @@ class SyncEngine {
             await _queueManager.incrementRetry(op.id, error: opError.toString());
           }
           failedCount++;
-          // ✅ Continue with next operation — do NOT halt the whole queue
         }
       }
 
@@ -201,6 +202,50 @@ class SyncEngine {
         
         return res['success'] == true;
       } 
+      
+      else if (op.table == 'cahier_textes' && op.action == 'create_seance') {
+        final repo = locator<PedagogieRepository>();
+        final data = op.data;
+        
+        final res = await repo.createSeance(
+          classId: data['classId'] as int,
+          subjectId: data['subjectId'] as int,
+          employeeId: data['employeeId'] as int,
+          sessionDate: data['sessionDate'] as String,
+          titreLecon: data['titreLecon'] as String,
+          heureDebut: data['heureDebut'] as String?,
+          heureFin: data['heureFin'] as String?,
+          objectifs: data['objectifs'] as String?,
+          contenuRealise: data['contenuRealise'] as String?,
+          supportsUtilises: data['supportsUtilises'] as String?,
+          devoirDonne: data['devoirDonne'] as String?,
+          observation: data['observation'] as String?,
+          anneeScolaire: data['anneeScolaire'] as String?,
+        );
+        
+        return res.isNotEmpty && res['_isOffline'] != true;
+      }
+
+      else if (op.table == 'cahier_textes' && op.action == 'update_seance') {
+        final repo = locator<PedagogieRepository>();
+        final data = op.data;
+        
+        await repo.updateSeance(
+          data['id'] as int,
+          titreLecon: data['titreLecon'] as String?,
+          sessionDate: data['sessionDate'] as String?,
+          heureDebut: data['heureDebut'] as String?,
+          heureFin: data['heureFin'] as String?,
+          objectifs: data['objectifs'] as String?,
+          contenuRealise: data['contenuRealise'] as String?,
+          supportsUtilises: data['supportsUtilises'] as String?,
+          devoirDonne: data['devoirDonne'] as String?,
+          observation: data['observation'] as String?,
+          statut: data['statut'] as String?,
+        );
+        
+        return true;
+      }
       
       else if (op.table == 'student_results' && op.action == 'save_grades') {
         final repo = locator<AcademicsRepository>();

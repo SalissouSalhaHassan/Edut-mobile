@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/api/mobile_api_client.dart';
+import '../../../core/api/offline_store_manager.dart';
+import '../../../core/api/offline_queue_manager.dart';
+import '../../../core/api/sync_engine.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 
@@ -27,6 +30,18 @@ class PedagogieRepository {
     String? dateDebut,
     String? dateFin,
   }) async {
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = "cahier_textes_${classId}_${subjectId}_$statut";
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("📶 Offline Mode: Fetching cahier de textes from local cache.");
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
+    }
+
     // 1. Try Backend API
     try {
       final queryParams = <String>[];
@@ -37,7 +52,13 @@ class PedagogieRepository {
       final url = '/api/mobile/pedagogie/cahier-textes${queryParams.isNotEmpty ? '?${queryParams.join('&')}' : ''}';
       final res = await _apiClient.getJson(url);
       if (res['success'] == true && res['data'] != null) {
-        return List<Map<String, dynamic>>.from(res['data']);
+        final list = List<Map<String, dynamic>>.from(res['data']);
+        await cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudents,
+          key: cacheKey,
+          data: list,
+        );
+        return list;
       }
     } catch (e) {
       debugPrint('API getSeances failed, falling back to Supabase: $e');
@@ -91,15 +112,27 @@ class PedagogieRepository {
         result = await filtered.order('session_date', ascending: false);
       }
 
-      return List<Map<String, dynamic>>.from(result);
+      final list = List<Map<String, dynamic>>.from(result);
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+        data: list,
+      );
+      return list;
     } catch (e) {
-      debugPrint('PedagogieRepository.getSeances error: $e');
-      rethrow;
+      debugPrint('PedagogieRepository.getSeances error, loading cache: $e');
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
     }
   }
 
   // ─── Fetch classes & subjects for current teacher ─────────────────────────
   Future<List<Map<String, dynamic>>> getTeacherClassesAndSubjects() async {
+    final cacheManager = locator<OfflineStoreManager>();
+    const cacheKey = "teacher_classes_and_subjects";
+
     try {
       final session = locator<SessionManager>();
       final employeeIdStr = await session.getEmployeeId();
@@ -113,24 +146,37 @@ class PedagogieRepository {
             'school_subjects(id, subject_name)',
           );
 
+      List<dynamic> res;
       if (employeeId != null) {
-        final res = await q.eq('teacher_id', employeeId);
-        if ((res as List).isNotEmpty) {
-          return List<Map<String, dynamic>>.from(res);
+        res = await q.eq('teacher_id', employeeId);
+        if (res.isEmpty) {
+          res = await _client.from('class_subjects').select(
+                'class_id, subject_id, teacher_id, '
+                'school_classes(id, class_name), '
+                'school_subjects(id, subject_name)',
+              );
         }
+      } else {
+        res = await _client.from('class_subjects').select(
+              'class_id, subject_id, teacher_id, '
+              'school_classes(id, class_name), '
+              'school_subjects(id, subject_name)',
+            );
       }
 
-      final allRes = await _client
-          .from('class_subjects')
-          .select(
-            'class_id, subject_id, teacher_id, '
-            'school_classes(id, class_name), '
-            'school_subjects(id, subject_name)',
-          );
-      return List<Map<String, dynamic>>.from(allRes);
+      final list = List<Map<String, dynamic>>.from(res);
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+        data: list,
+      );
+      return list;
     } catch (e) {
       debugPrint('PedagogieRepository.getTeacherClassesAndSubjects error: $e');
-      return [];
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudents,
+        key: cacheKey,
+      );
     }
   }
 
@@ -166,6 +212,24 @@ class PedagogieRepository {
       'statut': 'Brouillon',
       'anneeScolaire': anneeScolaire ?? '2025-2026',
     };
+
+    final syncEngine = locator<SyncEngine>();
+    final queueManager = locator<OfflineQueueManager>();
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("📶 Offline Mode: Enqueuing createSeance locally.");
+      await queueManager.enqueue(
+        table: 'cahier_textes',
+        action: 'create_seance',
+        data: payload,
+      );
+      return {
+        'id': DateTime.now().millisecondsSinceEpoch,
+        ...payload,
+        'created_at': DateTime.now().toIso8601String(),
+        '_isOffline': true,
+      };
+    }
 
     // 1. Try Backend API (Bypasses Postgres Client RLS)
     try {
@@ -210,8 +274,18 @@ class PedagogieRepository {
 
       return Map<String, dynamic>.from(response.first as Map);
     } catch (e) {
-      debugPrint('PedagogieRepository.createSeance error: $e');
-      rethrow;
+      debugPrint('PedagogieRepository.createSeance error -> Enqueueing offline: $e');
+      await queueManager.enqueue(
+        table: 'cahier_textes',
+        action: 'create_seance',
+        data: payload,
+      );
+      return {
+        'id': DateTime.now().millisecondsSinceEpoch,
+        ...payload,
+        'created_at': DateTime.now().toIso8601String(),
+        '_isOffline': true,
+      };
     }
   }
 
@@ -243,6 +317,19 @@ class PedagogieRepository {
       if (statut != null) 'statut': statut,
     };
 
+    final syncEngine = locator<SyncEngine>();
+    final queueManager = locator<OfflineQueueManager>();
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("📶 Offline Mode: Enqueuing updateSeance locally.");
+      await queueManager.enqueue(
+        table: 'cahier_textes',
+        action: 'update_seance',
+        data: payload,
+      );
+      return;
+    }
+
     // 1. Try Backend API
     try {
       final res = await _apiClient.putJson(
@@ -273,8 +360,12 @@ class PedagogieRepository {
 
       await _client.from('cahier_textes').update(data).eq('id', id);
     } catch (e) {
-      debugPrint('PedagogieRepository.updateSeance error: $e');
-      rethrow;
+      debugPrint('PedagogieRepository.updateSeance error -> Enqueueing offline: $e');
+      await queueManager.enqueue(
+        table: 'cahier_textes',
+        action: 'update_seance',
+        data: payload,
+      );
     }
   }
 
