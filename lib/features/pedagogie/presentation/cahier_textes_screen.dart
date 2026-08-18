@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/pedagogie_repository.dart';
 import 'seance_form_screen.dart';
+import 'inspection_dialog.dart';
 
 /// Statuts with colors
 const _statutColors = {
@@ -453,13 +454,21 @@ class _CahierTextesScreenState extends State<CahierTextesScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (canSubmit)
+                  _actionBtn(
+                    icon: Icons.rate_review_rounded,
+                    label: 'Viser / Inspecter',
+                    color: const Color(0xFF0F766E),
+                    onTap: () => InspectionDialog.show(context, seance: seance, onValidated: _load),
+                  ),
+                  if (canSubmit) ...[
+                    const SizedBox(width: 8),
                     _actionBtn(
                       icon: Icons.send,
                       label: 'Soumettre',
                       color: const Color(0xFF3B82F6),
                       onTap: () => _submitSeance(seance),
                     ),
+                  ],
                   if (canEdit) ...[
                     const SizedBox(width: 8),
                     _actionBtn(

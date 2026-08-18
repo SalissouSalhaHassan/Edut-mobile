@@ -5,6 +5,7 @@ import '../../../core/auth/session_manager.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/attendance_repository.dart';
 
 class StudentAttendanceScreen extends StatefulWidget {
@@ -580,39 +581,89 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     );
   }
 
+  Future<void> _notifyAbsentParentsViaWhatsApp() async {
+    final absentStudents = _students.where((s) => _statuses[s['id']] == 'Absent').toList();
+    if (absentStudents.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucun élève marqué absent.')),
+      );
+      return;
+    }
+
+    final dateStr = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    final subject = widget.subjectName ?? 'la séance';
+    final className = widget.className;
+
+    int preparedCount = 0;
+    for (final s in absentStudents) {
+      final phone = s['mobile'] ?? s['whatsapp'] ?? s['parent_phone'] ?? s['nom_pere'];
+      if (phone != null && phone.toString().trim().isNotEmpty) {
+        final text = "*ÉTABLISSEMENT SCOLAIRE EDUT* 🏫\n\nCher parent,\nNous vous informons que votre enfant *${s['nom_etudiant']}* (Classe: $className) a été noté(e) *ABSENT(E)* le *$dateStr* lors du cours de *$subject*.\n\n_Veuillez justifier cette absence sur l'application Edut ou auprès de la vie scolaire._";
+        final cleanPhone = phone.toString().replaceAll(RegExp(r'\D'), '');
+        final waUrl = Uri.parse("https://api.whatsapp.com/send?phone=${cleanPhone.length == 8 ? '227$cleanPhone' : cleanPhone}&text=${Uri.encodeComponent(text)}");
+        if (await canLaunchUrl(waUrl)) {
+          await launchUrl(waUrl, mode: LaunchMode.externalApplication);
+          preparedCount++;
+          break; // Open WhatsApp for parent
+        }
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$preparedCount alerte(s) WhatsApp préparée(s) pour les parents.'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    }
+  }
+
   Widget _buildBulkActionsBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       child: Row(
         children: [
           Expanded(
+            flex: 3,
             child: OutlinedButton.icon(
               onPressed: _canManageAttendance
                   ? () => _setAllStatus('Présent')
                   : null,
               icon: const Icon(Icons.check_circle, size: 16, color: AppColors.success),
-              label: const Text("Tout Présent", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.success)),
+              label: const Text("Tous Présents", style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.success)),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.success, width: 1.5),
                 backgroundColor: AppColors.success.withAlpha(12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 9),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
+            flex: 3,
             child: OutlinedButton.icon(
               onPressed:
                   _canManageAttendance ? () => _setAllStatus('Absent') : null,
               icon: const Icon(Icons.cancel, size: 16, color: AppColors.danger),
-              label: const Text("Tout Absent", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.danger)),
+              label: const Text("Tous Absents", style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.danger)),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.danger, width: 1.5),
                 backgroundColor: AppColors.danger.withAlpha(12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 9),
               ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: _notifyAbsentParentsViaWhatsApp,
+            icon: const Icon(Icons.chat_bubble_rounded, color: Color(0xFF10B981), size: 20),
+            tooltip: 'Notifier les absents sur WhatsApp',
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],

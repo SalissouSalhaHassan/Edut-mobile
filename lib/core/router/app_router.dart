@@ -40,6 +40,7 @@ import '../../features/owner/presentation/owner_register_school_screen.dart';
 import '../../features/owner/presentation/owner_permissions_screen.dart';
 import '../../features/messaging/presentation/messaging_screen.dart';
 import '../../features/messaging/presentation/notifications_screen.dart';
+import '../../features/messaging/presentation/direct_chat_screen.dart';
 import '../../features/ministry/presentation/ministry_dashboard_screen.dart';
 import '../di/injection.dart';
 import '../auth/session_manager.dart';
@@ -340,6 +341,20 @@ class AppRouter {
           permission: AppPermissions.messagingView,
           child: MessagingScreen(),
         ),
+      ),
+      GoRoute(
+        path: '/messaging/chat',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final recipientId = extra['recipientId'] as int? ?? 0;
+          final recipientName = extra['recipientName'] as String? ?? 'Discussion';
+          final recipientRole = extra['recipientRole'] as String?;
+          return DirectChatScreen(
+            recipientId: recipientId,
+            recipientName: recipientName,
+            recipientRole: recipientRole,
+          );
+        },
       ),
       GoRoute(
         path: '/pedagogie/cahier-textes',
