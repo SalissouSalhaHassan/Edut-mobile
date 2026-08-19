@@ -678,50 +678,69 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
           ...missingToday.map((m) {
             final className = m['className'] ?? 'Classe';
             return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF7ED),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFFFED7AA)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFDBA74),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.priority_high_rounded, size: 14, color: Colors.white),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(className, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        const Text('Aucune séance enregistrée pour ce jour', style: TextStyle(fontSize: 11, color: Color(0xFF9A3412))),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('🔔 Rappel envoyé aux enseignants de la classe $className'),
-                          backgroundColor: const Color(0xFFEA580C),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFDBA74),
+                          shape: BoxShape.circle,
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA580C),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: const Icon(Icons.priority_high_rounded, size: 14, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          className,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF9A3412),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('🔔 Rappel envoyé aux enseignants de la classe $className'),
+                              backgroundColor: const Color(0xFFEA580C),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEA580C),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.notifications_active_rounded, size: 13, color: Colors.white),
+                        label: const Text('Rappeler', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 28),
+                    child: Text(
+                      'Aucune séance enregistrée pour ce jour',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFFC2410C), height: 1.3),
                     ),
-                    child: const Text('Rappeler', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -740,49 +759,77 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
         ),
         const SizedBox(height: 8),
 
-        ...filledToday.map((f) {
-          final className = f['className'] ?? 'Classe';
-          final subjectName = f['subjectName'] ?? 'Matière';
-          final empName = f['employeeName'] ?? 'Enseignant';
-          final title = f['titreLecon'] ?? 'Séance du jour';
-          final start = f['heureDebut'] ?? '08:00';
-          final end = f['heureFin'] ?? '10:00';
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
+        if (filledToday.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF059669), size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('$className • $subjectName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                      const SizedBox(height: 2),
-                      Text(title, style: const TextStyle(fontSize: 11.5, color: AppColors.slate700)),
-                      const SizedBox(height: 2),
-                      Text('Par: $empName • $start → $end', style: const TextStyle(fontSize: 10.5, color: AppColors.slate400)),
-                    ],
-                  ),
-                ),
-              ],
+            child: const Center(
+              child: Text(
+                'Aucun cahier de textes encore renseigné ce matin.',
+                style: TextStyle(color: AppColors.slate500, fontSize: 12),
+              ),
             ),
-          );
-        }),
+          )
+        else
+          ...filledToday.map((f) {
+            final className = f['className'] ?? 'Classe';
+            final subjectName = f['subjectName'] ?? 'Matière';
+            final empName = f['employeeName'] ?? 'Enseignant';
+            final title = f['titreLecon'] ?? 'Séance du jour';
+            final start = f['heureDebut'] ?? '08:00';
+            final end = f['heureFin'] ?? '10:00';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF059669), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$className • $subjectName',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.slate900),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          title,
+                          style: const TextStyle(fontSize: 12, color: AppColors.slate700, height: 1.3),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Par: $empName • $start → $end',
+                          style: const TextStyle(fontSize: 11, color: AppColors.slate500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
       ],
     );
   }
