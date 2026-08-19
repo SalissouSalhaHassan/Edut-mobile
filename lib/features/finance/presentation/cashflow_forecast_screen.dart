@@ -351,13 +351,20 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
     final rate = (c['collectionRate'] as num?)?.toDouble() ?? 0.0;
     final expected = (c['expected'] as num?)?.toDouble() ?? 0.0;
     final paid = (c['paid'] as num?)?.toDouble() ?? 0.0;
-    final status = c['status'] ?? 'Moyen';
+    final studentCount = (c['studentCount'] as num?)?.toInt() ?? 0;
+    final status = c['status']?.toString() ?? 'En cours';
 
-    final Color statusColor = status == 'Excellent'
+    final Color statusColor = status == 'Excellent' || status == 'Soldé'
         ? const Color(0xFF10B981)
-        : status == 'Moyen'
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFFEF4444);
+        : status == 'Bon'
+            ? const Color(0xFF059669)
+            : status == 'Moyen'
+                ? const Color(0xFFF59E0B)
+                : status == 'En cours'
+                    ? const Color(0xFF6366F1)
+                    : expected > 0
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF94A3B8);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -373,7 +380,15 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+              Row(
+                children: [
+                  Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  if (studentCount > 0) ...[
+                    const SizedBox(width: 6),
+                    Text('• $studentCount élèves', style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
+                  ],
+                ],
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -381,7 +396,7 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '$status (${rate.toStringAsFixed(0)}%)',
+                  expected > 0 ? '$status (${rate.toStringAsFixed(0)}%)' : 'N/A',
                   style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
                 ),
               ),
