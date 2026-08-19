@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/permissions/permission_service.dart';
@@ -148,6 +149,41 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
       allPayments: allPaymentsList,
       headerConfig: headerConfig,
     );
+  }
+
+  Future<void> _shareReceiptViaWhatsApp(Map<String, dynamic> payment) async {
+    final student = _currentFee['students'] as Map<String, dynamic>? ?? {};
+    final name = student['nom_etudiant'] ?? 'Élève';
+    final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
+    final balance = (_currentFee['balance'] as num?)?.toDouble() ?? 0.0;
+    final ref = payment['reference'] ?? '';
+    final rawPhone = student['whatsapp'] ?? student['telephone_parent'] ?? student['telephone'] ?? '';
+    final phone = rawPhone.toString().replaceAll(RegExp(r'[^0-9+]'), '');
+
+    final amountFmt = amount.toStringAsFixed(0);
+    final balFmt = balance.toStringAsFixed(0);
+    final refStr = ref.toString().isNotEmpty ? " (Réf: $ref)" : "";
+
+    final text = "✅ *Confirmation de Paiement - Edut Pro*\n\n"
+        "Cher Parent, nous confirmons la réception d'un versement de *$amountFmt FCFA* pour l'élève *$name*$refStr.\n\n"
+        "Solde restant : *$balFmt FCFA*.\n\n"
+        "Merci pour votre confiance.";
+
+    final encoded = Uri.encodeComponent(text);
+    final uriStr = phone.isNotEmpty
+        ? "https://wa.me/$phone?text=$encoded"
+        : "https://wa.me/?text=$encoded";
+
+    final uri = Uri.parse(uriStr);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Impossible d'ouvrir WhatsApp")),
+        );
+      }
+    }
   }
 
   @override
@@ -470,12 +506,18 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
                 ],
               ),
             ),
-            if (_canCollectFinance)
+            if (_canCollectFinance) ...[
+              IconButton(
+                icon: const Icon(Icons.share, color: Color(0xFF25D366), size: 20),
+                onPressed: () => _shareReceiptViaWhatsApp(paymentData),
+                tooltip: "Envoyer le reçu via WhatsApp",
+              ),
               IconButton(
                 icon: const Icon(Icons.print, color: AppColors.primary, size: 20),
                 onPressed: () => _printReceipt(paymentData),
                 tooltip: "Imprimer le reçu",
               ),
+            ],
           ],
         ),
       ),
