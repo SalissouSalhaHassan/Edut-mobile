@@ -51,12 +51,36 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
       final paymentsList = await _repository.getFeePayments(feeId);
 
       // 2. Fetch fresh state of this fee row to keep UI synchronized
-      final client = SupabaseClientManager().client;
-      final freshFee = await client
-          .from('student_fees')
-          .select('id, school_id, student_id, session_id, total_expected, total_paid, total_reduction, balance, status')
-          .eq('id', feeId)
-          .single();
+      Map<String, dynamic> freshFee = Map<String, dynamic>.from(_currentFee);
+      try {
+        final client = SupabaseClientManager().client;
+        final res = await client
+            .from('student_fees')
+            .select('id, school_id, student_id, session_id, total_expected, total_paid, total_reduction, balance, status')
+            .eq('id', feeId)
+            .maybeSingle();
+        if (res != null) {
+          freshFee = Map<String, dynamic>.from(res);
+        }
+      } catch (_) {}
+
+      // Re-calculate totals from payments if payments exist to guarantee 100% sync
+      if (paymentsList.isNotEmpty) {
+        double paidSum = 0.0;
+        double reductionSum = 0.0;
+        for (var p in paymentsList) {
+          paidSum += (p['amount'] as num?)?.toDouble() ?? 0.0;
+          reductionSum += (p['reduction'] as num?)?.toDouble() ?? 0.0;
+        }
+        final expected = (freshFee['total_expected'] as num?)?.toDouble() ?? 0.0;
+        final balance = (expected - paidSum - reductionSum).clamp(0.0, double.infinity);
+        final status = balance <= 0 ? 'Soldé' : paidSum > 0 ? 'Partiel' : 'Impayé';
+
+        freshFee['total_paid'] = paidSum;
+        freshFee['total_reduction'] = reductionSum;
+        freshFee['balance'] = balance;
+        freshFee['status'] = status;
+      }
 
       if (mounted) {
         setState(() {
