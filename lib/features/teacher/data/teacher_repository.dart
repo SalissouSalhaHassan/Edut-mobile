@@ -77,22 +77,46 @@ class TeacherRepository {
         if (list.isNotEmpty) return list;
       } catch (_) {}
 
-      // Default fallback
+      // Default fallback if offline
       return [
         {
           'class_id': 1,
           'subject_id': 1,
-          'school_classes': {'class_name': '3ème B'},
+          'school_classes': {'class_name': '6ème A'},
           'school_subjects': {'subject_name': 'Mathématiques'},
         },
         {
           'class_id': 2,
           'subject_id': 1,
-          'school_classes': {'class_name': '4ème A'},
+          'school_classes': {'class_name': '5ème A'},
           'school_subjects': {'subject_name': 'Mathématiques'},
         },
         {
           'class_id': 3,
+          'subject_id': 1,
+          'school_classes': {'class_name': '4ème A'},
+          'school_subjects': {'subject_name': 'Mathématiques'},
+        },
+        {
+          'class_id': 4,
+          'subject_id': 1,
+          'school_classes': {'class_name': '3ème A'},
+          'school_subjects': {'subject_name': 'Mathématiques'},
+        },
+        {
+          'class_id': 5,
+          'subject_id': 2,
+          'school_classes': {'class_name': '2nde C'},
+          'school_subjects': {'subject_name': 'Physique-Chimie'},
+        },
+        {
+          'class_id': 6,
+          'subject_id': 2,
+          'school_classes': {'class_name': '1ère D'},
+          'school_subjects': {'subject_name': 'Physique-Chimie'},
+        },
+        {
+          'class_id': 7,
           'subject_id': 2,
           'school_classes': {'class_name': 'Terminale D'},
           'school_subjects': {'subject_name': 'Physique-Chimie'},

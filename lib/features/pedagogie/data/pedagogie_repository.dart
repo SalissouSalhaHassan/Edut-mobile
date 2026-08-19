@@ -128,7 +128,7 @@ class PedagogieRepository {
     }
   }
 
-  // ─── Fetch classes & subjects for current teacher ─────────────────────────
+  // ─── Fetch classes & subjects for current teacher / director ─────────────
   Future<List<Map<String, dynamic>>> getTeacherClassesAndSubjects() async {
     final cacheManager = locator<OfflineStoreManager>();
     const cacheKey = "teacher_classes_and_subjects";
@@ -138,39 +138,42 @@ class PedagogieRepository {
       final employeeIdStr = await session.getEmployeeId();
       final employeeId = int.tryParse(employeeIdStr ?? '');
 
-      var q = _client
-          .from('class_subjects')
-          .select(
-            'class_id, subject_id, teacher_id, '
-            'school_classes(id, class_name), '
-            'school_subjects(id, subject_name)',
-          );
-
-      List<dynamic> res;
-      if (employeeId != null) {
-        res = await q.eq('teacher_id', employeeId);
-        if (res.isEmpty) {
-          res = await _client.from('class_subjects').select(
-                'class_id, subject_id, teacher_id, '
-                'school_classes(id, class_name), '
-                'school_subjects(id, subject_name)',
-              );
-        }
-      } else {
-        res = await _client.from('class_subjects').select(
-              'class_id, subject_id, teacher_id, '
-              'school_classes(id, class_name), '
-              'school_subjects(id, subject_name)',
-            );
+      String endpoint = '/api/mobile/academics?action=getTeacherClassesAndSubjects';
+      if (employeeId != null && employeeId > 0) {
+        endpoint += '&employeeId=$employeeId';
       }
 
-      final list = List<Map<String, dynamic>>.from(res);
-      await cacheManager.saveDataList(
+      try {
+        final res = await _apiClient.getJson(endpoint);
+        final list = (res['data'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+        if (list.isNotEmpty) {
+          await cacheManager.saveDataList(
+            boxName: OfflineStoreManager.boxStudents,
+            key: cacheKey,
+            data: list,
+          );
+          return list;
+        }
+      } catch (_) {}
+
+      // Fallback: fetch all classes & subjects
+      try {
+        final allRes = await _apiClient.getJson('/api/mobile/academics?action=getAllClassesAndSubjects');
+        final list = (allRes['data'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+        if (list.isNotEmpty) {
+          await cacheManager.saveDataList(
+            boxName: OfflineStoreManager.boxStudents,
+            key: cacheKey,
+            data: list,
+          );
+          return list;
+        }
+      } catch (_) {}
+
+      return cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: cacheKey,
-        data: list,
       );
-      return list;
     } catch (e) {
       debugPrint('PedagogieRepository.getTeacherClassesAndSubjects error: $e');
       return cacheManager.getDataList(

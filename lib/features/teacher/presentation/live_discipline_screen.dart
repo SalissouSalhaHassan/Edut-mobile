@@ -34,7 +34,7 @@ class _LiveDisciplineScreenState extends State<LiveDisciplineScreen> {
     }
 
     setState(() {
-      _classes = classNames.isNotEmpty ? classNames.toList() : ['3ème B', '4ème A', 'Terminale D'];
+      _classes = classNames.isNotEmpty ? classNames.toList() : ['6ème A', '5ème A', '4ème A', '3ème A', '2nde C', '1ère D', 'Tle D'];
       if (widget.initialClass != null && _classes.contains(widget.initialClass)) {
         _selectedClass = widget.initialClass!;
       } else {

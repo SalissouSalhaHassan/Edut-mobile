@@ -355,29 +355,25 @@ class PlanificationRepository {
     try {
       final employeeId = await _getEmployeeId();
 
-      var q = _client
-          .from('class_subjects')
-          .select(
-            'class_id, subject_id, teacher_id, '
-            'school_classes(id, class_name), '
-            'school_subjects(id, subject_name)',
-          );
-
-      if (employeeId != null) {
-        final res = await q.eq('teacher_id', employeeId);
-        if ((res as List).isNotEmpty) {
-          return List<Map<String, dynamic>>.from(res);
-        }
+      String endpoint = '/api/mobile/academics?action=getTeacherClassesAndSubjects';
+      if (employeeId != null && employeeId > 0) {
+        endpoint += '&employeeId=$employeeId';
       }
 
-      final allRes = await _client
-          .from('class_subjects')
-          .select(
-            'class_id, subject_id, teacher_id, '
-            'school_classes(id, class_name), '
-            'school_subjects(id, subject_name)',
-          );
-      return List<Map<String, dynamic>>.from(allRes);
+      try {
+        final res = await _apiClient.getJson(endpoint);
+        final list = (res['data'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+        if (list.isNotEmpty) return list;
+      } catch (_) {}
+
+      // Fallback: fetch all classes
+      try {
+        final allRes = await _apiClient.getJson('/api/mobile/academics?action=getAllClassesAndSubjects');
+        final list = (allRes['data'] as List?)?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+        if (list.isNotEmpty) return list;
+      } catch (_) {}
+
+      return [];
     } catch (e) {
       debugPrint('PlanificationRepository.getTeacherClassesAndSubjects error: $e');
       return [];

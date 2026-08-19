@@ -279,17 +279,52 @@ class AttendanceRepository {
     }
   }
 
-  // Fetch classes and subjects taught by a specific teacher
+  // Fetch classes and subjects taught by a specific teacher / staff
   Future<List<Map<String, dynamic>>> getTeacherClassesAndSubjects(int employeeId) async {
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = "attendance_teacher_classes_$employeeId";
+
     try {
-      final response = await _apiClient.getJson(
-        '/api/mobile/attendance?action=getTeacherClassesAndSubjects&employeeId=$employeeId',
+      try {
+        final response = await _apiClient.getJson(
+          '/api/mobile/academics?action=getTeacherClassesAndSubjects&employeeId=$employeeId',
+        );
+        final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+        if (list.isNotEmpty) {
+          await cacheManager.saveDataList(
+            boxName: OfflineStoreManager.boxClassSubjects,
+            key: cacheKey,
+            data: list,
+          );
+          return list;
+        }
+      } catch (_) {}
+
+      try {
+        final response = await _apiClient.getJson(
+          '/api/mobile/attendance?action=getTeacherClassesAndSubjects&employeeId=$employeeId',
+        );
+        final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+        if (list.isNotEmpty) {
+          await cacheManager.saveDataList(
+            boxName: OfflineStoreManager.boxClassSubjects,
+            key: cacheKey,
+            data: list,
+          );
+          return list;
+        }
+      } catch (_) {}
+
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxClassSubjects,
+        key: cacheKey,
       );
-      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
-      return list;
     } catch (e) {
       debugPrint("Error fetching teacher classes and subjects: $e");
-      return [];
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxClassSubjects,
+        key: cacheKey,
+      );
     }
   }
 }

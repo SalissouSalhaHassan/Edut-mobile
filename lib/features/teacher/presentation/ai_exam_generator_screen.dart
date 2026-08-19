@@ -57,8 +57,8 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
         if (sName != null && sName.toString().isNotEmpty) subjectNames.add(sName.toString());
       }
 
-      _classes = classNames.isNotEmpty ? classNames.toList() : ['3ème B', '4ème A', 'Terminale D'];
-      _subjects = subjectNames.isNotEmpty ? subjectNames.toList() : ['Mathématiques', 'Physique-Chimie', 'SVT'];
+      _classes = classNames.isNotEmpty ? classNames.toList() : ['6ème A', '5ème A', '4ème A', '3ème A', '2nde C', '1ère D', 'Tle D'];
+      _subjects = subjectNames.isNotEmpty ? subjectNames.toList() : ['Mathématiques', 'Français', 'Physique-Chimie', 'SVT', 'Histoire-Géo', 'Anglais', 'Philosophie'];
 
       if (widget.initialClass != null && _classes.contains(widget.initialClass)) {
         _selectedClass = widget.initialClass!;
