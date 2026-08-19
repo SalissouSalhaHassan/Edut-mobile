@@ -45,7 +45,7 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
 
     try {
       final profile = await locator<PermissionService>().getCurrentProfile();
-      final feeId = _currentFee['id'] as int;
+      final feeId = (_currentFee['id'] as num?)?.toInt() ?? 0;
 
       // 1. Fetch payments
       final paymentsList = await _repository.getFeePayments(feeId);

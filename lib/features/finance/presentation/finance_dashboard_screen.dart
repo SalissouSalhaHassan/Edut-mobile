@@ -69,13 +69,13 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
       _sessions = await _repository.getSessions(_schoolId);
 
       if (_sessions.isNotEmpty) {
-        // Find active session or default to the first one (most recent)
+        // Find active session or default to the first one
         final activeSession = _sessions.firstWhere(
-          (s) => s['is_active'] == true,
+          (s) => s['is_active'] == true || (s['status']?.toString().toLowerCase() == 'actif'),
           orElse: () => _sessions.first,
         );
-        _selectedSessionId = activeSession['id'] as int;
-        _selectedSessionName = activeSession['session_name'] as String;
+        _selectedSessionId = (activeSession['id'] as num?)?.toInt() ?? 1;
+        _selectedSessionName = activeSession['session_name']?.toString() ?? '';
 
         await _fetchFinanceData();
       } else {
