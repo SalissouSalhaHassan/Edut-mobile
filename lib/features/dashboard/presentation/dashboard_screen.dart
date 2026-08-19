@@ -689,19 +689,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       context.push('/hostel');
                     },
                   ),
-                if (_hasHrAccess || _isSuperAdmin)
-                  ListTile(
-                    leading: const Icon(
-                      Icons.admin_panel_settings_rounded,
-                      color: Color(0xFF1E293B),
-                    ),
-                    title: const Text('QG Direction & Approbations', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Validation demandes & Suivi bida', style: TextStyle(fontSize: 11)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.push('/admin/director-cockpit');
-                    },
+                ListTile(
+                  leading: const Icon(
+                    Icons.admin_panel_settings_rounded,
+                    color: Color(0xFF1E293B),
                   ),
+                  title: const Text('QG Direction & Approbations', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Validation demandes & Suivi bida', style: TextStyle(fontSize: 11)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/admin/director-cockpit');
+                  },
+                ),
                 if (_hasHrAccess)
                   ListTile(
                     leading: const Icon(
@@ -1224,6 +1223,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 28),
           ] else ...[
             _buildWelcomeCard(),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () => context.push('/admin/director-cockpit'),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF312E81).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFFDE047), size: 26),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QG Direction & Approbations',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.5),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Approbations 1-Clic • Suivi Bida • Présence Ens.',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 28),
           ],
 
@@ -1245,6 +1297,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildQuickActionsGrid(bool isTeacher) {
     final List<Widget> quickActions = [
+      if (!isTeacher)
+        _buildQuickActionCard(
+          title: 'QG Direction',
+          description: 'Approbations & Suivi Bida',
+          icon: Icons.admin_panel_settings_rounded,
+          color: const Color(0xFF1E1B4B),
+          onTap: () => context.push('/admin/director-cockpit'),
+        ),
       if (isTeacher) ...[
         _buildQuickActionCard(
           title: 'Examens IA',
