@@ -30,7 +30,15 @@ class EarlyWarningCard extends StatelessWidget {
             ? const Color(0xFFFFFBEB)
             : const Color(0xFFF0FDF4);
 
-    final atRiskSubjects = List<Map<String, dynamic>>.from(data['atRiskSubjects'] ?? []);
+    final rawAtRisk = List<Map<String, dynamic>>.from(data['atRiskSubjects'] ?? []);
+    final Map<String, Map<String, dynamic>> uniqueMap = {};
+    for (var s in rawAtRisk) {
+      final name = (s['subjectName'] ?? '').toString().trim();
+      if (name.isNotEmpty && !uniqueMap.containsKey(name.toLowerCase())) {
+        uniqueMap[name.toLowerCase()] = s;
+      }
+    }
+    final atRiskSubjects = uniqueMap.values.toList();
     final summary = data['riskSummary']?.toString() ?? 'Suivi académique normal.';
 
     return Container(
