@@ -5,6 +5,7 @@ import '../../../core/auth/session_manager.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/api/sync_engine.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../data/attendance_repository.dart';
 
@@ -250,10 +251,15 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
       });
 
       if (result['success'] == true) {
+        final isOnline = locator<SyncEngine>().isOnlineNotifier.value;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Appel enregistré avec succès !"),
-            backgroundColor: AppColors.success,
+          SnackBar(
+            content: Text(
+              isOnline
+                  ? "Appel enregistré avec succès !"
+                  : "💾 Appel enregistré localement (Mode Hors-ligne). Synchronisation automatique dès le retour du réseau 📶",
+            ),
+            backgroundColor: isOnline ? AppColors.success : const Color(0xFFD97706),
           ),
         );
         Navigator.pop(context);
@@ -502,24 +508,59 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
               ],
             ),
           ],
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(50),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.calendar_month, color: Colors.white, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  dateStr,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(50),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_month, color: Colors.white, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      dateStr,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ValueListenableBuilder<bool>(
+                valueListenable: locator<SyncEngine>().isOnlineNotifier,
+                builder: (context, isOnline, _) {
+                  if (isOnline) {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.wifi_off_rounded, size: 13, color: Color(0xFFB45309)),
+                        SizedBox(width: 4),
+                        Text(
+                          "Mode Hors-Ligne",
+                          style: TextStyle(
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),

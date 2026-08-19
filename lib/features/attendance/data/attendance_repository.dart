@@ -15,6 +15,32 @@ class AttendanceRepository {
       : _apiClient = apiClient ?? MobileApiClient(),
         _client = client ?? SupabaseClientManager().client;
 
+  // Record student gate presence check-in from scanning QR Code
+  Future<Map<String, dynamic>> recordStudentGateScan({
+    int? studentId,
+    String? numAdmission,
+  }) async {
+    try {
+      final response = await _apiClient.postJson(
+        '/api/mobile/attendance',
+        {
+          'action': 'recordStudentGateScan',
+          'payload': {
+            'studentId': studentId,
+            'numAdmission': numAdmission,
+            'scanMethod': 'QR_CODE',
+          },
+        },
+      );
+      return response;
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
   // Record presence check-in from scanning QR Code
   Future<Map<String, dynamic>> recordTeacherSessionScan({
     required int classId,

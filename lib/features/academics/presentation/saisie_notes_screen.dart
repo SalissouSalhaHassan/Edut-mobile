@@ -5,6 +5,7 @@ import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/api/supabase_client.dart';
+import '../../../core/api/sync_engine.dart';
 import '../data/academics_repository.dart';
 import '../utils/calculations.dart';
 import '../../ai/data/ai_repository.dart';
@@ -382,10 +383,15 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         });
 
         if (res['success'] == true) {
+          final isOnline = locator<SyncEngine>().isOnlineNotifier.value;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Notes enregistrées avec succès !'),
-              backgroundColor: AppColors.success,
+            SnackBar(
+              content: Text(
+                isOnline
+                    ? 'Notes enregistrées avec succès !'
+                    : '💾 Notes enregistrées localement (Mode Hors-ligne). Synchronisation automatique dès le retour du réseau 📶',
+              ),
+              backgroundColor: isOnline ? AppColors.success : const Color(0xFFD97706),
             ),
           );
           // Reload data to ensure sync under current selected session & period
@@ -732,16 +738,53 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    "Coef: ${_coefficient.toStringAsFixed(0)}",
-                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ValueListenableBuilder<bool>(
+                      valueListenable: locator<SyncEngine>().isOnlineNotifier,
+                      builder: (context, isOnline, _) {
+                        if (isOnline) {
+                          return const SizedBox.shrink();
+                        }
+                        return Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF59E0B)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.wifi_off_rounded, size: 12, color: Color(0xFFB45309)),
+                              SizedBox(width: 4),
+                              Text(
+                                "Hors-Ligne",
+                                style: TextStyle(
+                                  color: Color(0xFFB45309),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "Coef: ${_coefficient.toStringAsFixed(0)}",
+                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

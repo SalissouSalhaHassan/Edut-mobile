@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -296,7 +297,14 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
     final name = _student?['nom_etudiant'] ?? 'Élève';
     final matricule = _student?['num_admission'] ?? 'MAT-2025';
     final classe = _student?['classe'] ?? 'Classe non assignée';
-    final qrData = 'EDUT:ID:${_student?['id']}:MAT:$matricule:VALID:2026';
+    final qrData = jsonEncode({
+      'app': 'edut',
+      'type': 'student_pass',
+      'student_id': _student?['id'],
+      'num_admission': matricule,
+      'nom_etudiant': name,
+      'classe': classe,
+    });
 
     return Container(
       width: double.infinity,

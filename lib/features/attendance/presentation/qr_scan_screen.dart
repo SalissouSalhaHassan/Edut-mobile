@@ -73,27 +73,77 @@ class _QRScanScreenState extends State<QRScanScreen> {
     if (_isProcessing || !_hasCameraPermission) return;
 
     final barcode = capture.barcodes.first;
-    final url = barcode.rawValue;
+    final rawValue = barcode.rawValue;
 
-    if (url == null || url.trim().isEmpty) return;
+    if (rawValue == null || rawValue.trim().isEmpty) return;
 
     setState(() {
       _isProcessing = true;
       _statusMessage = "Traitement du scan...";
     });
 
-    // Parse QR content to extract classId
-    // Accepted formats:
-    //   1. Full URL:  https://edut.pro/...?classId=15
-    //   2. Full URL:  https://edut.pro/...?classroom=15
-    //   3. URL with path segment:  https://edut.pro/.../scan/15
-    //   4. Plain number string:  "15"
-    //   5. Compact JSON:  {"classId":15}
+    final trimmed = rawValue.trim();
+
+    // Check if it's a Student ID Card / Student Pass
+    bool isStudentPass = false;
+    int? studentId;
+    String? numAdmission;
+    String? studentName;
+    String? studentClass;
+
+    if (trimmed.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
+        if (decoded['type'] == 'student_pass' || decoded['student_id'] != null || decoded['num_admission'] != null) {
+          isStudentPass = true;
+          studentId = int.tryParse(decoded['student_id']?.toString() ?? '');
+          numAdmission = decoded['num_admission']?.toString();
+          studentName = decoded['nom_etudiant']?.toString();
+          studentClass = decoded['classe']?.toString();
+        }
+      } catch (_) {}
+    } else if (trimmed.startsWith('EDUT:ID:')) {
+      // Legacy format: EDUT:ID:123:MAT:ADM-01:VALID:2026
+      isStudentPass = true;
+      final parts = trimmed.split(':');
+      for (int i = 0; i < parts.length; i++) {
+        if (parts[i] == 'ID' && i + 1 < parts.length) {
+          studentId = int.tryParse(parts[i + 1]);
+        }
+        if (parts[i] == 'MAT' && i + 1 < parts.length) {
+          numAdmission = parts[i + 1];
+        }
+      }
+    }
+
+    if (isStudentPass) {
+      debugPrint('🪪 Student Gate Pass detected: ID=$studentId, MAT=$numAdmission');
+      final result = await locator<AttendanceRepository>().recordStudentGateScan(
+        studentId: studentId,
+        numAdmission: numAdmission,
+      );
+
+      if (result['success'] == true) {
+        final studentData = result['student'] as Map<String, dynamic>? ?? {};
+        final isAlready = result['alreadyRecorded'] == true;
+        _showStudentResultSheet(
+          success: true,
+          alreadyRecorded: isAlready,
+          student: studentData,
+          message: result['message'] ?? (isAlready ? "Présence déjà enregistrée" : "Accès Autorisé - Présent"),
+        );
+      } else {
+        _showResultSheet(
+          success: false,
+          message: result['error'] ?? "Élève non identifié dans la base de l'établissement.",
+        );
+      }
+      return;
+    }
+
+    // Otherwise, treat as Classroom QR
     int? classId;
     try {
-      final trimmed = url.trim();
-
-      // Try JSON format first: {"classId":15}
       if (trimmed.startsWith('{')) {
         try {
           final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
@@ -102,54 +152,46 @@ class _QRScanScreenState extends State<QRScanScreen> {
         } catch (_) {}
       }
 
-      // Try as URL (covers both query params and path segments)
       if (classId == null) {
         try {
           final uri = Uri.parse(trimmed);
-
-          // 1. Query param: ?classId=15 or ?classroom=15
           final paramVal = uri.queryParameters['classId'] ??
               uri.queryParameters['classroom'] ??
               uri.queryParameters['class_id'];
           if (paramVal != null) classId = int.tryParse(paramVal);
 
-          // 2. Last path segment: /scan/15  or  /qr/15
           if (classId == null && uri.pathSegments.isNotEmpty) {
             classId = int.tryParse(uri.pathSegments.last);
           }
         } catch (_) {}
       }
 
-      // Try plain numeric string
       classId ??= int.tryParse(trimmed);
     } catch (_) {
       classId = null;
     }
 
-    debugPrint('🔍 QR raw value: $url');
+    debugPrint('🔍 QR raw value: $rawValue');
     debugPrint('🔍 Resolved classId: $classId');
 
     if (classId == null) {
       _showResultSheet(
         success: false,
-        message: "Code QR invalide. Veuillez scanner un QR code de classe valide.",
+        message: "Code QR invalide. Veuillez scanner un QR code de classe ou une carte scolaire valide.",
       );
       return;
     }
-
 
     final sessionManager = locator<SessionManager>();
     final employeeIdStr = await sessionManager.getEmployeeId();
     int? employeeId = int.tryParse(employeeIdStr ?? '');
 
-    // If employeeId is missing from local session (stale cache), refresh from API
     if (employeeId == null) {
       debugPrint('⚠️ employeeId missing from session — refreshing profile from API...');
       try {
         final freshProfile = await locator<MobileApiClient>().getCurrentProfile();
         final freshEmpId = int.tryParse(freshProfile.employeeId ?? '');
         if (freshEmpId != null) {
-          // Update the session storage so future scans don't need a refresh
           await sessionManager.saveSession(
             token: (await sessionManager.getToken()) ?? '',
             email: freshProfile.email,
@@ -199,6 +241,162 @@ class _QRScanScreenState extends State<QRScanScreen> {
     }
   }
 
+  void _showStudentResultSheet({
+    required bool success,
+    required bool alreadyRecorded,
+    required Map<String, dynamic> student,
+    required String message,
+  }) {
+    if (!mounted) return;
+
+    setState(() {
+      _statusMessage = message;
+    });
+
+    _controller.stop();
+
+    final name = student['nomEtudiant'] ?? student['nom_etudiant'] ?? 'Élève';
+    final matricule = student['numAdmission'] ?? student['num_admission'] ?? 'N/A';
+    final classe = student['classe'] ?? 'Classe';
+    final photo = student['photoPath'] ?? student['photo_path'];
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                
+                // Student Avatar
+                Center(
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: const Color(0xFF1E293B),
+                        backgroundImage: photo != null && photo.toString().startsWith('http')
+                            ? NetworkImage(photo.toString())
+                            : null,
+                        child: photo == null || !photo.toString().startsWith('http')
+                            ? const Icon(Icons.person, size: 44, color: Colors.white70)
+                            : null,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: alreadyRecorded ? AppColors.warning : AppColors.success,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Icon(
+                          alreadyRecorded ? Icons.access_time_filled_rounded : Icons.check_circle_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                
+                Text(
+                  name,
+                  style: const TextStyle(color: AppColors.slate900, fontSize: 19, fontWeight: FontWeight.w900),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$classe • Matricule: $matricule',
+                  style: const TextStyle(color: AppColors.slate500, fontSize: 13, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Status Box
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: alreadyRecorded ? const Color(0xFFFFFBEB) : const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: alreadyRecorded ? AppColors.warning.withValues(alpha: 0.4) : AppColors.success.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        alreadyRecorded ? Icons.info_outline_rounded : Icons.verified_rounded,
+                        color: alreadyRecorded ? AppColors.warning : AppColors.success,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color: alreadyRecorded ? const Color(0xFFB45309) : const Color(0xFF15803D),
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (mounted) {
+                      setState(() {
+                        _isProcessing = false;
+                        _statusMessage = null;
+                      });
+                      _controller.start();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: alreadyRecorded ? AppColors.warning : AppColors.success,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    "Scanner le Suivant",
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showResultSheet({required bool success, required String message}) {
     if (!mounted) return;
 
@@ -235,12 +433,11 @@ class _QRScanScreenState extends State<QRScanScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
                 CircleAvatar(
                   radius: 38,
                   backgroundColor: success
-                      ? AppColors.success.withAlpha(25)
-                      : AppColors.danger.withAlpha(25),
+                      ? AppColors.success.withValues(alpha: 0.15)
+                      : AppColors.danger.withValues(alpha: 0.15),
                   child: Icon(
                     success ? Icons.check_circle_rounded : Icons.error_rounded,
                     color: success ? AppColors.success : AppColors.danger,
@@ -248,21 +445,18 @@ class _QRScanScreenState extends State<QRScanScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
                 Text(
                   success ? "Scan Réussi" : "Échec du Scan",
                   style: const TextStyle(color: AppColors.slate900, fontSize: 20, fontWeight: FontWeight.w900),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                
                 Text(
                   message,
                   style: const TextStyle(color: AppColors.slate500, fontSize: 14, fontWeight: FontWeight.w600, height: 1.4),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 28),
-
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
