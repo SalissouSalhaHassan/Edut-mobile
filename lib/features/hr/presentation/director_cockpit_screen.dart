@@ -676,7 +676,8 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
           ),
           const SizedBox(height: 8),
           ...missingToday.map((m) {
-            final className = m['className'] ?? 'Classe';
+            final rawName = (m['className'] ?? m['class_name'] ?? m['classe'])?.toString().trim();
+            final className = (rawName != null && rawName.isNotEmpty) ? rawName : 'Classe';
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -776,12 +777,16 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
           )
         else
           ...filledToday.map((f) {
-            final className = f['className'] ?? 'Classe';
-            final subjectName = f['subjectName'] ?? 'Matière';
-            final empName = f['employeeName'] ?? 'Enseignant';
-            final title = f['titreLecon'] ?? 'Séance du jour';
-            final start = f['heureDebut'] ?? '08:00';
-            final end = f['heureFin'] ?? '10:00';
+            final rawClass = (f['className'] ?? f['class_name'] ?? f['classe'])?.toString().trim();
+            final className = (rawClass != null && rawClass.isNotEmpty) ? rawClass : 'Classe';
+            final rawSubject = (f['subjectName'] ?? f['subject_name'] ?? f['matiere'])?.toString().trim();
+            final subjectName = (rawSubject != null && rawSubject.isNotEmpty) ? rawSubject : 'Matière';
+            final rawEmp = (f['employeeName'] ?? f['employee_name'] ?? f['enseignant'])?.toString().trim();
+            final empName = (rawEmp != null && rawEmp.isNotEmpty) ? rawEmp : 'Enseignant';
+            final rawTitle = (f['titreLecon'] ?? f['titre_lecon'])?.toString().trim();
+            final title = (rawTitle != null && rawTitle.isNotEmpty) ? rawTitle : 'Séance du jour';
+            final start = f['heureDebut'] ?? f['heure_debut'] ?? '08:00';
+            final end = f['heureFin'] ?? f['heure_fin'] ?? '10:00';
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),

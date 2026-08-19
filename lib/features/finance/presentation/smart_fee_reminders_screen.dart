@@ -79,24 +79,57 @@ class _SmartFeeRemindersScreenState extends State<SmartFeeRemindersScreen> {
             'balance': 60000,
             'dueDate': '28/05/2026',
           },
+          {
+            'id': 5,
+            'studentName': 'Abdoulaye Seydou',
+            'className': '4ème A',
+            'parentName': 'M. Seydou Garba',
+            'parentPhone': '+227 93 44 55 66',
+            'totalExpected': 140000,
+            'totalPaid': 80000,
+            'balance': 60000,
+            'dueDate': '28/05/2026',
+          },
         ];
       } else {
         _unpaidStudents = pending.asMap().entries.map<Map<String, dynamic>>((entry) {
           final idx = entry.key;
           final p = entry.value;
+          final sName = (p['studentName'] != null && p['studentName'].toString().isNotEmpty)
+              ? p['studentName'].toString()
+              : 'Élève ${p['studentId'] ?? idx + 1}';
+          final cName = (p['className'] != null && p['className'].toString().isNotEmpty)
+              ? p['className'].toString()
+              : '3ème B';
+          final pName = (p['parentName'] != null && p['parentName'].toString().isNotEmpty)
+              ? p['parentName'].toString()
+              : 'Parent d\'élève';
+          final pPhone = (p['parentPhone'] != null && p['parentPhone'].toString().isNotEmpty)
+              ? p['parentPhone'].toString()
+              : '+227 90 00 00 00';
+
           return {
-            'id': p['id'] ?? idx,
-            'studentName': 'Élève ${p['studentId'] ?? idx}',
-            'className': '3ème B',
-            'parentName': 'Parent d\'élève',
-            'parentPhone': '+227 90 00 00 00',
-            'totalExpected': p['totalExpected'] ?? 150000,
-            'totalPaid': p['totalPaid'] ?? 100000,
-            'balance': p['balance'] ?? 50000,
-            'dueDate': 'Fin du mois',
+            'id': p['id'] ?? idx + 1,
+            'studentName': sName,
+            'className': cName,
+            'parentName': pName,
+            'parentPhone': pPhone,
+            'totalExpected': (p['totalExpected'] as num?)?.toInt() ?? 150000,
+            'totalPaid': (p['totalPaid'] as num?)?.toInt() ?? 100000,
+            'balance': (p['balance'] as num?)?.toInt() ?? 50000,
+            'dueDate': p['dueDate'] ?? 'Fin du mois',
           };
         }).toList();
       }
+
+      // Dynamically extract all distinct classes from the dataset so filter chips match perfectly!
+      final dynamicClasses = <String>{'Toutes'};
+      for (var s in _unpaidStudents) {
+        final c = (s['className'] ?? '').toString().trim();
+        if (c.isNotEmpty) dynamicClasses.add(c);
+      }
+      _classes.clear();
+      _classes.addAll(dynamicClasses);
 
       if (mounted) setState(() => _isLoading = false);
     } catch (_) {
