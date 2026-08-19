@@ -80,10 +80,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       final sessions = await _financeRepository.getSessions(schoolId);
       if (sessions.isNotEmpty) {
         final active = sessions.firstWhere(
-          (row) => row['is_active'] == true,
+          (row) => row['is_active'] == true || (row['status']?.toString().toLowerCase() == 'actif'),
           orElse: () => sessions.first,
         );
-        final activeSessionId = active['id'] as int?;
+        final activeSessionId = (active['id'] as num?)?.toInt();
         activeSession = (active['session_name'] ?? '').toString();
         if (activeSessionId != null) {
           final stats = await _financeRepository.getFinanceStats(

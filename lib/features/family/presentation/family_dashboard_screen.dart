@@ -219,10 +219,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           _sessions = await _repository.getSessions(_schoolId!);
           if (_sessions.isNotEmpty) {
             final active = _sessions.firstWhere(
-              (s) => s['is_active'] == true,
+              (s) => s['is_active'] == true || (s['status']?.toString().toLowerCase() == 'actif'),
               orElse: () => _sessions.first,
             );
-            _selectedSessionId = active['id'] as int;
+            _selectedSessionId = (active['id'] as num?)?.toInt() ?? 1;
             _selectedSessionName = active['session_name'] as String? ?? '';
           }
         } catch (e) {

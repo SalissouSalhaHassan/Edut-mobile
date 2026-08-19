@@ -101,11 +101,11 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       if (_sessions.isNotEmpty) {
         // Find active session
         final activeSession = _sessions.firstWhere(
-          (s) => s['is_active'] == true,
+          (s) => s['is_active'] == true || (s['status']?.toString().toLowerCase() == 'actif'),
           orElse: () => _sessions.first,
         );
-        _selectedSessionId = activeSession['id'] as int;
-        _selectedSessionName = activeSession['session_name'] as String;
+        _selectedSessionId = (activeSession['id'] as num?)?.toInt() ?? 1;
+        _selectedSessionName = activeSession['session_name']?.toString() ?? '';
 
         // Fetch periods
         _periods = await _repository.getPeriods(schoolId, _selectedSessionId!, classId: widget.classId);

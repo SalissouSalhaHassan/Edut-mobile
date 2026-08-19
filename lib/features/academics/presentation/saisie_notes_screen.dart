@@ -126,11 +126,11 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
       if (_sessions.isNotEmpty) {
         // Find active session or default to most recent (highest id)
         final activeSession = _sessions.firstWhere(
-          (s) => s['is_active'] == true,
-          orElse: () => _sessions.first, // already sorted by id DESC
+          (s) => s['is_active'] == true || (s['status']?.toString().toLowerCase() == 'actif'),
+          orElse: () => _sessions.first,
         );
-        _selectedSessionId = activeSession['id'] as int;
-        _selectedSessionName = activeSession['session_name'] as String;
+        _selectedSessionId = (activeSession['id'] as num?)?.toInt() ?? 1;
+        _selectedSessionName = activeSession['session_name']?.toString() ?? '';
         debugPrint("✅ Active session: [$_selectedSessionId] $_selectedSessionName");
 
         // Fetch periods for this session
