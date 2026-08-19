@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/api/mobile_api_client.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
@@ -16,20 +17,26 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
-  String _selectedExamType = "Tous";
+  String _selectedCategory = "all";
   String _selectedSubject = "Toutes";
-  String _selectedYear = "Toutes";
+  String _selectedExamType = "Tous";
 
-  List<String> _examTypes = ["Tous", "BEPC", "BAC D", "BAC C", "BAC A"];
-  List<String> _subjects = ["Toutes", "Mathématiques", "Physique-Chimie", "SVT", "Français", "Philosophie", "Histoire-Géo"];
-  List<String> _years = ["Toutes", "2025", "2024", "2023", "2022", "2021"];
-  List<Map<String, dynamic>> _exams = [];
+  final List<Map<String, String>> _categories = [
+    {'id': 'all', 'label': 'Tout', 'icon': '📚'},
+    {'id': 'exams', 'label': 'Annales BEPC/BAC', 'icon': '📑'},
+    {'id': 'books', 'label': 'Livres & Manuels', 'icon': '📖'},
+    {'id': 'videos', 'label': 'Vidéos de Cours', 'icon': '🎥'},
+    {'id': 'courses', 'label': 'Fiches & Polycopiés', 'icon': '📝'},
+  ];
+
+  List<String> _subjects = ["Toutes", "Mathématiques", "Physique-Chimie", "SVT", "Français", "Philosophie", "Histoire-Géo", "Anglais"];
+  List<Map<String, dynamic>> _resources = [];
   List<Map<String, dynamic>> _filtered = [];
 
   @override
   void initState() {
     super.initState();
-    _loadExams();
+    _loadResources();
   }
 
   @override
@@ -38,22 +45,32 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadExams() async {
+  Future<void> _loadResources() async {
     setState(() => _isLoading = true);
     try {
       final res = await _apiClient.getJson(
-        '/api/mobile/e-library/past-exams?examType=$_selectedExamType&subject=$_selectedSubject&year=$_selectedYear',
+        '/api/mobile/e-library/resources?category=$_selectedCategory&subject=$_selectedSubject',
       );
       if (res['success'] == true && res['data'] != null) {
         final data = res['data'];
         setState(() {
-          _examTypes = List<String>.from(data['examTypes'] ?? _examTypes);
-          _subjects = List<String>.from(data['subjects'] ?? _subjects);
-          _years = List<String>.from(data['years'] ?? _years);
-          _exams = List<Map<String, dynamic>>.from(data['exams'] ?? []);
-          _filtered = _exams;
+          _resources = List<Map<String, dynamic>>.from(data['resources'] ?? []);
+          _filtered = _resources;
           _isLoading = false;
         });
+      } else {
+        // Fallback to past-exams endpoint
+        final legacyRes = await _apiClient.getJson(
+          '/api/mobile/e-library/past-exams?examType=$_selectedExamType&subject=$_selectedSubject',
+        );
+        if (legacyRes['success'] == true && legacyRes['data'] != null) {
+          final data = legacyRes['data'];
+          setState(() {
+            _resources = List<Map<String, dynamic>>.from(data['exams'] ?? []);
+            _filtered = _resources;
+            _isLoading = false;
+          });
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
@@ -64,15 +81,39 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
     final q = query.trim().toLowerCase();
     setState(() {
       if (q.isEmpty) {
-        _filtered = _exams;
+        _filtered = _resources;
       } else {
-        _filtered = _exams.where((e) {
+        _filtered = _resources.where((e) {
           final t = (e['title'] ?? '').toString().toLowerCase();
           final s = (e['subject'] ?? '').toString().toLowerCase();
-          return t.contains(q) || s.contains(q);
+          final d = (e['description'] ?? '').toString().toLowerCase();
+          return t.contains(q) || s.contains(q) || d.contains(q);
         }).toList();
       }
     });
+  }
+
+  Future<void> _openResource(Map<String, dynamic> item) async {
+    final videoUrl = item['videoUrl']?.toString();
+    final fileUrl = item['fileUrl']?.toString();
+    final url = videoUrl?.isNotEmpty == true ? videoUrl : fileUrl;
+
+    if (url != null && url.isNotEmpty) {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ouverture du document : ${item['title']}'),
+          backgroundColor: const Color(0xFF2563EB),
+        ),
+      );
+    }
   }
 
   @override
@@ -83,8 +124,8 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Annales Nationales & Examens", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text("Sujets officiels BEPC & BAC avec corrigés types", style: TextStyle(fontSize: 11, color: AppColors.slate500)),
+            Text("Médiathèque & E-Learning", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text("Manuels, vidéos explicatives & annales d'examens", style: TextStyle(fontSize: 11, color: AppColors.slate500)),
           ],
         ),
         backgroundColor: Colors.white,
@@ -96,7 +137,7 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
           // Filter section
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -105,7 +146,7 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
                   controller: _searchController,
                   onChanged: _filterSearch,
                   decoration: InputDecoration(
-                    hintText: "Rechercher une épreuve ou matière...",
+                    hintText: "Rechercher un livre, cours, vidéo ou examen...",
                     hintStyle: const TextStyle(color: AppColors.slate400, fontSize: 13),
                     prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slate400, size: 20),
                     filled: true,
@@ -114,23 +155,24 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
-                // Exam Type selector
+                // Category selector
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _examTypes.map((type) {
-                      final isSel = type == _selectedExamType;
+                    children: _categories.map((cat) {
+                      final isSel = cat['id'] == _selectedCategory;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(type),
+                          avatar: Text(cat['icon']!, style: const TextStyle(fontSize: 13)),
+                          label: Text(cat['label']!),
                           selected: isSel,
                           onSelected: (sel) {
                             if (sel) {
-                              setState(() => _selectedExamType = type);
-                              _loadExams();
+                              setState(() => _selectedCategory = cat['id']!);
+                              _loadResources();
                             }
                           },
                           selectedColor: const Color(0xFF2563EB),
@@ -148,18 +190,18 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
             ),
           ),
 
-          // Exams list
+          // Resources list
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
                 : _filtered.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.menu_book_rounded, color: AppColors.slate400, size: 40),
+                            const Icon(Icons.menu_book_rounded, color: AppColors.slate400, size: 44),
                             const SizedBox(height: 12),
-                            Text("Aucune annale trouvée pour ces critères.", style: AppTextStyles.caption),
+                            Text("Aucune ressource trouvée pour ces critères.", style: AppTextStyles.caption),
                           ],
                         ),
                       )
@@ -167,8 +209,8 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
                         padding: const EdgeInsets.all(16),
                         itemCount: _filtered.length,
                         itemBuilder: (context, index) {
-                          final exam = _filtered[index];
-                          return _buildExamCard(exam);
+                          final item = _filtered[index];
+                          return _buildResourceCard(item);
                         },
                       ),
           ),
@@ -177,27 +219,40 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
     );
   }
 
-  Widget _buildExamCard(Map<String, dynamic> exam) {
-    final title = exam['title'] ?? 'Épreuve officielle';
-    final subject = exam['subject'] ?? 'Matière';
-    final year = exam['year']?.toString() ?? '2025';
-    final examType = exam['examType'] ?? 'BEPC';
-    final size = exam['fileSize'] ?? '1.5 MB';
-    final hasKey = exam['hasAnswerKey'] == true;
-    final desc = exam['description'] ?? '';
+  Widget _buildResourceCard(Map<String, dynamic> item) {
+    final title = item['title'] ?? 'Ressource pédagogique';
+    final subject = item['subject'] ?? 'Matière';
+    final level = item['level'] ?? 'Secondaire';
+    final category = item['category'] ?? 'courses';
+    final isVideo = category == 'videos' || item['type'] == 'Vidéo';
+    final isExam = category == 'exams';
+    final desc = item['description'] ?? '';
+    final author = item['author'] ?? 'Edut Pro';
+
+    final Color badgeColor = isVideo
+        ? const Color(0xFFDC2626)
+        : isExam
+            ? const Color(0xFF2563EB)
+            : const Color(0xFF059669);
+
+    final Color badgeBg = isVideo
+        ? const Color(0xFFFEF2F2)
+        : isExam
+            ? const Color(0xFFEFF6FF)
+            : const Color(0xFFECFDF5);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -210,15 +265,30 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: badgeBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  '$examType • Session $year',
-                  style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 11.5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isVideo
+                          ? Icons.play_circle_fill_rounded
+                          : isExam
+                              ? Icons.assignment_turned_in_rounded
+                              : Icons.menu_book_rounded,
+                      color: badgeColor,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '$subject • $level',
+                      style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 11.5),
+                    ),
+                  ],
                 ),
               ),
-              if (hasKey)
+              if (item['hasCorrection'] == true)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -229,51 +299,44 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
                     children: [
                       Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 12),
                       SizedBox(width: 4),
-                      Text('Corrigé type inclus', style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold, fontSize: 10.5)),
+                      Text('Corrigé type', style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold, fontSize: 10.5)),
                     ],
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.slate900)),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: AppColors.slate900)),
           if (desc.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(desc, style: const TextStyle(fontSize: 11.5, color: AppColors.slate600)),
+            Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.slate600, height: 1.35)),
           ],
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Taille PDF : $size', style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
+              Text(
+                'Source : $author',
+                style: const TextStyle(fontSize: 11, color: AppColors.slate400, fontWeight: FontWeight.w500),
+              ),
               Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Ouverture du sujet PDF : $title'), backgroundColor: const Color(0xFF2563EB)),
-                      );
-                    },
-                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 14),
-                    label: const Text('Consulter', style: TextStyle(fontSize: 11.5)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Téléchargement hors-ligne terminé : $title'), backgroundColor: AppColors.success),
-                      );
-                    },
-                    icon: const Icon(Icons.download_rounded, size: 14, color: Colors.white),
-                    label: const Text('Télécharger', style: TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                    onPressed: () => _openResource(item),
+                    icon: Icon(
+                      isVideo ? Icons.play_arrow_rounded : Icons.visibility_rounded,
+                      size: 15,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      isVideo ? 'Regarder' : 'Consulter',
+                      style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: badgeColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
                     ),
                   ),
                 ],
@@ -285,3 +348,4 @@ class _PastExamsScreenState extends State<PastExamsScreen> {
     );
   }
 }
+
