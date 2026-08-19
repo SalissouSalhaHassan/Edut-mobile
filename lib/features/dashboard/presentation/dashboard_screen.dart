@@ -879,6 +879,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Navigator.pop(context);
                     context.push('/offline-sync');
                   },
+                ),
                 ListTile(
                   leading: const Icon(
                     Icons.phonelink_lock_rounded,
