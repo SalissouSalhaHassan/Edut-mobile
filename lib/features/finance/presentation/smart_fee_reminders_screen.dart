@@ -81,16 +81,20 @@ class _SmartFeeRemindersScreenState extends State<SmartFeeRemindersScreen> {
           },
         ];
       } else {
-        _unpaidStudents = pending.map((p, idx) => {
-          'id': p['id'] ?? idx,
-          'studentName': 'Élève ${p['studentId'] ?? idx}',
-          'className': '3ème B',
-          'parentName': 'Parent d\'élève',
-          'parentPhone': '+227 90 00 00 00',
-          'totalExpected': p['totalExpected'] ?? 150000,
-          'totalPaid': p['totalPaid'] ?? 100000,
-          'balance': p['balance'] ?? 50000,
-          'dueDate': 'Fin du mois',
+        _unpaidStudents = pending.asMap().entries.map<Map<String, dynamic>>((entry) {
+          final idx = entry.key;
+          final p = entry.value;
+          return {
+            'id': p['id'] ?? idx,
+            'studentName': 'Élève ${p['studentId'] ?? idx}',
+            'className': '3ème B',
+            'parentName': 'Parent d\'élève',
+            'parentPhone': '+227 90 00 00 00',
+            'totalExpected': p['totalExpected'] ?? 150000,
+            'totalPaid': p['totalPaid'] ?? 100000,
+            'balance': p['balance'] ?? 50000,
+            'dueDate': 'Fin du mois',
+          };
         }).toList();
       }
 
