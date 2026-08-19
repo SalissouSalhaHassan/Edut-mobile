@@ -542,6 +542,11 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               ),
             ),
           IconButton(
+            onPressed: () => context.push('/security/connected-devices'),
+            icon: const Icon(Icons.phonelink_lock_rounded, color: Color(0xFF0F4C81)),
+            tooltip: 'Appareils Connectés',
+          ),
+          IconButton(
             onPressed: _logout,
             icon: const Icon(Icons.logout),
             tooltip: 'Déconnexion',
@@ -677,6 +682,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                     matricule: _student['num_admission'] as String? ?? 'MAT-2025',
                     studentName: _student['nom_etudiant'] as String? ?? 'Élève',
                   ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Appareils Connectés",
+                  icon: Icons.phonelink_lock_rounded,
+                  color: const Color(0xFF0F4C81),
+                  onTap: () => context.push('/security/connected-devices'),
                 ),
               ],
             ),

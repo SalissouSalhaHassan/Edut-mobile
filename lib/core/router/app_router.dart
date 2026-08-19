@@ -64,6 +64,7 @@ import '../../features/ai/presentation/exam_predictor_screen.dart';
 import '../../features/family/presentation/family_transport_screen.dart';
 import '../../features/finance/presentation/smart_fee_reminders_screen.dart';
 import '../../features/sync/presentation/offline_sync_screen.dart';
+import '../../features/security/presentation/connected_devices_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -558,6 +559,14 @@ class AppRouter {
       GoRoute(
         path: '/offline-sync',
         builder: (context, state) => const OfflineSyncScreen(),
+      ),
+      GoRoute(
+        path: '/security/connected-devices',
+        builder: (context, state) => const ConnectedDevicesScreen(),
+      ),
+      GoRoute(
+        path: '/connected-devices',
+        builder: (context, state) => const ConnectedDevicesScreen(),
       ),
     ],
   );

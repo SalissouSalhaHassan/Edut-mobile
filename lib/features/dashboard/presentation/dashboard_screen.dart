@@ -879,6 +879,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Navigator.pop(context);
                     context.push('/offline-sync');
                   },
+                ListTile(
+                  leading: const Icon(
+                    Icons.phonelink_lock_rounded,
+                    color: Color(0xFF0F4C81),
+                  ),
+                  title: const Text('Appareils Connectés', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Téléphone unique & Sessions', style: TextStyle(fontSize: 11)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/security/connected-devices');
+                  },
                 ),
                 const Divider(),
                 ListTile(
