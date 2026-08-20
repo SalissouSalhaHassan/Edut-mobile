@@ -113,12 +113,69 @@ class PermissionService {
 
   Future<bool> hasPermission(String permission) async {
     final profile = await getCurrentProfile();
+    final role = profile.role.toLowerCase().trim();
+
+    // 1. Super Admin, Owner, Director, General Director, Admin, Censeur, Surveillant have broad access
+    if (role == 'super_admin' ||
+        role == 'owner' ||
+        role == 'director' ||
+        role == 'directeur' ||
+        role == 'admin' ||
+        role == 'censeur' ||
+        role.contains('super') ||
+        role.contains('admin') ||
+        role.contains('direct') ||
+        role.contains('owner') ||
+        role.contains('proviseur') ||
+        role.contains('principal') ||
+        role.contains('fondat') ||
+        role.contains('promoteur') ||
+        role.contains('مدير')) {
+      return true;
+    }
+
+    // 2. Teachers have guaranteed access to exams, messaging, attendance, academics, and student views
+    if (role == 'teacher' ||
+        role == 'enseignant' ||
+        role == 'professeur' ||
+        role.contains('teacher') ||
+        role.contains('enseign') ||
+        role.contains('prof') ||
+        role.contains('أستاذ') ||
+        role.contains('معلم')) {
+      if (permission.startsWith('messaging.') ||
+          permission.startsWith('exams.') ||
+          permission.startsWith('attendance.') ||
+          permission.startsWith('academics.') ||
+          permission.startsWith('students.')) {
+        return true;
+      }
+    }
+
+    // 3. Students & Parents have guaranteed access to view exams, messaging, attendance, academics
+    if (role == 'student' ||
+        role == 'parent' ||
+        role.contains('student') ||
+        role.contains('eleve') ||
+        role.contains('élève') ||
+        role.contains('parent') ||
+        role.contains('tuteur')) {
+      if (permission == AppPermissions.messagingView ||
+          permission == AppPermissions.examsView ||
+          permission == AppPermissions.attendanceView ||
+          permission == AppPermissions.academicsView) {
+        return true;
+      }
+    }
+
     return profile.permissions.contains(permission);
   }
 
   Future<bool> hasAnyPermission(List<String> permissions) async {
-    final profile = await getCurrentProfile();
-    return permissions.any(profile.permissions.contains);
+    for (final p in permissions) {
+      if (await hasPermission(p)) return true;
+    }
+    return false;
   }
 
   Future<bool> hasRole(String role) async {
@@ -176,7 +233,7 @@ class PermissionService {
       } catch (_) {}
     }
 
-    var permissions = <String>{};
+    var permissions = <String>{..._permissionsForRole(dbRole)};
 
     if (roleId != null) {
       final rows = await _client
@@ -189,11 +246,7 @@ class PermissionService {
         for (final row in rowList) {
           permissions.addAll(_mapModulePermissionRow(row));
         }
-      } else {
-        permissions = <String>{..._permissionsForRole(dbRole)};
       }
-    } else {
-      permissions = <String>{..._permissionsForRole(dbRole)};
     }
 
     return UserAccessProfile(role: dbRole, permissions: permissions);
@@ -274,19 +327,33 @@ class PermissionService {
     if (role.contains('super') || isSuperAdmin) return 'super_admin';
     if (role.contains('teacher') ||
         role.contains('enseignant') ||
-        role.contains('professeur')) {
+        role.contains('professeur') ||
+        role.contains('prof') ||
+        role.contains('أستاذ') ||
+        role.contains('معلم')) {
       return 'teacher';
     }
-    if (role.contains('director') || role.contains('directeur')) {
+    if (role.contains('director') ||
+        role.contains('directeur') ||
+        role.contains('proviseur') ||
+        role.contains('principal') ||
+        role.contains('fondat') ||
+        role.contains('promoteur') ||
+        role.contains('dirigeant') ||
+        role.contains('مدير')) {
       return 'director';
     }
-    if (role.contains('comptable') || role.contains('accountant')) {
+    if (role.contains('censeur')) return 'censeur';
+    if (role.contains('surveillant')) return 'surveillant';
+    if (role.contains('comptable') || role.contains('accountant') || role.contains('caissier') || role.contains('caiss')) {
       return 'accountant';
     }
     if (role.contains('secret')) return 'secretary';
-    if (role.contains('personnel') || role == 'hr') return 'personnel';
+    if (role.contains('personnel') || role == 'hr' || role.contains('rh')) return 'personnel';
     if (role.contains('owner') || role.contains('propriet')) return 'owner';
     if (role.contains('admin') || isAdmin) return 'admin';
+    if (role.contains('parent') || role.contains('tuteur')) return 'parent';
+    if (role.contains('eleve') || role.contains('élève') || role.contains('student') || role.contains('etudiant')) return 'student';
 
     return role.isEmpty ? fallbackRole : role;
   }
@@ -302,7 +369,19 @@ class PermissionService {
 
     final permissions = <String>{};
 
-    if (_matchesModule(moduleName, const ['students', 'student', 'eleves'])) {
+    if (_matchesModule(moduleName, const [
+      'students',
+      'student',
+      'eleves',
+      'eleve',
+      'élève',
+      'élèves',
+      'etudiant',
+      'etudiants',
+      'inscription',
+      'inscriptions',
+      'admission',
+    ])) {
       if (canView) permissions.add(AppPermissions.studentsView);
       if (canEdit) {
         permissions.addAll({
@@ -314,15 +393,34 @@ class PermissionService {
       if (canDelete) permissions.add(AppPermissions.studentsDelete);
     }
 
-    if (_matchesModule(moduleName, const ['finance', 'finances'])) {
+    if (_matchesModule(moduleName, const [
+      'finance',
+      'finances',
+      'comptabilite',
+      'comptabilité',
+      'caisse',
+      'paiements',
+      'frais',
+      'scolarite',
+      'scolarité',
+      'recus',
+      'reçus',
+    ])) {
       if (canView) permissions.add(AppPermissions.financeView);
-      if (canEdit) permissions.add(AppPermissions.financeCollect);
+      if (canEdit || canDelete) permissions.add(AppPermissions.financeCollect);
     }
 
     if (_matchesModule(moduleName, const [
       'hr',
+      'rh',
       'human resources',
       'ressources humaines',
+      'personnel',
+      'employes',
+      'employés',
+      'enseignants',
+      'professeurs',
+      'salaires',
     ])) {
       if (canView) permissions.add(AppPermissions.hrView);
       if (canEdit || canDelete) permissions.add(AppPermissions.hrManage);
@@ -331,7 +429,11 @@ class PermissionService {
     if (_matchesModule(moduleName, const [
       'hostel',
       'internat',
+      'dortoir',
       'dortoirs',
+      'chambres',
+      'hebergement',
+      'hébergement',
       'dormitory',
     ])) {
       if (canView) permissions.add(AppPermissions.hostelView);
@@ -343,6 +445,9 @@ class PermissionService {
       'platform',
       'schools',
       'security',
+      'etablissements',
+      'établissements',
+      'configuration',
     ])) {
       if (canView) permissions.add(AppPermissions.ownerPlatformView);
       if (canEdit || canDelete) {
@@ -350,12 +455,43 @@ class PermissionService {
       }
     }
 
-    if (_matchesModule(moduleName, const ['exam', 'exams', 'resultats'])) {
+    if (_matchesModule(moduleName, const [
+      'exam',
+      'exams',
+      'examen',
+      'examens',
+      'evaluation',
+      'evaluations',
+      'évaluation',
+      'évaluations',
+      'resultat',
+      'resultats',
+      'résultat',
+      'résultats',
+      'bulletin',
+      'bulletins',
+      'composition',
+      'compositions',
+      'note',
+      'notes',
+    ])) {
       if (canView) permissions.add(AppPermissions.examsView);
       if (canEdit || canDelete) permissions.add(AppPermissions.examsManage);
     }
 
-    if (_matchesModule(moduleName, const ['attendance', 'appel', 'presence'])) {
+    if (_matchesModule(moduleName, const [
+      'attendance',
+      'appel',
+      'presence',
+      'presences',
+      'présence',
+      'présences',
+      'assiduite',
+      'assiduité',
+      'absences',
+      'retards',
+      'pointage',
+    ])) {
       if (canView) permissions.add(AppPermissions.attendanceView);
       if (canEdit || canDelete) {
         permissions.add(AppPermissions.attendanceManage);
@@ -364,9 +500,18 @@ class PermissionService {
 
     if (_matchesModule(moduleName, const [
       'academics',
+      'academic',
+      'pedagogie',
+      'pédagogie',
+      'cours',
+      'classes',
+      'matieres',
+      'matières',
       'notes',
       'devoirs',
       'homework',
+      'cahier_textes',
+      'planification',
     ])) {
       if (canView) permissions.add(AppPermissions.academicsView);
       if (canEdit || canDelete) permissions.add(AppPermissions.academicsManage);
@@ -400,7 +545,18 @@ class PermissionService {
     if (_matchesModule(moduleName, const [
       'messaging',
       'messages',
+      'message',
+      'messagerie',
+      'notification',
       'notifications',
+      'communication',
+      'communications',
+      'chat',
+      'sms',
+      'discussion',
+      'discussions',
+      'mail',
+      'email',
     ])) {
       if (canView) permissions.add(AppPermissions.messagingView);
       if (canEdit || canDelete) permissions.add(AppPermissions.messagingManage);
