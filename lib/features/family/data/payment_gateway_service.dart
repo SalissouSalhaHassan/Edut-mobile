@@ -91,6 +91,8 @@ class PaymentGatewayService {
     ),
   ];
 
+  static const List<PaymentGatewayOption> gateways = mobileMoneyOptions;
+
   Future<bool> launchGateway({
     required PaymentGatewayOption gateway,
     required int studentId,

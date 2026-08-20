@@ -65,10 +65,9 @@ class _StudentHomeworkScreenState extends State<StudentHomeworkScreen>
       }
 
       if (_className.isEmpty) {
-        final profile = await session.getUserProfile();
-        _className = profile?['classe']?.toString() ?? 'Terminale D';
+        _className = await session.getStudentClass() ?? 'Terminale D';
         if (_studentName.isEmpty) {
-          _studentName = profile?['nom_etudiant']?.toString() ?? 'Élève';
+          _studentName = await session.getStudentName() ?? 'Élève';
         }
       }
 
