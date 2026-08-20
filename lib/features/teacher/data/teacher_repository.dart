@@ -432,57 +432,41 @@ class TeacherRepository {
   Future<Map<String, dynamic>> getSelfServiceHrData() async {
     try {
       final res = await _apiClient.getJson('/api/mobile/teacher/self-service-hr');
-      return Map<String, dynamic>.from(res['data'] ?? {});
+      if (res['success'] == true && res['data'] != null) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+      throw Exception(res['error'] ?? 'Données indisponibles');
     } catch (e) {
       debugPrint('TeacherRepository.getSelfServiceHrData error: $e');
+      final session = locator<SessionManager>();
+      final email = await session.getEmail() ?? '';
+      final name = email.isNotEmpty ? email.split('@').first.toUpperCase() : 'Enseignant';
+
       return {
         'employee': {
-          'name': 'Professeur',
-          'poste': 'Professeur Titulaire',
-          'matricule': 'ENS-2025-042',
-          'salaireBase': 280000,
-          'departement': 'Sciences Exactes',
+          'name': name,
+          'poste': 'Enseignant',
+          'matricule': 'ENS-2026',
+          'salaireBase': 0,
+          'departement': 'Corps Enseignant',
         },
-        'payslips': [
-          {
-            'id': 1,
-            'monthYear': 'Mai 2026',
-            'basicSalary': 280000,
-            'totalAllowance': 45000,
-            'totalDeduction': 12500,
-            'netSalary': 312500,
-            'status': 'Payé',
-            'paymentDate': '2026-05-28',
-            'paymentMode': 'Virement Bancaire',
-          }
-        ],
+        'smartInsights': {
+          'projectedNetSalary': 0,
+          'approvedExtraHoursAmount': 0,
+          'pendingExtraHoursAmount': 0,
+          'approvedExtraHoursCount': 0,
+          'pendingRequestsCount': 0,
+        },
+        'payslips': [],
         'extraHours': {
-          'totalEarned': 13000,
-          'list': [
-            {
-              'id': 101,
-              'date': '14/05/2026',
-              'typeHour': 'Cours de soutien',
-              'className': 'Terminale D',
-              'subjectName': 'Mathématiques',
-              'hoursCount': 2.0,
-              'hourlyRate': 3500,
-              'totalAmount': 7000,
-              'status': 'Approuvé',
-            }
-          ],
+          'totalEarned': 0,
+          'totalApproved': 0,
+          'totalPending': 0,
+          'list': [],
         },
-        'requests': [
-          {
-            'id': 201,
-            'requestType': 'Congé familial',
-            'startDate': '22/05/2026',
-            'endDate': '24/05/2026',
-            'daysCount': 3,
-            'reason': 'Événement familial',
-            'status': 'Approuvé',
-          }
-        ],
+        'requests': [],
+        'classes': [],
+        'subjects': [],
       };
     }
   }
