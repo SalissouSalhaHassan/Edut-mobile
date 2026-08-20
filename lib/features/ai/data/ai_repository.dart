@@ -49,6 +49,25 @@ class AiRepository {
     }
   }
 
+  Future<bool> sendEarlyWarningAlert({
+    required int studentId,
+    required String riskLevel,
+    String? message,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/ai/early-warning', {
+        'action': 'notifyParent',
+        'studentId': studentId,
+        'riskLevel': riskLevel,
+        'message': message,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint("AiRepository.sendEarlyWarningAlert error: $e");
+      return false;
+    }
+  }
+
   Future<String> generateGradeAppreciation({
     required String studentName,
     required String subjectName,
@@ -74,7 +93,8 @@ class AiRepository {
     required String lessonTitle,
     required String subjectName,
     String? className,
-    int count = 3,
+    String? difficulty,
+    int count = 4,
   }) async {
     try {
       final response = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
@@ -82,12 +102,78 @@ class AiRepository {
         'lessonTitle': lessonTitle,
         'subjectName': subjectName,
         'className': className ?? '',
+        'difficulty': difficulty ?? 'Moyenne',
         'questionCount': count,
       });
       return List<Map<String, dynamic>>.from(response['questions'] ?? []);
     } catch (e) {
       debugPrint("AiRepository.generateQuizQuestions error: $e");
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> generateFullExam({
+    required String lessonTitle,
+    required String subjectName,
+    required String className,
+    int durationMinutes = 120,
+    String difficulty = 'Moyen',
+  }) async {
+    try {
+      final response = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
+        'action': 'generateExam',
+        'lessonTitle': lessonTitle,
+        'subjectName': subjectName,
+        'className': className,
+        'durationMinutes': durationMinutes,
+        'difficulty': difficulty,
+      });
+      return response['exam'] != null ? Map<String, dynamic>.from(response['exam']) : null;
+    } catch (e) {
+      debugPrint("AiRepository.generateFullExam error: $e");
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> generateFichePedagogique({
+    required String lessonTitle,
+    required String subjectName,
+    required String className,
+    int durationMinutes = 55,
+  }) async {
+    try {
+      final response = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
+        'action': 'generateFichePedagogique',
+        'lessonTitle': lessonTitle,
+        'subjectName': subjectName,
+        'className': className,
+        'durationMinutes': durationMinutes,
+      });
+      return response['fiche'] != null ? Map<String, dynamic>.from(response['fiche']) : null;
+    } catch (e) {
+      debugPrint("AiRepository.generateFichePedagogique error: $e");
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> generateRemediationPlan({
+    required String lessonTitle,
+    required String subjectName,
+    required String className,
+    String? difficultyFocus,
+  }) async {
+    try {
+      final response = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
+        'action': 'generateRemediation',
+        'lessonTitle': lessonTitle,
+        'subjectName': subjectName,
+        'className': className,
+        'difficultyFocus': difficultyFocus,
+      });
+      return response['remediation'] != null ? Map<String, dynamic>.from(response['remediation']) : null;
+    } catch (e) {
+      debugPrint("AiRepository.generateRemediationPlan error: $e");
+      return null;
     }
   }
 }

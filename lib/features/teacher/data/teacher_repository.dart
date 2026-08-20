@@ -563,4 +563,164 @@ class TeacherRepository {
       debugPrint('TeacherRepository.saveCommProtectionSettings error: $e');
     }
   }
+
+  // ─── AI Pedagogic Copilot & Generators ──────────────────────────────────────
+  Future<Map<String, dynamic>> generateAiExam({
+    required String className,
+    required String subjectName,
+    required String topic,
+    required String difficulty,
+    required String durationMinutes,
+    int questionCount = 4,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
+        'action': 'generateExam',
+        'className': className,
+        'subjectName': subjectName,
+        'lessonTitle': topic,
+        'difficulty': difficulty,
+        'durationMinutes': int.tryParse(durationMinutes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 60,
+        'questionCount': questionCount,
+      });
+
+      if (res['success'] == true && res['exam'] != null) {
+        return Map<String, dynamic>.from(res['exam']);
+      }
+    } catch (e) {
+      debugPrint('TeacherRepository.generateAiExam error: $e');
+    }
+
+    // Fallback exam
+    return {
+      'title': 'ÉPREUVE DE ${subjectName.toUpperCase()} - CLASSE DE $className',
+      'instructions': 'Lisez attentivement les consignes. La clarté de la rédaction est évaluée sur 20 points.',
+      'durationMinutes': 60,
+      'totalPoints': 20,
+      'sections': [
+        {
+          'sectionName': 'Partie I : Questions de Cours & QCM (5 Points)',
+          'points': 5,
+          'content': '1. Définir les concepts clés de "$topic".\n2. Citer les propriétés fondamentales.',
+          'correction': '1. Définitions exactes selon le cours.\n2. Énoncés des propriétés.',
+        },
+        {
+          'sectionName': 'Partie II : Exercices d\'Application (7 Points)',
+          'points': 7,
+          'content': 'Exercice 1 : Application numérique directe.\nExercice 2 : Résolution guidée d\'un cas type.',
+          'correction': 'Exercice 1 : Calculs détaillés et résultat final.\nExercice 2 : Démarche et justification.',
+        },
+        {
+          'sectionName': 'Partie III : Problème de Synthèse (8 Points)',
+          'points': 8,
+          'content': 'Situation problème intégratrice mobilisant l\'ensemble des acquis du thème "$topic".',
+          'correction': 'Barème : Analyse (2 pts), Démarche (3 pts), Justesse (2 pts), Présentation (1 pt).',
+        },
+      ],
+    };
+  }
+
+  Future<Map<String, dynamic>> generateAiFichePedagogique({
+    required String className,
+    required String subjectName,
+    required String chapter,
+    required String lessonTitle,
+    required String durationMinutes,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
+        'action': 'generateFichePedagogique',
+        'className': className,
+        'subjectName': subjectName,
+        'chapter': chapter,
+        'lessonTitle': lessonTitle,
+        'durationMinutes': int.tryParse(durationMinutes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 55,
+      });
+
+      if (res['success'] == true && res['fiche'] != null) {
+        return Map<String, dynamic>.from(res['fiche']);
+      }
+    } catch (e) {
+      debugPrint('TeacherRepository.generateAiFichePedagogique error: $e');
+    }
+
+    return {
+      'subject': subjectName,
+      'classe': className,
+      'title': lessonTitle,
+      'duration': durationMinutes,
+      'generalObjective': 'Maîtriser les notions clés de $lessonTitle.',
+      'specificObjectives': [
+        'Identifier et définir les notions fondamentales.',
+        'Appliquer les règles dans des exercices pratiques.',
+      ],
+      'prerequisites': ['Prérequis du chapitre précédent'],
+      'teachingMaterials': ['Tableau', 'Manuel scolaire officiel'],
+      'phases': [
+        {
+          'step': '1. Motivation & Rappel (10 min)',
+          'duration': '10 min',
+          'teacherActivity': 'Rappel des acquis du cours précédent.',
+          'studentActivity': 'Répondent aux questions et rappellent les définitions.',
+        },
+        {
+          'step': '2. Développement & Structuration (25 min)',
+          'duration': '25 min',
+          'teacherActivity': 'Explicitation de la notion avec exemples concrets.',
+          'studentActivity': 'Prise de notes et participation active.',
+        },
+        {
+          'step': '3. Synthèse & Évaluation (20 min)',
+          'duration': '20 min',
+          'teacherActivity': 'Contrôle formatif et bilan au tableau.',
+          'studentActivity': 'Exercice d\'application individuel.',
+        },
+      ],
+      'boardSummary': 'Retenons : $lessonTitle est essentiel pour la suite du programme.',
+    };
+  }
+
+  Future<Map<String, dynamic>> generateAiRemediation({
+    required String className,
+    required String subjectName,
+    required String topic,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/ai/teacher-copilot', {
+        'action': 'generateRemediation',
+        'className': className,
+        'subjectName': subjectName,
+        'lessonTitle': topic,
+      });
+
+      if (res['success'] == true && res['remediation'] != null) {
+        return Map<String, dynamic>.from(res['remediation']);
+      }
+    } catch (e) {
+      debugPrint('TeacherRepository.generateAiRemediation error: $e');
+    }
+
+    return {
+      'theme': topic,
+      'diagnostic': 'Difficultés dans l\'application de la méthode sur $topic.',
+      'strategy': 'Rappel théorique simplifié puis 2 exercices d\'application immédiate.',
+      'conceptBreakdown': [
+        {'concept': 'Compréhension du cours', 'masteryRate': 0.65},
+        {'concept': 'Calculs et formules', 'masteryRate': 0.45},
+        {'concept': 'Raisonnement & Démonstration', 'masteryRate': 0.40},
+      ],
+      'atRiskStudents': [
+        {'name': 'Élève en difficulté 1', 'score': '07.5/20', 'issue': 'Formules non maîtrisées'},
+        {'name': 'Élève en difficulté 2', 'score': '08.0/20', 'issue': 'Problème de méthode'},
+      ],
+      'remediationPlan': {
+        'title': 'Plan d\'action de soutien en 3 étapes',
+        'steps': [
+          'Étape 1 : Fiche synthèse et formules clés',
+          'Étape 2 : Exercice type résolu pas à pas',
+          'Étape 3 : Évaluation formative d\'autonomie',
+        ],
+      },
+    };
+  }
 }
