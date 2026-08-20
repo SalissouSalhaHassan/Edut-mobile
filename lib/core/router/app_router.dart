@@ -568,6 +568,14 @@ class AppRouter {
         path: '/connected-devices',
         builder: (context, state) => const ConnectedDevicesScreen(),
       ),
+      GoRoute(
+        path: '/library',
+        builder: (context, state) => const FamilyLibraryScreen(),
+      ),
+      GoRoute(
+        path: '/e-learning',
+        builder: (context, state) => const FamilyLibraryScreen(),
+      ),
     ],
   );
 }

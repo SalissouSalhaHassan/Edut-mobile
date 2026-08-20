@@ -667,10 +667,10 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 ),
                 const SizedBox(width: 8),
                 _buildQuickActionChip(
-                  label: "Annales BEPC / BAC",
+                  label: "Médiathèque & E-Learning",
                   icon: Icons.menu_book_rounded,
-                  color: const Color(0xFF2563EB),
-                  onTap: () => context.push('/library/past-exams'),
+                  color: const Color(0xFF7C3AED),
+                  onTap: () => context.push('/family/library'),
                 ),
                 const SizedBox(width: 8),
                 _buildQuickActionChip(
@@ -798,8 +798,8 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 onTap: () => context.push('/family/transport'),
               ),
               _buildServiceCard(
-                title: 'Bibliothèque',
-                subtitle: 'Livres, emprunts & retours',
+                title: 'Médiathèque & E-Learning',
+                subtitle: 'Livres PDF, vidéos & annales BEPC/BAC',
                 icon: Icons.local_library_rounded,
                 color: const Color(0xFF7C3AED),
                 onTap: () => context.push('/family/library'),
