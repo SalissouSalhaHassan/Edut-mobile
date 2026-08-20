@@ -234,9 +234,18 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
     );
   }
 
+  String _formatAmount(dynamic amount) {
+    if (amount == null) return '0';
+    final num val = amount is num ? amount : (num.tryParse(amount.toString()) ?? 0);
+    final str = val.toInt().toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return str.replaceAllMapped(reg, (Match m) => '${m[1]} ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final emp = _hrData['employee'] as Map<String, dynamic>?;
+    final smart = _hrData['smartInsights'] as Map<String, dynamic>? ?? {};
     final payslips = (_hrData['payslips'] as List?) ?? [];
     final extraHours = _hrData['extraHours'] as Map<String, dynamic>?;
     final extraList = (extraHours?['list'] as List?) ?? [];
@@ -249,6 +258,13 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
         backgroundColor: const Color(0xFF0D9488),
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser',
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D9488)))
@@ -269,25 +285,60 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
                       BoxShadow(color: const Color(0xFF0D9488).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6)),
                     ],
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      const CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Colors.white24,
-                        child: Icon(Icons.badge_rounded, color: Colors.white, size: 28),
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.white24,
+                            child: Icon(Icons.badge_rounded, color: Colors.white, size: 28),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(emp?['name'] ?? 'Professeur', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
+                                Text('${emp?['poste']} • ${emp?['matricule']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                const SizedBox(height: 4),
+                                Text('Salaire base : ${_formatAmount(emp?['salaireBase'])} FCFA', style: const TextStyle(color: Color(0xFFA7F3D0), fontWeight: FontWeight.bold, fontSize: 12.5)),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(emp?['name'] ?? 'Professeur', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 2),
-                            Text('${emp?['poste']} • ${emp?['matricule']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                            const SizedBox(height: 4),
-                            Text('Salaire base : ${emp?['salaireBase']} FCFA', style: const TextStyle(color: Color(0xFFA7F3D0), fontWeight: FontWeight.bold, fontSize: 12.5)),
-                          ],
-                        ),
+                      const SizedBox(height: 12),
+                      const Divider(color: Colors.white24, height: 1),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Est. Net: ${_formatAmount(smart['projectedNetSalary'] ?? emp?['salaireBase'])} FCFA',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          InkWell(
+                            onTap: () => _generateAndPrintAttestationPdf(emp),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white38),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.workspace_premium_rounded, size: 14, color: Colors.white),
+                                  SizedBox(width: 5),
+                                  Text('Attestation PDF', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -315,7 +366,7 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
                       _buildPayslipsTab(payslips),
 
                       // 2. Extra Hours Tab
-                      _buildExtraHoursTab(extraHours?['totalEarned'] ?? 0, extraList),
+                      _buildExtraHoursTab(extraHours?['totalEarned'] ?? 0, extraHours?['totalApproved'] ?? 0, extraList),
 
                       // 3. Requests Tab
                       _buildRequestsTab(requests),
@@ -328,6 +379,21 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
   }
 
   Widget _buildPayslipsTab(List<dynamic> payslips) {
+    if (payslips.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.slate400),
+              const SizedBox(height: 12),
+              const Text('Aucun bulletin de paie disponible.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.slate700)),
+            ],
+          ),
+        ),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: payslips.length,
@@ -369,8 +435,8 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Base: $base FCFA', style: const TextStyle(fontSize: 12, color: AppColors.slate500)),
-                  Text('Primes: +$primes FCFA', style: const TextStyle(fontSize: 12, color: Color(0xFF0D9488), fontWeight: FontWeight.w600)),
+                  Text('Base: ${_formatAmount(base)} FCFA', style: const TextStyle(fontSize: 12, color: AppColors.slate500)),
+                  Text('Primes: +${_formatAmount(primes)} FCFA', style: const TextStyle(fontSize: 12, color: Color(0xFF0D9488), fontWeight: FontWeight.w600)),
                 ],
               ),
               const SizedBox(height: 4),
@@ -378,7 +444,7 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Net à Payer : $net FCFA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F766E))),
+                  Text('Net à Payer : ${_formatAmount(net)} FCFA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F766E))),
                   ElevatedButton.icon(
                     onPressed: () => _generateAndPrintPayslipPdf(p, _hrData['employee']),
                     icon: const Icon(Icons.picture_as_pdf_rounded, size: 16, color: Colors.white),
@@ -627,7 +693,169 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
     }
   }
 
-  Widget _buildExtraHoursTab(num totalEarned, List<dynamic> extraList) {
+  Future<void> _generateAndPrintAttestationPdf(Map<String, dynamic>? employee) async {
+    try {
+      final pdf = pw.Document();
+      final empName = employee?['name'] ?? 'Professeur';
+      final empPoste = employee?['poste'] ?? 'Professeur Titulaire';
+      final empMatricule = employee?['matricule'] ?? 'ENS-2025-042';
+      final empDept = employee?['departement'] ?? 'Corps Enseignant';
+      final now = DateTime.now();
+      final dateFormatted = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                // Official Republic Header
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('RÉPUBLIQUE DU NIGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                        pw.Text('MINISTÈRE DE L\'ÉDUCATION NATIONALE', style: const pw.TextStyle(fontSize: 8.5)),
+                        pw.Text('Direction Régionale de l\'Enseignement', style: const pw.TextStyle(fontSize: 8)),
+                        pw.SizedBox(height: 6),
+                        pw.Text('COMPLEXE SCOLAIRE PRIVÉ D\'EXCELLENCE EDUT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.teal800)),
+                      ],
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.teal800, width: 1.5),
+                        borderRadius: pw.BorderRadius.circular(6),
+                      ),
+                      child: pw.Text('EDUT-RH\nREF: ATT-$empMatricule', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.teal900)),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+                pw.Divider(thickness: 1.2, color: PdfColors.teal800),
+                pw.SizedBox(height: 30),
+
+                // Title
+                pw.Center(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.teal50,
+                      border: pw.Border.all(color: PdfColors.teal800, width: 1.5),
+                      borderRadius: pw.BorderRadius.circular(6),
+                    ),
+                    child: pw.Text(
+                      'ATTESTATION DE TRAVAIL & D\'EMPLOI',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14, color: PdfColors.teal900),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 35),
+
+                // Body text
+                pw.Text(
+                  'La Direction Générale du Complexe Scolaire Privé d\'Excellence EDUT certifie et atteste par la présente que :',
+                  style: const pw.TextStyle(fontSize: 11, lineSpacing: 1.5),
+                ),
+                pw.SizedBox(height: 16),
+
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(14),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.grey100,
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColors.grey300),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Nom & Prénoms : $empName', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Matricule Agent : $empMatricule', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Fonction / Poste : $empPoste', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Département d\'Affectation : $empDept', style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 18),
+
+                pw.Text(
+                  'Est employé(e) au sein de notre établissement scolaire d\'excellence et exerce ses fonctions pédagogiques et d\'encadrement avec régularité, compétence et professionnalisme conformément aux textes régissant l\'enseignement privé au Niger.',
+                  style: const pw.TextStyle(fontSize: 10.5, lineSpacing: 1.5),
+                  textAlign: pw.TextAlign.justify,
+                ),
+                pw.SizedBox(height: 14),
+                pw.Text(
+                  'La présente attestation lui est délivrée à sa demande pour servir et valoir ce que de droit.',
+                  style: const pw.TextStyle(fontSize: 10.5, lineSpacing: 1.5),
+                ),
+                pw.SizedBox(height: 40),
+
+                // Date and Signature
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Fait à Niamey, le $dateFormatted', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                        pw.SizedBox(height: 20),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(6),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.teal700, width: 0.8),
+                            borderRadius: pw.BorderRadius.circular(4),
+                          ),
+                          child: pw.Text('Vérification Numérique EDUT-ID Validée', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.teal800)),
+                        ),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text('Pour la Direction Générale', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        pw.Text('Le Directeur Général des Études', style: const pw.TextStyle(fontSize: 8.5)),
+                        pw.SizedBox(height: 8),
+                        pw.Container(
+                          width: 100,
+                          height: 40,
+                          alignment: pw.Alignment.center,
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.teal800, style: pw.BorderStyle.dashed),
+                            borderRadius: pw.BorderRadius.circular(4),
+                          ),
+                          child: pw.Text('[ Cachet Officiel &\nSignature Électronique ]', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 7, color: PdfColors.teal900, fontWeight: pw.FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Attestation_Travail_${empMatricule}_$dateFormatted.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur génération attestation: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Widget _buildExtraHoursTab(num totalEarned, num totalApproved, List<dynamic> extraList) {
     return Column(
       children: [
         Container(
@@ -646,7 +874,11 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
                 children: [
                   const Text('Total Cumulé Heures Sup', style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text('$totalEarned FCFA', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  Text('${_formatAmount(totalEarned)} FCFA', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  if (totalApproved > 0) ...[
+                    const SizedBox(height: 2),
+                    Text('Validé : ${_formatAmount(totalApproved)} FCFA', style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
+                  ],
                 ],
               ),
               ElevatedButton.icon(
@@ -658,51 +890,77 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
             ],
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: extraList.length,
-            itemBuilder: (context, i) {
-              final ex = extraList[i];
-              final type = ex['typeHour'] ?? 'Heure Sup';
-              final cls = ex['className'] ?? '';
-              final date = ex['date'] ?? '';
-              final amount = ex['totalAmount'] ?? 0;
-              final status = ex['status'] ?? 'En attente';
+        if (extraList.isEmpty)
+          const Expanded(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Aucune heure supplémentaire déclarée.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.slate600)),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: extraList.length,
+              itemBuilder: (context, i) {
+                final ex = extraList[i];
+                final type = ex['typeHour'] ?? 'Heure Sup';
+                final cls = ex['className'] ?? '';
+                final date = ex['date'] ?? '';
+                final amount = ex['totalAmount'] ?? 0;
+                final status = ex['status'] ?? 'En attente';
+                final isApproved = status == 'Approuvé' || status == 'Payé';
+                final isPending = status == 'En attente';
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('$type • $cls', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                        const SizedBox(height: 2),
-                        Text(date, style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('+$amount FCFA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))),
-                        const SizedBox(height: 2),
-                        Text(status, style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('$type • $cls', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                          const SizedBox(height: 2),
+                          Text(date, style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('+${_formatAmount(amount)} FCFA', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))),
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isApproved ? const Color(0xFFECFDF5) : (isPending ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: isApproved ? const Color(0xFF065F46) : (isPending ? const Color(0xFF92400E) : const Color(0xFF991B1B)),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
@@ -723,54 +981,73 @@ class _TeacherSelfServiceHrScreenState extends State<TeacherSelfServiceHrScreen>
             ),
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: requests.length,
-            itemBuilder: (context, i) {
-              final r = requests[i];
-              final type = r['requestType'] ?? '';
-              final reason = r['reason'] ?? '';
-              final status = r['status'] ?? 'En attente';
-              final comment = r['adminComment'] ?? '';
+        if (requests.isEmpty)
+          const Expanded(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Aucune demande administrative enregistrée.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.slate600)),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: requests.length,
+              itemBuilder: (context, i) {
+                final r = requests[i];
+                final type = r['requestType'] ?? '';
+                final reason = r['reason'] ?? '';
+                final status = r['status'] ?? 'En attente';
+                final comment = r['adminComment'] ?? '';
+                final isApproved = status == 'Approuvé';
+                final isPending = status == 'En attente';
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0D9488))),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0D9488))),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isApproved ? const Color(0xFFECFDF5) : (isPending ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isApproved ? const Color(0xFF065F46) : (isPending ? const Color(0xFF92400E) : const Color(0xFF991B1B)),
+                              ),
+                            ),
                           ),
-                          child: Text(status, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text('Motif : $reason', style: const TextStyle(fontSize: 12, color: AppColors.slate800)),
+                      if (comment.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text('Note Direction : $comment', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF047857))),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Motif : $reason', style: const TextStyle(fontSize: 12, color: AppColors.slate800)),
-                    if (comment.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text('Note Direction : $comment', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF047857))),
                     ],
-                  ],
-                ),
-              );
-            },
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }

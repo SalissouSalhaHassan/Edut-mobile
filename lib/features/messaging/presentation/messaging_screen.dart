@@ -39,8 +39,8 @@ class _MessagingScreenState extends State<MessagingScreen>
     'Tous les Parents',
     'Tout le Personnel',
     'Tous (Parents + Staff)',
-    'Classe specifique',
-    'Destinataire specifique',
+    'Classe spécifique',
+    'Destinataire spécifique',
   ];
 
   @override
@@ -162,7 +162,7 @@ class _MessagingScreenState extends State<MessagingScreen>
       final staff = (_stats['staffCount'] as num?)?.toInt() ?? 0;
       return students + staff;
     }
-    if (_target == 'Classe specifique') {
+    if (_target.startsWith('Classe')) {
       return 0;
     }
     return _recipientUserId == null ? 0 : 1;
@@ -176,16 +176,16 @@ class _MessagingScreenState extends State<MessagingScreen>
       ).showSnackBar(const SnackBar(content: Text('Le message est vide.')));
       return;
     }
-    if (_target == 'Classe specifique' &&
+    if (_target.startsWith('Classe') &&
         (_className == null || _className!.isEmpty)) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Selectionnez une classe.')));
+      ).showSnackBar(const SnackBar(content: Text('Sélectionnez une classe.')));
       return;
     }
-    if (_target == 'Destinataire specifique' && _recipientUserId == null) {
+    if (_target.startsWith('Destinataire') && _recipientUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selectionnez un destinataire.')),
+        const SnackBar(content: Text('Sélectionnez un destinataire.')),
       );
       return;
     }
@@ -205,7 +205,10 @@ class _MessagingScreenState extends State<MessagingScreen>
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Message envoye a $count destinataire(s).')),
+        SnackBar(
+          content: Text('Message envoyé avec succès à $count destinataire(s).'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
       );
       _tabController.animateTo(2);
     } catch (e) {
@@ -251,7 +254,7 @@ class _MessagingScreenState extends State<MessagingScreen>
           unselectedLabelColor: AppColors.slate500,
           tabs: const [
             Tab(text: 'Envoyer'),
-            Tab(text: 'Modeles'),
+            Tab(text: 'Modèles'),
             Tab(text: 'Historique'),
           ],
         ),
@@ -275,7 +278,7 @@ class _MessagingScreenState extends State<MessagingScreen>
               const SizedBox(height: 12),
               Text(_errorMessage!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _load, child: const Text('Reessayer')),
+              ElevatedButton(onPressed: _load, child: const Text('Réessayer')),
             ],
           ),
         ),
@@ -296,9 +299,9 @@ class _MessagingScreenState extends State<MessagingScreen>
         const SizedBox(height: 16),
         _fieldCard(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Canal', style: AppTextStyles.caption),
+              Text('Canal d\'envoi', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: _channel,
@@ -312,7 +315,7 @@ class _MessagingScreenState extends State<MessagingScreen>
                     setState(() => _channel = value ?? _channel),
               ),
               const SizedBox(height: 16),
-              Text('Destinataires', style: AppTextStyles.caption),
+              Text('Destinataires', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: _target,
@@ -328,7 +331,7 @@ class _MessagingScreenState extends State<MessagingScreen>
                   _recipientUserId = null;
                 }),
               ),
-              if (_target == 'Classe specifique') ...[
+              if (_target.startsWith('Classe')) ...[
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   initialValue: _className,
@@ -347,7 +350,7 @@ class _MessagingScreenState extends State<MessagingScreen>
                   onChanged: (value) => setState(() => _className = value),
                 ),
               ],
-              if (_target == 'Destinataire specifique') ...[
+              if (_target.startsWith('Destinataire')) ...[
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
                   initialValue: _recipientUserId,
@@ -373,40 +376,71 @@ class _MessagingScreenState extends State<MessagingScreen>
         const SizedBox(height: 16),
         _fieldCard(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextField(
                 controller: _subjectController,
-                decoration: const InputDecoration(labelText: 'Sujet'),
+                decoration: const InputDecoration(labelText: 'Sujet du message'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _contentController,
-                minLines: 7,
+                minLines: 6,
                 maxLines: 10,
                 decoration: const InputDecoration(
-                  labelText: 'Message',
+                  labelText: 'Contenu du message',
                   alignLabelWithHint: true,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Estimation: $_estimatedRecipients destinataire(s)',
-                      style: AppTextStyles.caption,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.people_outline_rounded, size: 16, color: Color(0xFF4F46E5)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Estimation : $_estimatedRecipients destinataire(s)',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 12),
                   ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
                     onPressed: _isSending ? null : _send,
                     icon: _isSending
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.send_rounded),
-                    label: const Text('Envoyer'),
+                        : const Icon(Icons.send_rounded, size: 16),
+                    label: const Text('Envoyer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                 ],
               ),
@@ -563,6 +597,7 @@ class _MessagingScreenState extends State<MessagingScreen>
 
   Widget _fieldCard({required Widget child}) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
