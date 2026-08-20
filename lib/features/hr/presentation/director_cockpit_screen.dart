@@ -456,7 +456,7 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
       final total = item['totalAmount'] ?? 0;
 
       title = '$typeHour ($className)';
-      details = 'Matière: $subjectName • $hours Heure(s) • Total: $total FCFA\nNote: ${item['notes'] ?? 'Aucune note'}';
+      details = 'Matière: $subjectName • $hours Heure(s) • Total: ${_formatAmount(total)} FCFA\nNote: ${item['notes'] ?? 'Aucune note'}';
       typeIcon = Icons.more_time_rounded;
       typeColor = const Color(0xFF3B82F6);
     } else {
@@ -467,7 +467,7 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
 
       title = reqType;
       if (advance != null && advance > 0) {
-        details = 'Montant sollicité : $advance FCFA\nMotif : $reason';
+        details = 'Montant sollicité : ${_formatAmount(advance)} FCFA\nMotif : $reason';
       } else {
         final start = item['startDate'] ?? '';
         final end = item['endDate'] ?? '';
@@ -1015,5 +1015,16 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
         ),
       ),
     );
+  String _formatAmount(dynamic amount) {
+    if (amount == null) return '0';
+    final numVal = amount is num ? amount : (num.tryParse(amount.toString()) ?? 0);
+    final isInt = numVal % 1 == 0;
+    final str = isInt ? numVal.toInt().toString() : numVal.toStringAsFixed(1);
+    final parts = str.split('.');
+    final integerPart = parts[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]} ',
+    );
+    return parts.length > 1 ? '$integerPart.${parts[1]}' : integerPart;
   }
 }
