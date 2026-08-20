@@ -580,6 +580,39 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
               ),
             ],
           ),
+          if (balance > 0) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                icon: const Icon(Icons.payments_rounded, size: 16),
+                label: Text(
+                  'Payer cette tranche via Mobile Money (${balance.toStringAsFixed(0)} FCFA)',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  if (_studentId == null) return;
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => MobileMoneyPaymentDialog(
+                      studentId: _studentId!,
+                      studentName: _studentName,
+                      defaultAmount: balance,
+                      feeId: fee['id'],
+                      onPaymentSuccess: (result) => _loadData(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           if (paid > 0) ...[
             const SizedBox(height: 12),
             SizedBox(
