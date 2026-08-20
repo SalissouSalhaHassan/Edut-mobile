@@ -1,21 +1,33 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/api/mobile_api_client.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/di/injection.dart';
 
 class HrRepository {
   final SupabaseClient _client;
+  final MobileApiClient _apiClient;
 
-  HrRepository({SupabaseClient? client})
-      : _client = client ?? SupabaseClientManager().client;
+  HrRepository({SupabaseClient? client, MobileApiClient? apiClient})
+      : _client = client ?? SupabaseClientManager().client,
+        _apiClient = apiClient ?? locator<MobileApiClient>();
 
   Future<int?> _schoolId() async {
     return int.tryParse(await locator<SessionManager>().getSchoolId() ?? '');
   }
 
   Future<List<Map<String, dynamic>>> getEmployees() async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/hr?action=employees');
+      if (res['data'] is List) {
+        return List<Map<String, dynamic>>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getEmployees error: $e. Falling back to Supabase...');
+    }
+
     try {
       final schoolId = await _schoolId();
       final query = _client.from('employees').select(
@@ -28,7 +40,7 @@ class HrRepository {
           : await query.eq('school_id', schoolId).order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
-      debugPrint('Error fetching employees: $e');
+      debugPrint('Error fetching employees from Supabase: $e');
       return [];
     }
   }
@@ -38,36 +50,64 @@ class HrRepository {
     required Map<String, dynamic> payload,
   }) async {
     try {
-      final schoolId = await _schoolId();
-      final data = Map<String, dynamic>.from(payload);
-      if (schoolId != null) {
-        data['school_id'] = schoolId;
-      }
-
-      if (employeeId == null) {
-        await _client.from('employees').insert(data);
-      } else {
-        await _client.from('employees').update(data).eq('id', employeeId);
-      }
-
-      return {'success': true};
+      final res = await _apiClient.postJson('/api/mobile/hr', {
+        'action': 'save_employee',
+        if (employeeId != null) 'employeeId': employeeId,
+        'payload': payload,
+      });
+      return {'success': true, 'data': res['data']};
     } catch (e) {
-      debugPrint('Error saving employee: $e');
-      return {'success': false, 'error': '$e'};
+      debugPrint('API saveEmployee error: $e. Falling back to Supabase...');
+      try {
+        final schoolId = await _schoolId();
+        final data = Map<String, dynamic>.from(payload);
+        if (schoolId != null) {
+          data['school_id'] = schoolId;
+        }
+
+        if (employeeId == null) {
+          await _client.from('employees').insert(data);
+        } else {
+          await _client.from('employees').update(data).eq('id', employeeId);
+        }
+
+        return {'success': true};
+      } catch (err) {
+        debugPrint('Error saving employee via Supabase: $err');
+        return {'success': false, 'error': '$err'};
+      }
     }
   }
 
   Future<Map<String, dynamic>> deleteEmployee(int employeeId) async {
     try {
-      await _client.from('employees').delete().eq('id', employeeId);
+      await _apiClient.postJson('/api/mobile/hr', {
+        'action': 'delete_employee',
+        'employeeId': employeeId,
+      });
       return {'success': true};
     } catch (e) {
-      debugPrint('Error deleting employee: $e');
-      return {'success': false, 'error': '$e'};
+      debugPrint('API deleteEmployee error: $e. Falling back to Supabase...');
+      try {
+        await _client.from('employees').update({'statut': 'Inactif'}).eq('id', employeeId);
+        return {'success': true};
+      } catch (err) {
+        debugPrint('Error deleting employee: $err');
+        return {'success': false, 'error': '$err'};
+      }
     }
   }
 
   Future<List<Map<String, dynamic>>> getEmployeeAttendance(String dateStr) async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/hr?action=attendance&date=$dateStr');
+      if (res['data'] is List) {
+        return List<Map<String, dynamic>>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getEmployeeAttendance error: $e. Falling back to Supabase...');
+    }
+
     try {
       final schoolId = await _schoolId();
       final rows = await _client
@@ -91,61 +131,28 @@ class HrRepository {
     required List<Map<String, dynamic>> records,
   }) async {
     try {
-      final schoolId = await _schoolId();
-      if (schoolId == null) {
-        return {
-          'success': false,
-          'error': 'School ID introuvable pour enregistrer le pointage.',
-        };
-      }
-
-      final existing = await getEmployeeAttendance(dateStr);
-      final existingByEmployee = {
-        for (final row in existing) row['employee_id'] as int: row,
-      };
-
-      for (final record in records) {
-        final employeeId = record['employee_id'] as int?;
-        if (employeeId == null) continue;
-        final existingRow = existingByEmployee[employeeId];
-        final values = {
-          'school_id': schoolId,
-          'employee_id': employeeId,
-          'date': '${dateStr}T08:00:00',
-          'period_number': record['period_number'] ?? 1,
-          'status': _normalizeAttendanceStatus(
-            record['status']?.toString() ?? 'Present',
-          ),
-          'remarques': record['remarques'] ?? '',
-        };
-
-        if (existingRow != null) {
-          await _client
-              .from('employee_attendance')
-              .update(values)
-              .eq('id', existingRow['id']);
-        } else {
-          await _client.from('employee_attendance').insert(values);
-        }
-      }
-
+      await _apiClient.postJson('/api/mobile/hr', {
+        'action': 'save_attendance',
+        'dateStr': dateStr,
+        'records': records,
+      });
       return {'success': true};
     } catch (e) {
-      debugPrint('Error saving employee attendance: $e');
-      final message = e.toString();
-      if (message.contains('row-level security policy') ||
-          message.contains('42501')) {
-        return {
-          'success': false,
-          'error':
-              'Le pointage du personnel est refuse par la politique de securite de la base. Verifiez la politique RLS de employee_attendance ou autorisez school_id pour cet utilisateur.',
-        };
-      }
-      return {'success': false, 'error': message};
+      debugPrint('API saveEmployeeAttendance error: $e');
+      return {'success': false, 'error': '$e'};
     }
   }
 
   Future<Map<String, dynamic>> getPayrollRules() async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/hr?action=payroll_rules');
+      if (res['data'] is Map) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getPayrollRules error: $e. Falling back to Supabase...');
+    }
+
     try {
       final row = await _client
           .from('payroll_rules')
@@ -155,17 +162,11 @@ class HrRepository {
       if (row != null) {
         return row;
       }
-
-      final created = await _client
-          .from('payroll_rules')
-          .insert({
-            'leave_allow_per_month': 1,
-            'late_penalty': 0.5,
-            'half_day_penalty': 0.5,
-          })
-          .select('id, leave_allow_per_month, late_penalty, half_day_penalty')
-          .single();
-      return created;
+      return {
+        'leave_allow_per_month': 1,
+        'late_penalty': 0.5,
+        'half_day_penalty': 0.5,
+      };
     } catch (e) {
       debugPrint('Error fetching payroll rules: $e');
       return {
@@ -178,20 +179,29 @@ class HrRepository {
 
   Future<Map<String, dynamic>> savePayrollRules(Map<String, dynamic> payload) async {
     try {
-      final existing = await _client
-          .from('payroll_rules')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-      if (existing == null) {
-        await _client.from('payroll_rules').insert(payload);
-      } else {
-        await _client.from('payroll_rules').update(payload).eq('id', existing['id']);
-      }
+      await _apiClient.postJson('/api/mobile/hr', {
+        'action': 'save_payroll_rules',
+        ...payload,
+      });
       return {'success': true};
     } catch (e) {
-      debugPrint('Error saving payroll rules: $e');
-      return {'success': false, 'error': '$e'};
+      debugPrint('API savePayrollRules error: $e. Falling back to Supabase...');
+      try {
+        final existing = await _client
+            .from('payroll_rules')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
+        if (existing == null) {
+          await _client.from('payroll_rules').insert(payload);
+        } else {
+          await _client.from('payroll_rules').update(payload).eq('id', existing['id']);
+        }
+        return {'success': true};
+      } catch (err) {
+        debugPrint('Error saving payroll rules: $err');
+        return {'success': false, 'error': '$err'};
+      }
     }
   }
 
@@ -199,6 +209,20 @@ class HrRepository {
     int? employeeId,
     String? monthYear,
   }) async {
+    try {
+      final queryParams = <String, String>{'action': 'salary_records'};
+      if (employeeId != null) queryParams['employeeId'] = employeeId.toString();
+      if (monthYear != null && monthYear.isNotEmpty) queryParams['monthYear'] = monthYear;
+
+      final queryString = Uri(queryParameters: queryParams).query;
+      final res = await _apiClient.getJson('/api/mobile/hr?$queryString');
+      if (res['data'] is List) {
+        return List<Map<String, dynamic>>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getSalaryRecords error: $e. Falling back to Supabase...');
+    }
+
     try {
       dynamic query = _client.from('salary_records').select(
             'id, employee_id, month_year, absent_days, leave_taken, late_days, '
@@ -225,31 +249,27 @@ class HrRepository {
     required Map<String, dynamic> payload,
   }) async {
     try {
-      final data = Map<String, dynamic>.from(payload);
-      data['status'] = _normalizeSalaryStatus(
-        data['status']?.toString() ?? 'Unpaid',
-      );
-      if (recordId == null) {
-        await _client.from('salary_records').insert(data);
-      } else {
-        await _client.from('salary_records').update(data).eq('id', recordId);
-      }
-      return {'success': true};
+      final res = await _apiClient.postJson('/api/mobile/hr', {
+        'action': 'save_salary_record',
+        if (recordId != null) 'recordId': recordId,
+        ...payload,
+      });
+      return {'success': true, 'data': res['data']};
     } catch (e) {
-      debugPrint('Error saving salary record: $e');
+      debugPrint('API saveSalaryRecord error: $e');
       return {'success': false, 'error': '$e'};
     }
   }
 
   Future<Map<String, dynamic>> markSalaryAsPaid(int recordId) async {
     try {
-      await _client.from('salary_records').update({
-        'status': 'Paid',
-        'payment_date': DateTime.now().toIso8601String(),
-      }).eq('id', recordId);
+      await _apiClient.postJson('/api/mobile/hr', {
+        'action': 'mark_paid',
+        'recordId': recordId,
+      });
       return {'success': true};
     } catch (e) {
-      debugPrint('Error marking salary as paid: $e');
+      debugPrint('API markSalaryAsPaid error: $e');
       return {'success': false, 'error': '$e'};
     }
   }
@@ -305,6 +325,15 @@ class HrRepository {
   }
 
   Future<Map<String, dynamic>> getHrDashboardData() async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/hr?action=dashboard');
+      if (res['data'] is Map) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+    } catch (e) {
+      debugPrint('API getHrDashboardData error: $e. Falling back to local composition...');
+    }
+
     try {
       final employees = await getEmployees();
       final salaryRecords = await getSalaryRecords();

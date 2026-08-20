@@ -21,7 +21,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
   final TextEditingController _employeeSearchController =
       TextEditingController();
   final TextEditingController _payrollMonthController = TextEditingController(
-    text: DateFormat('MMMM yyyy').format(DateTime.now()),
+    text: DateFormat('MMMM yyyy', 'fr_FR').format(DateTime.now()),
   );
 
   late TabController _tabController;
@@ -67,7 +67,9 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
       _attendance = List<Map<String, dynamic>>.from(dashboard['attendance'] ?? []);
       _stats = Map<String, dynamic>.from(dashboard['stats'] ?? {});
       _payrollRules = Map<String, dynamic>.from(rules);
-      _canManageHr = profile.permissions.contains(AppPermissions.hrManage);
+      _canManageHr = profile.permissions.contains(AppPermissions.hrManage) ||
+          profile.role.toLowerCase().contains('admin') ||
+          profile.role.toLowerCase().contains('direct');
       _isLoading = false;
     });
     _applyEmployeeSearch();
@@ -131,24 +133,24 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        employee == null ? 'Nouvel employe' : 'Modifier employe',
+                        employee == null ? 'Nouvel Employé' : 'Modifier l\'Employé',
                         style: AppTextStyles.heading2,
                       ),
                       const SizedBox(height: 16),
-                      _textField('Matricule', empIdController),
+                      _textField('Matricule Agent (ex: EMP-2025-001)', empIdController),
                       const SizedBox(height: 10),
-                      _textField('Nom complet', nameController),
+                      _textField('Nom et Prénoms', nameController),
                       const SizedBox(height: 10),
-                      _textField('Poste', posteController),
+                      _textField('Poste / Fonction', posteController),
                       const SizedBox(height: 10),
-                      _textField('Departement', departmentController),
+                      _textField('Département / Service', departmentController),
                       const SizedBox(height: 10),
-                      _textField('Telephone', phoneController),
+                      _textField('Téléphone Mobile', phoneController),
                       const SizedBox(height: 10),
-                      _textField('Email', emailController),
+                      _textField('Adresse Email', emailController),
                       const SizedBox(height: 10),
                       _textField(
-                        'Salaire de base',
+                        'Salaire de base (FCFA)',
                         salaryController,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -157,7 +159,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
                         initialValue: status,
-                        items: const ['Actif', 'Inactif', 'En conge']
+                        items: const ['Actif', 'Inactif', 'En congé']
                             .map(
                               (item) => DropdownMenuItem<String>(
                                 value: item,
@@ -168,7 +170,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                         onChanged: (value) {
                           setModalState(() => status = value ?? 'Actif');
                         },
-                        decoration: _decoration('Statut'),
+                        decoration: _decoration('Statut Professionnel'),
                       ),
                       const SizedBox(height: 18),
                       SizedBox(
@@ -202,9 +204,9 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                   }
                                   _showMessage(
                                     result['success'] == true
-                                        ? 'Employe enregistre.'
+                                        ? '✅ Employé enregistré avec succès.'
                                         : (result['error']?.toString() ??
-                                            'Erreur employe'),
+                                            'Erreur lors de l\'enregistrement.'),
                                   );
                                   if (result['success'] == true) {
                                     await _load();
@@ -214,9 +216,13 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                           child: Text(
-                            _isSaving ? 'Enregistrement...' : 'Enregistrer',
+                            _isSaving ? 'Enregistrement en cours...' : 'Enregistrer',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
@@ -236,7 +242,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
     if (!mounted) return;
     _showMessage(
       result['success'] == true
-          ? 'Employe supprime.'
+          ? 'Employé supprimé.'
           : (result['error']?.toString() ?? 'Erreur suppression'),
     );
     if (result['success'] == true) {
@@ -260,7 +266,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
             'name': employee['nom'],
             'status':
                 _normalizeAttendanceStatus(
-                  (records[employee['id']]?['status'] ?? 'Present').toString(),
+                  (records[employee['id']]?['status'] ?? 'Présent').toString(),
                 ),
           },
         )
@@ -283,11 +289,11 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Pointage du jour', style: AppTextStyles.heading2),
-                    const SizedBox(height: 8),
+                    Text('Pointage du Jour', style: AppTextStyles.heading2),
+                    const SizedBox(height: 4),
                     Text(
-                      DateFormat('dd/MM/yyyy').format(_attendanceDate),
-                      style: AppTextStyles.body,
+                      DateFormat('EEEE dd MMMM yyyy', 'fr_FR').format(_attendanceDate),
+                      style: AppTextStyles.body.copyWith(color: AppColors.slate600),
                     ),
                     const SizedBox(height: 16),
                     Flexible(
@@ -310,17 +316,17 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                               children: [
                                 Expanded(
                                   child: Text(
-                                    (row['name'] ?? 'Employe').toString(),
+                                    (row['name'] ?? 'Employé').toString(),
                                     style: AppTextStyles.bodyBold,
                                   ),
                                 ),
                                 DropdownButton<String>(
                                   value: row['status'] as String,
                                   items: const [
-                                    'Present',
+                                    'Présent',
                                     'Absent',
                                     'En Retard',
-                                    'Conge',
+                                    'En Congé',
                                   ]
                                       .map(
                                         (status) => DropdownMenuItem<String>(
@@ -332,7 +338,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                   onChanged: (value) {
                                     setModalState(() {
                                       row['status'] = _normalizeAttendanceStatus(
-                                        value ?? 'Present',
+                                        value ?? 'Présent',
                                       );
                                     });
                                   },
@@ -371,7 +377,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                 }
                                 _showMessage(
                                   result['success'] == true
-                                      ? 'Pointage enregistre.'
+                                      ? '✅ Pointage enregistré avec succès.'
                                       : (result['error']?.toString() ??
                                           'Erreur pointage'),
                                 );
@@ -383,9 +389,13 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         child: Text(
-                          _isSaving ? 'Enregistrement...' : 'Valider le pointage',
+                          _isSaving ? 'Enregistrement en cours...' : 'Valider le pointage',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ),
                     ),
@@ -465,7 +475,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Fiche de paie', style: AppTextStyles.heading2),
+                      Text('Fiche de Paie', style: AppTextStyles.heading2),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<int>(
                         initialValue: selectedEmployeeId,
@@ -483,13 +493,13 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                         onChanged: (value) {
                           setModalState(() => selectedEmployeeId = value);
                         },
-                        decoration: _decoration('Employe'),
+                        decoration: _decoration('Employé'),
                       ),
                       const SizedBox(height: 10),
-                      _textField('Mois', monthController),
+                      _textField('Mois (ex: Août 2026)', monthController),
                       const SizedBox(height: 10),
                       _textField(
-                        'Prime',
+                        'Primes & Indemnités (FCFA)',
                         allowanceController,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -498,7 +508,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                       ),
                       const SizedBox(height: 10),
                       _textField(
-                        'Retenue additionnelle',
+                        'Retenues & Cotisations (FCFA)',
                         deductionController,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -512,23 +522,23 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                             .map(
                               (item) => DropdownMenuItem<String>(
                                 value: item,
-                                child: Text(item),
+                                child: Text(item == 'Paid' ? 'Payé' : 'En attente'),
                               ),
                             )
                             .toList(),
                         onChanged: (value) {
                           setModalState(() => status = value ?? 'Unpaid');
                         },
-                        decoration: _decoration('Statut'),
+                        decoration: _decoration('Statut de Paiement'),
                       ),
                       const SizedBox(height: 16),
                       _summaryCard([
-                        'Salaire de base: ${baseSalary.toStringAsFixed(0)} CFA',
-                        'Absences: $absentDays',
-                        'Retards: $lateDays',
-                        'Conges: $leaveDays',
-                        'Retenue calculee: ${computedDeduction.toStringAsFixed(0)} CFA',
-                        'Net estime: ${netSalary.toStringAsFixed(0)} CFA',
+                        'Salaire de base: ${_money(baseSalary)}',
+                        'Absences: $absentDays jour(s)',
+                        'Retards: $lateDays fois',
+                        'Congés: $leaveDays jour(s)',
+                        'Retenue calculée: ${_money(computedDeduction)}',
+                        'Net estimé: ${_money(netSalary)}',
                       ]),
                       const SizedBox(height: 10),
                       SizedBox(
@@ -538,7 +548,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                               ? null
                               : () async {
                                   if (selectedEmployeeId == null) {
-                                    _showMessage('Selectionnez un employe.');
+                                    _showMessage('Veuillez sélectionner un employé.');
                                     return;
                                   }
                                   setState(() => _isComputingPayroll = true);
@@ -562,7 +572,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                           label: Text(
                             _isComputingPayroll
                                 ? 'Calcul en cours...'
-                                : 'Charger le resume du mois',
+                                : 'Charger le résumé du mois',
                           ),
                         ),
                       ),
@@ -574,7 +584,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                               ? null
                               : () async {
                                   if (selectedEmployeeId == null) {
-                                    _showMessage('Selectionnez un employe.');
+                                    _showMessage('Veuillez sélectionner un employé.');
                                     return;
                                   }
                                   setState(() => _isSaving = true);
@@ -606,7 +616,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                   }
                                   _showMessage(
                                     result['success'] == true
-                                        ? 'Fiche de paie enregistree.'
+                                        ? '✅ Fiche de paie enregistrée avec succès.'
                                         : (result['error']?.toString() ??
                                             'Erreur paie'),
                                   );
@@ -618,9 +628,13 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                           child: Text(
-                            _isSaving ? 'Enregistrement...' : 'Enregistrer',
+                            _isSaving ? 'Enregistrement en cours...' : 'Enregistrer la fiche',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
@@ -663,19 +677,20 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Regles de paie'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Règles de Paie', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _textField(
-                  'Conges/mois',
+                  'Congés autorisés / mois',
                   leaveController,
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 10),
                 _textField(
-                  'Penalite retard',
+                  'Pénalité retard (jours)',
                   lateController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -683,7 +698,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                 ),
                 const SizedBox(height: 10),
                 _textField(
-                  'Penalite demi-jour',
+                  'Pénalité demi-journée',
                   halfController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -713,13 +728,18 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                 }
                 _showMessage(
                   result['success'] == true
-                      ? 'Regles enregistrees.'
-                      : (result['error']?.toString() ?? 'Erreur regles'),
+                      ? '✅ Règles enregistrées avec succès.'
+                      : (result['error']?.toString() ?? 'Erreur règles'),
                 );
                 if (result['success'] == true) {
                   await _load();
                 }
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
               child: const Text('Enregistrer'),
             ),
           ],
@@ -730,14 +750,18 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 
   String _normalizeAttendanceStatus(String value) {
     final normalized = value.trim().toLowerCase();
     if (normalized.contains('present') || normalized.contains('présent')) {
-      return 'Present';
+      return 'Présent';
     }
     if (normalized.contains('absent')) {
       return 'Absent';
@@ -746,10 +770,10 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
       return 'En Retard';
     }
     if (normalized.contains('conge') || normalized.contains('congé')) {
-      return 'Conge';
+      return 'En Congé';
     }
-    if (normalized.contains('non pointe')) {
-      return 'Non pointe';
+    if (normalized.contains('non pointe') || normalized.contains('non pointé')) {
+      return 'Non Pointé';
     }
     return value.trim().isEmpty ? 'Absent' : value.trim();
   }
@@ -769,19 +793,29 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
       appBar: AppBar(
         backgroundColor: const Color(0xFFF8FAFC),
         surfaceTintColor: const Color(0xFFF8FAFC),
-        title: const Text('Ressources Humaines'),
+        title: const Text('Ressources Humaines', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
           IconButton(
             onPressed: () => context.push('/attendance/teacher-reports'),
             icon: const Icon(Icons.timeline_rounded),
-            tooltip: 'Rapports presence enseignant',
+            tooltip: 'Rapports présence enseignant',
+          ),
+          IconButton(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Actualiser',
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.slate500,
+          indicatorColor: AppColors.primary,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
           tabs: const [
             Tab(text: 'Vue'),
-            Tab(text: 'Employes'),
+            Tab(text: 'Employés'),
             Tab(text: 'Paie'),
             Tab(text: 'Rapports'),
           ],
@@ -812,10 +846,11 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
               ),
               label: Text(
                 _tabController.index == 2
-                    ? 'Paie'
+                    ? 'Fiche de Paie'
                     : _tabController.index == 1
-                        ? 'Employe'
+                        ? 'Employé'
                         : 'Pointage',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             )
           : null,
@@ -851,27 +886,31 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                 'Actifs',
                 '${_stats['activeEmployees'] ?? 0}',
                 Icons.groups_rounded,
+                const Color(0xFF3B82F6),
               ),
               _statCard(
-                'Presents',
+                'Présents',
                 '${_stats['presentToday'] ?? 0}',
                 Icons.fact_check_rounded,
+                const Color(0xFF10B981),
               ),
               _statCard(
-                'Paiee',
+                'Payée',
                 _money(_stats['paidAmount']),
                 Icons.paid_rounded,
+                const Color(0xFF059669),
               ),
               _statCard(
-                'A payer',
+                'À payer',
                 _money(_stats['unpaidAmount']),
                 Icons.money_off_csred_rounded,
+                const Color(0xFFEF4444),
               ),
             ],
           ),
           const SizedBox(height: 18),
           _sectionCard(
-            title: 'Operations rapides',
+            title: 'Opérations rapides',
             child: Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -882,7 +921,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                   _openAttendanceSheet,
                 ),
                 _actionChip(
-                  'Regles de paie',
+                  'Règles de paie',
                   Icons.rule_folder_outlined,
                   _savePayrollRules,
                 ),
@@ -896,16 +935,16 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
           ),
           const SizedBox(height: 18),
           _sectionCard(
-            title: 'Presence du jour',
+            title: 'Présence du jour',
             child: Column(
               children: _employees.take(6).map((employee) {
                 final matches = _attendance
                     .where((row) => row['employee_id'] == employee['id'])
                     .toList();
                 final status = matches.isEmpty
-                    ? 'Non pointe'
+                    ? 'Non Pointé'
                     : _normalizeAttendanceStatus(
-                        (matches.first['status'] ?? 'Non pointe').toString(),
+                        (matches.first['status'] ?? 'Non Pointé').toString(),
                       );
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -917,7 +956,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                     ),
                   ),
                   title: Text(
-                    (employee['nom'] ?? 'Employe').toString(),
+                    (employee['nom'] ?? 'Employé').toString(),
                     style: AppTextStyles.bodyBold,
                   ),
                   subtitle: Text((employee['poste'] ?? '-').toString()),
@@ -939,14 +978,14 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
           child: TextField(
             controller: _employeeSearchController,
             onChanged: (_) => _applyEmployeeSearch(),
-            decoration: _decoration('Rechercher un employe').copyWith(
+            decoration: _decoration('Rechercher un employé...').copyWith(
               prefixIcon: const Icon(Icons.search_rounded),
             ),
           ),
         ),
         Expanded(
           child: _filteredEmployees.isEmpty
-              ? _emptyState('Aucun employe trouve.')
+              ? _emptyState('Aucun employé trouvé.')
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   itemCount: _filteredEmployees.length,
@@ -978,7 +1017,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      (employee['nom'] ?? 'Employe').toString(),
+                                      (employee['nom'] ?? 'Employé').toString(),
                                       style: AppTextStyles.bodyBold,
                                     ),
                                     Text(
@@ -1005,9 +1044,10 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Salaire: ${_money(employee['salaire_base'])}',
+                            'Salaire de base : ${_money(employee['salaire_base'])}',
                             style: AppTextStyles.caption.copyWith(
                               fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0F172A),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -1016,12 +1056,12 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                               children: [
                                 TextButton(
                                   onPressed: () => _openEmployeeForm(employee),
-                                  child: const Text('Modifier'),
+                                  child: const Text('Modifier', style: TextStyle(fontWeight: FontWeight.bold)),
                                 ),
                                 TextButton(
                                   onPressed: () async {
                                     _payrollMonthController.text =
-                                        DateFormat('MMMM yyyy')
+                                        DateFormat('MMMM yyyy', 'fr_FR')
                                             .format(DateTime.now());
                                     await _openPayrollForm({
                                       'employee_id': employee['id'],
@@ -1029,14 +1069,14 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                           _payrollMonthController.text,
                                     });
                                   },
-                                  child: const Text('Paie'),
+                                  child: const Text('Paie', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
                                 ),
                                 TextButton(
                                   onPressed: () =>
                                       _deleteEmployee(employee['id'] as int),
                                   child: const Text(
                                     'Supprimer',
-                                    style: TextStyle(color: AppColors.danger),
+                                    style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -1056,8 +1096,8 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
         .where(
           (row) =>
               _payrollMonthController.text.trim().isEmpty ||
-              (row['month_year'] ?? '').toString() ==
-                  _payrollMonthController.text.trim(),
+              (row['month_year'] ?? '').toString().toLowerCase() ==
+                  _payrollMonthController.text.trim().toLowerCase(),
         )
         .toList();
 
@@ -1070,7 +1110,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
               TextField(
                 controller: _payrollMonthController,
                 onChanged: (_) => setState(() {}),
-                decoration: _decoration('Filtrer par mois'),
+                decoration: _decoration('Filtrer par mois (ex: Août 2026)'),
               ),
               const SizedBox(height: 10),
               if (_canManageHr)
@@ -1079,7 +1119,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                   child: TextButton.icon(
                     onPressed: _savePayrollRules,
                     icon: const Icon(Icons.tune_rounded),
-                    label: const Text('Regles de paie'),
+                    label: const Text('Règles de paie'),
                   ),
                 ),
             ],
@@ -1087,7 +1127,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
         ),
         Expanded(
           child: filtered.isEmpty
-              ? _emptyState('Aucune fiche de paie.')
+              ? _emptyState('Aucune fiche de paie enregistrée.')
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   itemCount: filtered.length,
@@ -1116,7 +1156,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      (employee?['nom'] ?? 'Employe').toString(),
+                                      (employee?['nom'] ?? 'Employé').toString(),
                                       style: AppTextStyles.bodyBold,
                                     ),
                                     Text(
@@ -1126,13 +1166,13 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                   ],
                                 ),
                               ),
-                              _statusPill(paid ? 'Paid' : 'Unpaid'),
+                              _statusPill(paid ? 'Payé' : 'En attente'),
                             ],
                           ),
                           const SizedBox(height: 10),
                           Text(
                             'Net: ${_money(record['net_salary'])}',
-                            style: AppTextStyles.heading3,
+                            style: AppTextStyles.heading3.copyWith(color: const Color(0xFF0F172A)),
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -1157,7 +1197,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                       if (!mounted) return;
                                       _showMessage(
                                         result['success'] == true
-                                            ? 'Salaire marque comme paye.'
+                                            ? '✅ Salaire marqué comme payé.'
                                             : (result['error']?.toString() ??
                                                 'Erreur paiement'),
                                       );
@@ -1165,7 +1205,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                         await _load();
                                       }
                                     },
-                                    child: const Text('Marquer paye'),
+                                    child: const Text('Marquer payé', style: TextStyle(color: Color(0xFF059669), fontWeight: FontWeight.bold)),
                                   ),
                               ],
                             ),
@@ -1201,7 +1241,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
     final departments = <String, int>{};
 
     for (final employee in _employees) {
-      final dept = (employee['departement'] ?? 'Non defini').toString();
+      final dept = (employee['departement'] ?? 'Non défini').toString();
       departments[dept] = (departments[dept] ?? 0) + 1;
     }
 
@@ -1209,10 +1249,10 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
       padding: const EdgeInsets.all(20),
       children: [
         _sectionCard(
-          title: 'Repartition du personnel',
+          title: 'Répartition du personnel',
           child: Column(
             children: [
-              _reportLine('Total employes', '$totalEmployees'),
+              _reportLine('Total employés', '$totalEmployees'),
               _reportLine('Actifs', '$active'),
               _reportLine('Inactifs', '$inactive'),
             ],
@@ -1220,24 +1260,24 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
         ),
         const SizedBox(height: 16),
         _sectionCard(
-          title: 'Etat de la paie',
+          title: 'État de la paie',
           child: Column(
             children: [
-              _reportLine('Fiches payees', '$paidCount'),
-              _reportLine('Fiches impayees', '$unpaidCount'),
-              _reportLine('Montant verse', _money(_stats['paidAmount'])),
+              _reportLine('Fiches payées', '$paidCount'),
+              _reportLine('Fiches impayées', '$unpaidCount'),
+              _reportLine('Montant versé', _money(_stats['paidAmount'])),
               _reportLine('Montant restant', _money(_stats['unpaidAmount'])),
             ],
           ),
         ),
         const SizedBox(height: 16),
         _sectionCard(
-          title: 'Rapports de presence',
+          title: 'Rapports de présence',
           child: Column(
             children: [
               _reportLine('Pointages du jour', '${_attendance.length}'),
               _reportLine(
-                'Presents aujourd\'hui',
+                'Présents aujourd\'hui',
                 '${_stats['presentToday'] ?? 0}',
               ),
               const SizedBox(height: 8),
@@ -1254,7 +1294,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
         ),
         const SizedBox(height: 16),
         _sectionCard(
-          title: 'Repartition par departement',
+          title: 'Répartition par département',
           child: Column(
             children: departments.entries
                 .map((entry) => _reportLine(entry.key, '${entry.value}'))
@@ -1307,7 +1347,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
     );
   }
 
-  Widget _statCard(String label, String value, IconData icon) {
+  Widget _statCard(String label, String value, IconData icon, [Color? iconColor]) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1319,11 +1359,11 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: AppColors.primary),
-          const SizedBox(height: 10),
-          Text(label, style: AppTextStyles.caption),
-          const SizedBox(height: 4),
-          Text(value, style: AppTextStyles.heading3),
+          Icon(icon, color: iconColor ?? AppColors.primary, size: 22),
+          const SizedBox(height: 8),
+          Text(label, style: AppTextStyles.caption.copyWith(color: AppColors.slate500)),
+          const SizedBox(height: 2),
+          Text(value, style: AppTextStyles.heading3.copyWith(fontSize: 16)),
         ],
       ),
     );
@@ -1333,8 +1373,10 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
     final lower = text.toLowerCase();
     final positive = lower.contains('actif') ||
         lower.contains('paid') ||
-        lower.contains('present');
-    final waiting = lower.contains('unpaid') || lower.contains('retard');
+        lower.contains('payé') ||
+        lower.contains('present') ||
+        lower.contains('présent');
+    final waiting = lower.contains('unpaid') || lower.contains('retard') || lower.contains('attente');
     final color = positive
         ? const Color(0xFF059669)
         : waiting
@@ -1365,7 +1407,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
   Widget _actionChip(String label, IconData icon, VoidCallback onTap) {
     return ActionChip(
       avatar: Icon(icon, size: 18, color: AppColors.primary),
-      label: Text(label),
+      label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
       onPressed: onTap,
     );
   }
@@ -1448,8 +1490,20 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
     );
   }
 
+  String _formatAmount(dynamic amount) {
+    if (amount == null) return '0';
+    final numVal = amount is num ? amount : (num.tryParse(amount.toString()) ?? 0);
+    final isInt = numVal % 1 == 0;
+    final str = isInt ? numVal.toInt().toString() : numVal.toStringAsFixed(1);
+    final parts = str.split('.');
+    final integerPart = parts[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]} ',
+    );
+    return parts.length > 1 ? '$integerPart.${parts[1]}' : integerPart;
+  }
+
   String _money(dynamic value) {
-    final amount = (value as num?)?.toDouble() ?? 0;
-    return '${amount.toStringAsFixed(0)} CFA';
+    return '${_formatAmount(value)} FCFA';
   }
 }
