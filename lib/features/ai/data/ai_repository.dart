@@ -29,10 +29,18 @@ class AiRepository {
 
   Future<Map<String, dynamic>?> getEarlyWarningAnalysis({
     required int studentId,
+    int? sessionId,
+    String? term,
   }) async {
     try {
+      final queryParams = <String>[
+        'studentId=$studentId',
+        if (sessionId != null) 'sessionId=$sessionId',
+        if (term != null && term.isNotEmpty) 'term=${Uri.encodeComponent(term)}',
+      ].join('&');
+
       final response = await _apiClient.getJson(
-        '/api/mobile/ai/early-warning?studentId=$studentId',
+        '/api/mobile/ai/early-warning?$queryParams',
       );
       return response['data'] != null ? Map<String, dynamic>.from(response['data']) : null;
     } catch (e) {

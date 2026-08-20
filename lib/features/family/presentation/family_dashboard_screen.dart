@@ -290,6 +290,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         _selectedPeriod = null;
       }
     });
+    _loadAiWarning().catchError((e) => debugPrint("AI warning load error: $e"));
   }
 
   Future<void> _loadAttendance() async {
@@ -314,7 +315,11 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
   Future<void> _loadAiWarning() async {
     if (_studentId == null) return;
-    final res = await locator<AiRepository>().getEarlyWarningAnalysis(studentId: _studentId!);
+    final res = await locator<AiRepository>().getEarlyWarningAnalysis(
+      studentId: _studentId!,
+      sessionId: _selectedSessionId,
+      term: _selectedPeriod,
+    );
     if (mounted && res != null) {
       setState(() {
         _aiWarningData = res;
@@ -335,6 +340,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       _loadGrades(),
       _loadAttendance(),
       _loadHomework(),
+      _loadAiWarning(),
     ]);
     if (mounted) {
       setState(() {

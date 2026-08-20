@@ -67,16 +67,20 @@ class EarlyWarningCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                'Diagnostic IA & Prévention',
-                style: AppTextStyles.bodyBold.copyWith(
-                  color: AppColors.slate900,
-                  fontSize: 14,
+              Expanded(
+                child: Text(
+                  'Diagnostic IA & Prévention',
+                  style: AppTextStyles.bodyBold.copyWith(
+                    color: AppColors.slate900,
+                    fontSize: 13.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: badgeColor,
                   borderRadius: BorderRadius.circular(12),
@@ -85,7 +89,7 @@ class EarlyWarningCard extends StatelessWidget {
                   'Risque $riskLevel',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -107,6 +111,8 @@ class EarlyWarningCard extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: atRiskSubjects.map((s) {
+                final scoreVal = s['score'];
+                final scoreFormatted = scoreVal is num ? (scoreVal == scoreVal.roundToDouble() ? scoreVal.toInt().toString() : scoreVal.toStringAsFixed(1)) : scoreVal.toString();
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -115,7 +121,7 @@ class EarlyWarningCard extends StatelessWidget {
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Text(
-                    '${s['subjectName']} : ${s['score']}/20',
+                    '${s['subjectName']} : $scoreFormatted/20',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
