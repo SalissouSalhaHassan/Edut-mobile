@@ -96,22 +96,25 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     if (_selectedSessionId == null) return;
 
     try {
-      // 1. Fetch stats
-      final statsRes = await _repository.getFinanceStats(
-        schoolId: _schoolId,
-        sessionId: _selectedSessionId!,
-      );
+      // Parallel fetch for maximum speed
+      final results = await Future.wait([
+        _repository.getFinanceStats(
+          schoolId: _schoolId,
+          sessionId: _selectedSessionId!,
+        ),
+        _repository.getStudentFeesList(
+          schoolId: _schoolId,
+          sessionId: _selectedSessionId!,
+        ),
+      ]);
 
-      // 2. Fetch student fees
-      final feesList = await _repository.getStudentFeesList(
-        schoolId: _schoolId,
-        sessionId: _selectedSessionId!,
-      );
+      final statsRes = results[0] as Map<String, dynamic>;
+      final feesList = results[1] as List<Map<String, dynamic>>;
 
       if (mounted) {
         setState(() {
-          if (statsRes['success'] == true) {
-            _stats = statsRes['stats'];
+          if (statsRes['success'] == true && statsRes['stats'] != null) {
+            _stats = Map<String, dynamic>.from(statsRes['stats']);
           }
           _fees = feesList;
           _applyFilters();
