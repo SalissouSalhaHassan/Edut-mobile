@@ -23,6 +23,8 @@ import '../../features/attendance/presentation/teacher_attendance_screen.dart';
 import '../../features/attendance/presentation/student_attendance_screen.dart';
 import '../../features/academics/presentation/saisie_notes_screen.dart';
 import '../../features/academics/presentation/gestion_devoirs_screen.dart';
+import '../../features/academics/presentation/student_homework_screen.dart';
+import '../../features/library/presentation/past_exams_screen.dart';
 import '../../features/academics/presentation/qcm_scanner_screen.dart';
 import '../../features/finance/presentation/finance_dashboard_screen.dart';
 import '../../features/finance/presentation/cashflow_forecast_screen.dart';
@@ -158,6 +160,14 @@ class AppRouter {
       GoRoute(
         path: '/family/library',
         builder: (context, state) => const FamilyLibraryScreen(),
+      ),
+      GoRoute(
+        path: '/family/homework',
+        builder: (context, state) => const StudentHomeworkScreen(),
+      ),
+      GoRoute(
+        path: '/library/past-exams',
+        builder: (context, state) => const PastExamsScreen(),
       ),
       GoRoute(
         path: '/family/hostel',
