@@ -517,6 +517,7 @@ class TeacherRepository {
     required String subjectName,
     required double hoursCount,
     required double hourlyRate,
+    String? date,
     String? notes,
   }) async {
     try {
@@ -527,6 +528,7 @@ class TeacherRepository {
         'subjectName': subjectName,
         'hoursCount': hoursCount,
         'hourlyRate': hourlyRate,
+        'date': date,
         'notes': notes,
       });
     } catch (e) {
