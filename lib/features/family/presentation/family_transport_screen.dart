@@ -76,7 +76,34 @@ class _FamilyTransportScreenState extends State<FamilyTransportScreen>
       }
 
       if (studentId != null) {
-        _subscription = await _repository.getTransportSubscription(studentId: studentId);
+        final liveData = await _repository.getLiveTransportData(studentId: studentId);
+        if (liveData != null) {
+          _subscription = {
+            'id': liveData['subscriptionId'] ?? 1,
+            'status': liveData['status'] ?? 'Actif',
+            'pickup_point': liveData['pickupPoint'] ?? 'Arrêt Station Total • Plateau',
+            'dropoff_point': liveData['dropoffPoint'] ?? 'Complexe Scolaire Edut',
+            'boarding_status': liveData['boardingStatus'] ?? 'À bord du bus 🚌',
+            'boarding_time': liveData['boardingTime'] ?? '07:18',
+            'circuit_stops': liveData['circuitStops'],
+            'transport_routes': {
+              'route_name': liveData['route']?['routeName'] ?? 'Ligne 01 - Navette Express',
+              'vehicle_number': liveData['route']?['vehicleNumber'] ?? 'RN 24343 NY',
+              'driver_name': liveData['route']?['driverName'] ?? 'Mamadou Chauffeur',
+              'driver_phone': liveData['route']?['driverPhone'] ?? '+22796123456',
+              'current_latitude': liveData['route']?['currentLatitude'] ?? 13.5186,
+              'current_longitude': liveData['route']?['currentLongitude'] ?? 2.1125,
+              'speed_kmh': liveData['route']?['speedKmh'] ?? 38,
+              'eta_minutes': liveData['route']?['etaMinutes'] ?? 5,
+              'next_stop': liveData['route']?['nextStop'] ?? 'Arrêt Station Total • Plateau',
+            }
+          };
+          if (liveData['route']?['etaMinutes'] != null) {
+            _estimatedMinutes = (liveData['route']['etaMinutes'] as num).toInt();
+          }
+        } else {
+          _subscription = await _repository.getTransportSubscription(studentId: studentId);
+        }
       }
 
       // Default Active Circuit Fallback so parents always have live transport visibility
@@ -85,14 +112,18 @@ class _FamilyTransportScreenState extends State<FamilyTransportScreen>
         'status': 'Actif',
         'pickup_point': 'Arrêt Station Total • Plateau',
         'dropoff_point': 'Complexe Scolaire Edut',
+        'boarding_status': 'À bord du bus 🚌',
+        'boarding_time': '07:18',
         'transport_routes': {
           'route_name': 'Ligne ADS 01 - Plateau / Koira Kano',
           'vehicle_number': 'RN 24343 NY',
           'driver_name': 'Ali Chauffeur',
           'driver_phone': '+22796123456',
-          'current_latitude': 13.5136,
-          'current_longitude': 2.1098,
+          'current_latitude': 13.5186,
+          'current_longitude': 2.1125,
           'speed_kmh': 35,
+          'eta_minutes': 5,
+          'next_stop': 'Arrêt Station Total • Plateau',
         }
       };
     } catch (e) {
@@ -229,6 +260,71 @@ class _FamilyTransportScreenState extends State<FamilyTransportScreen>
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Boarding Status Card
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF16A34A),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'STATUT DE L\'ÉLÈVE',
+                              style: TextStyle(
+                                color: Color(0xFF15803D),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _subscription?['boarding_status']?.toString() ?? 'À bord du bus 🚌',
+                              style: const TextStyle(
+                                color: Color(0xFF166534),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _subscription?['boarding_time']?.toString() ?? '07:18',
+                          style: const TextStyle(
+                            color: Color(0xFF15803D),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],

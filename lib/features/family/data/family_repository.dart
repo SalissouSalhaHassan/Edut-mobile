@@ -187,6 +187,20 @@ class FamilyRepository {
     }
   }
 
+  Future<Map<String, dynamic>?> getLiveTransportData({
+    required int studentId,
+  }) async {
+    try {
+      final response = await _apiClient.getJson(
+        '/api/mobile/transport/live?studentId=$studentId',
+      );
+      return response['data'] == null ? null : Map<String, dynamic>.from(response['data']);
+    } catch (e) {
+      debugPrint("Error fetching live transport data: $e");
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getLibraryBooks() async {
     try {
       final response = await _apiClient.getJson(
