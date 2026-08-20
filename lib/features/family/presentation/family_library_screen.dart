@@ -160,7 +160,7 @@ class _FamilyLibraryScreenState extends State<FamilyLibraryScreen>
               ? 'Réservation enregistrée avec succès.'
               : 'Réservation impossible : ${result['error']}',
         ),
-        backgroundColor: result['success'] == true ? AppColors.success : AppColors.error,
+        backgroundColor: result['success'] == true ? AppColors.success : AppColors.danger,
       ),
     );
     if (result['success'] == true) {
