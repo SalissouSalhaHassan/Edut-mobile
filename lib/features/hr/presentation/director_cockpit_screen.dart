@@ -1015,6 +1015,8 @@ class _DirectorCockpitScreenState extends State<DirectorCockpitScreen>
         ),
       ),
     );
+  }
+
   String _formatAmount(dynamic amount) {
     if (amount == null) return '0';
     final numVal = amount is num ? amount : (num.tryParse(amount.toString()) ?? 0);
