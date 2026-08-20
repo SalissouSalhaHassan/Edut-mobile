@@ -374,7 +374,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
               : Column(
                   children: [
                     // Class & Date Header Info Card
-                    _buildHeaderCard(dateStr: DateFormat('dd MMMM yyyy').format(_selectedDate)),
+                    _buildHeaderCard(dateStr: _formatDateFrench(_selectedDate)),
 
                     // Stats Dashboard Grid
                     _buildStatsRow(
@@ -924,138 +924,237 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     );
   }
 
+  String _formatDateFrench(DateTime date) {
+    const months = [
+      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
   void _showBiometricDialog() {
+    String modalSearchQuery = "";
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFC7D2FE), width: 2),
-                ),
-                child: const Icon(
-                  Icons.fingerprint,
-                  size: 42,
-                  color: Color(0xFF4F46E5),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                "Scanner d'Empreinte Digitale",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                "Poser le doigt de l'élève sur le capteur biométrique ou sélectionner un élève ci-dessous",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 16),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 260),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _students.length,
-                  itemBuilder: (context, index) {
-                    final s = _students[index];
-                    final sId = s['id'] as int;
-                    final sName = s['nom_etudiant'] ?? s['nomEtudiant'] ?? 'Élève';
-                    final numAdm = s['num_admission'] ?? s['numAdmission'] ?? '';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filtered = _students.where((s) {
+              if (modalSearchQuery.trim().isEmpty) return true;
+              final q = modalSearchQuery.trim().toLowerCase();
+              final name = (s['nom_etudiant'] ?? s['nomEtudiant'] ?? '').toString().toLowerCase();
+              final numAdm = (s['num_admission'] ?? s['numAdmission'] ?? '').toString().toLowerCase();
+              return name.contains(q) || numAdm.contains(q);
+            }).toList();
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            return Container(
+              width: double.infinity,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.82,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4.5,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEEF2FF),
-                              shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFC7D2FE), width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.fingerprint_rounded,
+                        size: 40,
+                        color: Color(0xFF4F46E5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Scanner d'Empreinte Digitale",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    "Poser le doigt de l'élève sur le capteur biométrique ou valider directement la présence ci-dessous",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    onChanged: (val) {
+                      setModalState(() {
+                        modalSearchQuery = val;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: "Rechercher un élève par nom ou matricule...",
+                      hintStyle: const TextStyle(color: AppColors.slate400, fontSize: 12.5),
+                      prefixIcon: const Icon(Icons.search, color: AppColors.slate400, size: 18),
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: filtered.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: Center(
+                              child: Text(
+                                "Aucun élève trouvé",
+                                style: TextStyle(color: AppColors.slate500, fontSize: 13),
+                              ),
                             ),
-                            child: const Icon(Icons.fingerprint, color: Color(0xFF4F46E5), size: 20),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  sName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (numAdm.isNotEmpty)
-                                  Text(
-                                    "N° Adm: $numAdm",
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final s = filtered[index];
+                              final sId = s['id'] as int;
+                              final sName = s['nom_etudiant'] ?? s['nomEtudiant'] ?? 'Élève';
+                              final numAdm = s['num_admission'] ?? s['numAdmission'] ?? '';
+                              final isPresent = _statuses[sId] == 'Présent';
+
+                              return Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isPresent ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isPresent ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
                                   ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4F46E5),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              elevation: 0,
-                            ),
-                            icon: const Icon(Icons.check, size: 14, color: Colors.white),
-                            label: const Text("Valider", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              setState(() {
-                                _statuses[sId] = 'Présent';
-                                _remarks[sId] = 'Vérifié par empreinte digitale';
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text("Empreinte validée : $sName"),
-                                  backgroundColor: const Color(0xFF4F46E5),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: isPresent ? const Color(0xFFDCFCE7) : const Color(0xFFEEF2FF),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        isPresent ? Icons.check_circle_rounded : Icons.fingerprint_rounded,
+                                        color: isPresent ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            sName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13.5,
+                                              color: Color(0xFF0F172A),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            numAdm.isNotEmpty ? "Matricule : $numAdm" : "ID #$sId",
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isPresent ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        elevation: 0,
+                                      ),
+                                      icon: Icon(
+                                        isPresent ? Icons.done_all_rounded : Icons.check_rounded,
+                                        size: 15,
+                                        color: Colors.white,
+                                      ),
+                                      label: Text(
+                                        isPresent ? "Validé" : "Valider",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _statuses[sId] = 'Présent';
+                                          _remarks[sId] = 'Vérifié par empreinte digitale';
+                                        });
+                                        setModalState(() {});
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text("Présence validée par empreinte : $sName"),
+                                            backgroundColor: const Color(0xFF16A34A),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
                               );
                             },
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(height: 12),
-            ],
-          ),
+            );
+          },
         );
       },
     );
