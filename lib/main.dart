@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/di/injection.dart';
 import 'core/api/sync_engine.dart';
 import 'core/router/app_router.dart';
@@ -10,6 +11,14 @@ import 'features/auth/presentation/inactivity_lock_wrapper.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize date formatting locales for intl
+  try {
+    await initializeDateFormatting('fr_FR', null);
+    await initializeDateFormatting('fr', null);
+  } catch (e) {
+    debugPrint('Date formatting initialization error: $e');
+  }
+
   // Initialize dependency injection & Supabase
   await setupLocator();
 

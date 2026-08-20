@@ -20,9 +20,8 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
   final HrRepository _repository = locator<HrRepository>();
   final TextEditingController _employeeSearchController =
       TextEditingController();
-  final TextEditingController _payrollMonthController = TextEditingController(
-    text: DateFormat('MMMM yyyy', 'fr_FR').format(DateTime.now()),
-  );
+  final TextEditingController _payrollMonthController =
+      TextEditingController();
 
   late TabController _tabController;
   bool _isLoading = true;
@@ -38,10 +37,49 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
   Map<String, dynamic> _payrollRules = {};
   Map<String, dynamic> _stats = {};
 
+  static const List<String> _frenchMonths = [
+    '',
+    'Janvier',
+    'Février',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Août',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Décembre'
+  ];
+
+  static const List<String> _frenchDays = [
+    '',
+    'Lundi',
+    'Mardi',
+    'Mercredi',
+    'Jeudi',
+    'Vendredi',
+    'Samedi',
+    'Dimanche'
+  ];
+
+  static String _formatFrenchMonth(DateTime dt) {
+    final m = (dt.month >= 1 && dt.month <= 12) ? _frenchMonths[dt.month] : '';
+    return '$m ${dt.year}'.trim();
+  }
+
+  static String _formatFrenchFullDate(DateTime dt) {
+    final dayName = (dt.weekday >= 1 && dt.weekday <= 7) ? _frenchDays[dt.weekday] : '';
+    final m = (dt.month >= 1 && dt.month <= 12) ? _frenchMonths[dt.month] : '';
+    return '$dayName ${dt.day} $m ${dt.year}'.trim();
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _payrollMonthController.text = _formatFrenchMonth(DateTime.now());
     _load();
   }
 
@@ -54,25 +92,34 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
   }
 
   Future<void> _load() async {
-    final profile = await locator<PermissionService>().getCurrentProfile();
-    setState(() => _isLoading = true);
-    final dashboard = await _repository.getHrDashboardData();
-    final rules = await _repository.getPayrollRules();
+    try {
+      final profile = await locator<PermissionService>().getCurrentProfile();
+      if (!mounted) return;
+      setState(() => _isLoading = true);
 
-    if (!mounted) return;
-    setState(() {
-      _employees = List<Map<String, dynamic>>.from(dashboard['employees'] ?? []);
-      _salaryRecords =
-          List<Map<String, dynamic>>.from(dashboard['salaryRecords'] ?? []);
-      _attendance = List<Map<String, dynamic>>.from(dashboard['attendance'] ?? []);
-      _stats = Map<String, dynamic>.from(dashboard['stats'] ?? {});
-      _payrollRules = Map<String, dynamic>.from(rules);
-      _canManageHr = profile.permissions.contains(AppPermissions.hrManage) ||
-          profile.role.toLowerCase().contains('admin') ||
-          profile.role.toLowerCase().contains('direct');
-      _isLoading = false;
-    });
-    _applyEmployeeSearch();
+      final dashboard = await _repository.getHrDashboardData();
+      final rules = await _repository.getPayrollRules();
+
+      if (!mounted) return;
+      setState(() {
+        _employees = List<Map<String, dynamic>>.from(dashboard['employees'] ?? []);
+        _salaryRecords =
+            List<Map<String, dynamic>>.from(dashboard['salaryRecords'] ?? []);
+        _attendance = List<Map<String, dynamic>>.from(dashboard['attendance'] ?? []);
+        _stats = Map<String, dynamic>.from(dashboard['stats'] ?? {});
+        _payrollRules = Map<String, dynamic>.from(rules);
+        _canManageHr = profile.permissions.contains(AppPermissions.hrManage) ||
+            profile.role.toLowerCase().contains('admin') ||
+            profile.role.toLowerCase().contains('direct');
+        _isLoading = false;
+      });
+      _applyEmployeeSearch();
+    } catch (e) {
+      debugPrint('Error loading HR data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _applyEmployeeSearch() {
@@ -292,7 +339,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                     Text('Pointage du Jour', style: AppTextStyles.heading2),
                     const SizedBox(height: 4),
                     Text(
-                      DateFormat('EEEE dd MMMM yyyy', 'fr_FR').format(_attendanceDate),
+                      _formatFrenchFullDate(_attendanceDate),
                       style: AppTextStyles.body.copyWith(color: AppColors.slate600),
                     ),
                     const SizedBox(height: 16),
@@ -936,34 +983,44 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
           const SizedBox(height: 18),
           _sectionCard(
             title: 'Présence du jour',
-            child: Column(
-              children: _employees.take(6).map((employee) {
-                final matches = _attendance
-                    .where((row) => row['employee_id'] == employee['id'])
-                    .toList();
-                final status = matches.isEmpty
-                    ? 'Non Pointé'
-                    : _normalizeAttendanceStatus(
-                        (matches.first['status'] ?? 'Non Pointé').toString(),
-                      );
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFEEF2FF),
-                    child: Icon(
-                      Icons.person_outline,
-                      color: AppColors.primary,
+            child: _employees.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text(
+                        'Aucun employé enregistré.',
+                        style: TextStyle(color: AppColors.slate500, fontSize: 13),
+                      ),
                     ),
+                  )
+                : Column(
+                    children: _employees.take(6).map((employee) {
+                      final matches = _attendance
+                          .where((row) => row['employee_id'] == employee['id'])
+                          .toList();
+                      final status = matches.isEmpty
+                          ? 'Non Pointé'
+                          : _normalizeAttendanceStatus(
+                              (matches.first['status'] ?? 'Non Pointé').toString(),
+                            );
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFEEF2FF),
+                          child: Icon(
+                            Icons.person_outline,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          (employee['nom'] ?? 'Employé').toString(),
+                          style: AppTextStyles.bodyBold,
+                        ),
+                        subtitle: Text((employee['poste'] ?? '-').toString()),
+                        trailing: _statusPill(status),
+                      );
+                    }).toList(),
                   ),
-                  title: Text(
-                    (employee['nom'] ?? 'Employé').toString(),
-                    style: AppTextStyles.bodyBold,
-                  ),
-                  subtitle: Text((employee['poste'] ?? '-').toString()),
-                  trailing: _statusPill(status),
-                );
-              }).toList(),
-            ),
           ),
         ],
       ),
@@ -1061,8 +1118,7 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
                                 TextButton(
                                   onPressed: () async {
                                     _payrollMonthController.text =
-                                        DateFormat('MMMM yyyy', 'fr_FR')
-                                            .format(DateTime.now());
+                                        _formatFrenchMonth(DateTime.now());
                                     await _openPayrollForm({
                                       'employee_id': employee['id'],
                                       'month_year':
@@ -1349,10 +1405,10 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
 
   Widget _statCard(String label, String value, IconData icon, [Color? iconColor]) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFEBF0F5)),
       ),
       child: Column(
@@ -1360,10 +1416,22 @@ class _HrDashboardScreenState extends State<HrDashboardScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: iconColor ?? AppColors.primary, size: 22),
-          const SizedBox(height: 8),
-          Text(label, style: AppTextStyles.caption.copyWith(color: AppColors.slate500)),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(color: AppColors.slate500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 2),
-          Text(value, style: AppTextStyles.heading3.copyWith(fontSize: 16)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: AppTextStyles.heading3.copyWith(fontSize: 15),
+            ),
+          ),
         ],
       ),
     );
