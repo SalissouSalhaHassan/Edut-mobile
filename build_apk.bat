@@ -13,7 +13,11 @@ if exist "C:\src\flutter\bin\flutter.bat" (
     set FLUTTER_EXE=C:\src\flutter\bin\flutter.bat
 )
 
-echo [1/3] Installation des packages...
+echo [1/4] Nettoyage du cache Flutter (Clean)...
+call %FLUTTER_EXE% clean
+
+echo.
+echo [2/4] Installation des packages...
 call %FLUTTER_EXE% pub get
 if errorlevel 1 (
     echo Erreur lors de flutter pub get.
@@ -22,13 +26,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/3] Verification Gradle...
+echo [3/4] Verification Gradle...
 cd android
 call gradlew.bat --stop >nul 2>&1
 cd ..
 
 echo.
-echo [3/3] Compilation du fichier APK Release...
+echo [4/4] Compilation du fichier APK Release...
 call %FLUTTER_EXE% build apk --release --no-tree-shake-icons
 if errorlevel 1 (
     echo.
