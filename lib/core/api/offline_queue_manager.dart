@@ -99,8 +99,21 @@ class OfflineQueueManager {
       _updatePendingCount();
       debugPrint("➕ Enqueued Operation -> ID: $id, Table: $table, Action: $action");
     } catch (e) {
-      debugPrint("❌ Error enqueuing operation: $e");
+      debugPrint("❌ Failed to enqueue operation: $e");
     }
+  }
+
+  /// Enqueue an HTTP API request for offline synchronization
+  Future<void> enqueueRequest({
+    required String endpoint,
+    required String method,
+    required Map<String, dynamic> body,
+  }) async {
+    await enqueue(
+      table: endpoint,
+      action: method,
+      data: body,
+    );
   }
 
   /// Get list of all pending operations sorted chronologically

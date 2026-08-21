@@ -490,7 +490,7 @@ class _AiVoiceAssistantSheetState extends State<AiVoiceAssistantSheet>
               ),
               const SizedBox(width: 8),
               IconButton.filled(
-                style: IconButton.filled(
+                style: IconButton.styleFrom(
                   backgroundColor: const Color(0xFF4F46E5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),

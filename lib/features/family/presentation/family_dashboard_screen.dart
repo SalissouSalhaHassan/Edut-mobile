@@ -551,9 +551,9 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           IconButton(
             onPressed: () => AiVoiceAssistantSheet.show(
               context,
-              studentId: _selectedStudent?['id'],
-              studentName: _selectedStudent?['nom_etudiant'],
-              studentClass: _selectedStudent?['classe'],
+              studentId: _studentId,
+              studentName: _studentName,
+              studentClass: _studentClass,
             ),
             icon: const Icon(Icons.record_voice_over_rounded, color: Color(0xFF6366F1)),
             tooltip: 'Assistant Vocal Edut AI (Hausa / Zarma / FR)',
@@ -578,9 +578,9 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         label: const Text('Assistant Vocal 🇳🇪', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
         onPressed: () => AiVoiceAssistantSheet.show(
           context,
-          studentId: _selectedStudent?['id'],
-          studentName: _selectedStudent?['nom_etudiant'],
-          studentClass: _selectedStudent?['classe'],
+          studentId: _studentId,
+          studentName: _studentName,
+          studentClass: _studentClass,
         ),
       ),
       body: Column(
