@@ -23,6 +23,7 @@ import '../../discipline/presentation/student_conduct_sheet.dart';
 import '../../admissions/presentation/online_admission_sheet.dart';
 import '../../hostel/presentation/student_hostel_sheet.dart';
 import '../../transport/presentation/student_transport_sheet.dart';
+import '../../canteen/presentation/student_canteen_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
 import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
@@ -751,6 +752,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   icon: Icons.directions_bus_filled_rounded,
                   color: const Color(0xFF0284C7),
                   onTap: () => StudentTransportSheet.show(
+                    context,
+                    studentId: _student['id'] as int? ?? _studentId,
+                    studentName: _student['nom_etudiant'] as String? ?? _studentName,
+                    studentClass: _studentClass,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Cantine & Repas",
+                  icon: Icons.restaurant_rounded,
+                  color: const Color(0xFF059669),
+                  onTap: () => StudentCanteenSheet.show(
                     context,
                     studentId: _student['id'] as int? ?? _studentId,
                     studentName: _student['nom_etudiant'] as String? ?? _studentName,
