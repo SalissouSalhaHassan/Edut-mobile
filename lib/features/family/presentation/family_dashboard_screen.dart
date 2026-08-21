@@ -15,6 +15,7 @@ import '../data/family_repository.dart';
 import '../../messaging/data/messaging_repository.dart';
 import '../../ai/data/ai_repository.dart';
 import '../../ai/presentation/early_warning_card.dart';
+import '../../ai/presentation/ai_voice_assistant_sheet.dart';
 import 'voice_note_player_card.dart';
 import 'student_health_profile_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
@@ -548,6 +549,16 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               ),
             ),
           IconButton(
+            onPressed: () => AiVoiceAssistantSheet.show(
+              context,
+              studentId: _selectedStudent?['id'],
+              studentName: _selectedStudent?['nom_etudiant'],
+              studentClass: _selectedStudent?['classe'],
+            ),
+            icon: const Icon(Icons.record_voice_over_rounded, color: Color(0xFF6366F1)),
+            tooltip: 'Assistant Vocal Edut AI (Hausa / Zarma / FR)',
+          ),
+          IconButton(
             onPressed: () => context.push('/security/connected-devices'),
             icon: const Icon(Icons.phonelink_lock_rounded, color: Color(0xFF0F4C81)),
             tooltip: 'Appareils Connectés',
@@ -558,6 +569,19 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             tooltip: 'Déconnexion',
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF4F46E5),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.mic_rounded, size: 20),
+        label: const Text('Assistant Vocal 🇳🇪', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        onPressed: () => AiVoiceAssistantSheet.show(
+          context,
+          studentId: _selectedStudent?['id'],
+          studentName: _selectedStudent?['nom_etudiant'],
+          studentClass: _selectedStudent?['classe'],
+        ),
       ),
       body: Column(
         children: [

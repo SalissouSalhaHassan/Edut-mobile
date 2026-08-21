@@ -176,4 +176,26 @@ class AiRepository {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> askVoiceAssistant({
+    required String query,
+    required String language, // "HA" | "ZA" | "FR"
+    int? studentId,
+    String? studentName,
+    String? studentClass,
+  }) async {
+    try {
+      final response = await _apiClient.postJson('/api/mobile/ai/voice-assistant', {
+        'query': query,
+        'language': language,
+        'studentId': studentId,
+        'studentName': studentName,
+        'studentClass': studentClass,
+      });
+      return response['data'] != null ? Map<String, dynamic>.from(response['data']) : null;
+    } catch (e) {
+      debugPrint("AiRepository.askVoiceAssistant error: $e");
+      return null;
+    }
+  }
 }

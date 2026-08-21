@@ -114,6 +114,13 @@ class _QRScanScreenState extends State<QRScanScreen> {
           numAdmission = parts[i + 1];
         }
       }
+    } else if (trimmed.contains('CARD-EDUT-')) {
+      isStudentPass = true;
+      final match = RegExp(r'CARD-EDUT-(\d+)').firstMatch(trimmed);
+      if (match != null) {
+        studentId = int.tryParse(match.group(1) ?? '');
+      }
+      numAdmission = 'CARD-EDUT-${studentId ?? 0}';
     }
 
     if (isStudentPass) {

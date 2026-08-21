@@ -15,7 +15,7 @@ class AttendanceRepository {
       : _apiClient = apiClient ?? MobileApiClient(),
         _client = client ?? SupabaseClientManager().client;
 
-  // Record student gate presence check-in from scanning QR Code
+  // Record student gate presence check-in from scanning QR Code (with offline auto-queue)
   Future<Map<String, dynamic>> recordStudentGateScan({
     int? studentId,
     String? numAdmission,
@@ -34,10 +34,39 @@ class AttendanceRepository {
       );
       return response;
     } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      debugPrint("📶 Offline Mode / Network Error on Gate Scan: Enqueueing scan locally ($e)");
+      try {
+        final queueManager = locator<OfflineQueueManager>();
+        await queueManager.enqueueRequest(
+          endpoint: '/api/mobile/attendance',
+          method: 'POST',
+          body: {
+            'action': 'recordStudentGateScan',
+            'payload': {
+              'studentId': studentId,
+              'numAdmission': numAdmission,
+              'scanMethod': 'QR_CODE_OFFLINE',
+              'scannedAt': DateTime.now().toIso8601String(),
+            },
+          },
+        );
+        return {
+          'success': true,
+          'isOffline': true,
+          'message': 'Badge validé & enregistré hors-ligne (synchronisation automatique)',
+          'data': {
+            'student_id': studentId,
+            'num_admission': numAdmission,
+            'status': 'Présent',
+            'time': DateTime.now().toIso8601String(),
+          }
+        };
+      } catch (queueErr) {
+        return {
+          'success': false,
+          'error': '$e',
+        };
+      }
     }
   }
 
