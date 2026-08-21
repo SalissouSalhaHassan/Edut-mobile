@@ -1,13 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../../core/api/supabase_client.dart';
+import '../../../core/api/mobile_api_client.dart';
 
 class HostelRepository {
   final SupabaseClient _client;
+  final MobileApiClient _apiClient;
 
-  HostelRepository({SupabaseClient? client})
-      : _client = client ?? SupabaseClientManager().client;
+  HostelRepository({SupabaseClient? client, MobileApiClient? apiClient})
+      : _client = client ?? SupabaseClientManager().client,
+        _apiClient = apiClient ?? MobileApiClient();
 
   Future<List<Map<String, dynamic>>> getRooms() async {
     try {
@@ -98,28 +100,42 @@ class HostelRepository {
   Future<Map<String, dynamic>> allocateStudent({
     required int studentId,
     required int roomId,
+    String? remarks,
   }) async {
     try {
+      final existing = await _client
+          .from('hostel_allocations')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('status', 'Occupé')
+          .maybeSingle();
+
+      if (existing != null) {
+        return {
+          'success': false,
+          'error': 'Cet élève est déjà affecté à une chambre.',
+        };
+      }
+
       final room = await _client
           .from('hostel_rooms')
-          .select('id, capacity, occupied_beds')
+          .select('capacity, occupied_beds')
           .eq('id', roomId)
           .maybeSingle();
 
-      if (room == null) {
-        return {'success': false, 'error': 'Chambre introuvable.'};
-      }
+      final capacity = (room?['capacity'] as num?)?.toInt() ?? 1;
+      final occupied = (room?['occupied_beds'] as num?)?.toInt() ?? 0;
 
-      final capacity = (room['capacity'] as num?)?.toInt() ?? 0;
-      final occupied = (room['occupied_beds'] as num?)?.toInt() ?? 0;
       if (occupied >= capacity) {
-        return {'success': false, 'error': 'Chambre complete.'};
+        return {'success': false, 'error': 'Cette chambre est déjà complète.'};
       }
 
       await _client.from('hostel_allocations').insert({
         'student_id': studentId,
         'room_id': roomId,
-        'status': 'Occupe',
+        'status': 'Occupé',
+        'join_date': DateTime.now().toIso8601String(),
+        'remarks': remarks,
       });
 
       await _client.from('hostel_rooms').update({
@@ -128,30 +144,18 @@ class HostelRepository {
 
       return {'success': true};
     } catch (e) {
-      debugPrint('Error allocating hostel room: $e');
+      debugPrint('Error allocating student to hostel: $e');
       return {'success': false, 'error': '$e'};
     }
   }
 
-  Future<Map<String, dynamic>> vacateAllocation(int allocationId) async {
+  Future<Map<String, dynamic>> vacateStudent({
+    required int allocationId,
+    required int roomId,
+  }) async {
     try {
-      final allocation = await _client
-          .from('hostel_allocations')
-          .select('id, room_id, status')
-          .eq('id', allocationId)
-          .maybeSingle();
-
-      if (allocation == null) {
-        return {'success': false, 'error': 'Affectation introuvable.'};
-      }
-
-      final roomId = allocation['room_id'] as int?;
-      if (roomId == null) {
-        return {'success': false, 'error': 'Chambre introuvable.'};
-      }
-
       await _client.from('hostel_allocations').update({
-        'status': 'Libere',
+        'status': 'Libéré',
         'leave_date': DateTime.now().toIso8601String(),
       }).eq('id', allocationId);
 
@@ -193,6 +197,52 @@ class HostelRepository {
     } catch (e) {
       debugPrint('Error deleting hostel room: $e');
       return {'success': false, 'error': '$e'};
+    }
+  }
+
+  // ─── Mobile Family & Boarder Methods ────────────────────────────────────────
+
+  /// Fetch full student boarding profile, roommates, night attendance, and exit permits
+  Future<Map<String, dynamic>> getStudentHostelDetails(int studentId) async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/hostel/student?studentId=$studentId');
+      if (res['success'] == true && res['data'] != null) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+      return {'isBoarder': false};
+    } catch (e) {
+      debugPrint('Error getStudentHostelDetails: $e');
+      return {'isBoarder': false, 'error': e.toString()};
+    }
+  }
+
+  /// Request a weekend exit pass from mobile
+  Future<Map<String, dynamic>> applyExitPermission({
+    required int studentId,
+    required String permissionType,
+    required String departureDate,
+    required String returnDateExpected,
+    String? guardianName,
+    String? guardianPhone,
+    required String reason,
+  }) async {
+    try {
+      final res = await _apiClient.postJson(
+        '/api/mobile/hostel/exit-permissions/apply',
+        {
+          'studentId': studentId,
+          'permissionType': permissionType,
+          'departureDate': departureDate,
+          'returnDateExpected': returnDateExpected,
+          'guardianName': guardianName,
+          'guardianPhone': guardianPhone,
+          'reason': reason,
+        },
+      );
+      return Map<String, dynamic>.from(res);
+    } catch (e) {
+      debugPrint('Error applyExitPermission: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 }

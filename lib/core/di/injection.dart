@@ -104,7 +104,7 @@ Future<void> setupLocator() async {
   );
 
   locator.registerLazySingleton<HostelRepository>(
-    () => HostelRepository(client: supabaseManager.client),
+    () => HostelRepository(client: supabaseManager.client, apiClient: locator<MobileApiClient>()),
   );
 
   locator.registerLazySingleton<HrRepository>(

@@ -21,6 +21,7 @@ import 'student_health_profile_sheet.dart';
 import '../../health/presentation/student_health_sheet.dart';
 import '../../discipline/presentation/student_conduct_sheet.dart';
 import '../../admissions/presentation/online_admission_sheet.dart';
+import '../../hostel/presentation/student_hostel_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
 import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
@@ -729,6 +730,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   onTap: () => OnlineAdmissionSheet.show(
                     context,
                     defaultParentPhone: _student['telephone_parent'] as String? ?? _student['telephone'] as String?,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Internat & Dortoir",
+                  icon: Icons.home_work_outlined,
+                  color: const Color(0xFF2563EB),
+                  onTap: () => StudentHostelSheet.show(
+                    context,
+                    studentId: _student['id'] as int? ?? _studentId,
+                    studentName: _student['nom_etudiant'] as String? ?? _studentName,
+                    studentClass: _studentClass,
                   ),
                 ),
                 const SizedBox(width: 8),
