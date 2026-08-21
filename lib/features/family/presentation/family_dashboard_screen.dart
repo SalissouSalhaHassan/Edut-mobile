@@ -18,6 +18,7 @@ import '../../ai/presentation/early_warning_card.dart';
 import '../../ai/presentation/ai_voice_assistant_sheet.dart';
 import 'voice_note_player_card.dart';
 import 'student_health_profile_sheet.dart';
+import '../../health/presentation/student_health_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
 import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
@@ -549,6 +550,16 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
               ),
             ),
           IconButton(
+            onPressed: () => StudentHealthSheet.show(
+              context,
+              studentId: _studentId,
+              studentName: _studentName,
+              studentClass: _studentClass,
+            ),
+            icon: const Icon(Icons.health_and_safety_rounded, color: Color(0xFFE11D48)),
+            tooltip: 'Carnet de Santé & Infirmerie',
+          ),
+          IconButton(
             onPressed: () => AiVoiceAssistantSheet.show(
               context,
               studentId: _studentId,
@@ -687,12 +698,13 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                 const SizedBox(width: 8),
                 _buildQuickActionChip(
                   label: "Santé & Infirmerie",
-                  icon: Icons.local_hospital_rounded,
-                  color: const Color(0xFFEF4444),
-                  onTap: () => StudentHealthProfileSheet.show(
+                  icon: Icons.health_and_safety_rounded,
+                  color: const Color(0xFFE11D48),
+                  onTap: () => StudentHealthSheet.show(
                     context,
-                    studentId: _student['id'] as int? ?? 1,
-                    studentName: _student['nom_etudiant'] as String? ?? 'Élève',
+                    studentId: _student['id'] as int? ?? _studentId,
+                    studentName: _student['nom_etudiant'] as String? ?? _studentName,
+                    studentClass: _studentClass,
                   ),
                 ),
                 const SizedBox(width: 8),
