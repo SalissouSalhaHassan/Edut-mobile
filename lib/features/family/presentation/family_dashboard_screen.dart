@@ -19,6 +19,7 @@ import '../../ai/presentation/ai_voice_assistant_sheet.dart';
 import 'voice_note_player_card.dart';
 import 'student_health_profile_sheet.dart';
 import '../../health/presentation/student_health_sheet.dart';
+import '../../discipline/presentation/student_conduct_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
 import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
@@ -701,6 +702,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   icon: Icons.health_and_safety_rounded,
                   color: const Color(0xFFE11D48),
                   onTap: () => StudentHealthSheet.show(
+                    context,
+                    studentId: _student['id'] as int? ?? _studentId,
+                    studentName: _student['nom_etudiant'] as String? ?? _studentName,
+                    studentClass: _studentClass,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Discipline & Conduite",
+                  icon: Icons.shield_outlined,
+                  color: const Color(0xFFE11D48),
+                  onTap: () => StudentConductSheet.show(
                     context,
                     studentId: _student['id'] as int? ?? _studentId,
                     studentName: _student['nom_etudiant'] as String? ?? _studentName,
