@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/pedagogie_repository.dart';
 import 'seance_form_screen.dart';
 import 'inspection_dialog.dart';
+import '../../academics/presentation/ai_timetable_generator_sheet.dart';
 
 /// Statuts with colors
 const _statutColors = {
@@ -189,6 +190,11 @@ class _CahierTextesScreenState extends State<CahierTextesScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_rounded),
+            onPressed: () => AiTimetableGeneratorSheet.show(context),
+            tooltip: 'Générateur IA d\'Emploi du Temps 📅',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _load,

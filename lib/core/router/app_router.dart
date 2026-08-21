@@ -24,6 +24,7 @@ import '../../features/attendance/presentation/student_attendance_screen.dart';
 import '../../features/academics/presentation/saisie_notes_screen.dart';
 import '../../features/academics/presentation/gestion_devoirs_screen.dart';
 import '../../features/academics/presentation/student_homework_screen.dart';
+import '../../features/academics/presentation/ai_timetable_generator_sheet.dart';
 import '../../features/library/presentation/past_exams_screen.dart';
 import '../../features/academics/presentation/qcm_scanner_screen.dart';
 import '../../features/finance/presentation/finance_dashboard_screen.dart';
@@ -168,6 +169,12 @@ class AppRouter {
       GoRoute(
         path: '/library/past-exams',
         builder: (context, state) => const PastExamsScreen(),
+      ),
+      GoRoute(
+        path: '/academics/ai-timetable-scheduler',
+        builder: (context, state) => const Scaffold(
+          body: SafeArea(child: AiTimetableGeneratorSheet()),
+        ),
       ),
       GoRoute(
         path: '/family/hostel',
