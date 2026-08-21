@@ -20,6 +20,7 @@ import 'voice_note_player_card.dart';
 import 'student_health_profile_sheet.dart';
 import '../../health/presentation/student_health_sheet.dart';
 import '../../discipline/presentation/student_conduct_sheet.dart';
+import '../../admissions/presentation/online_admission_sheet.dart';
 import 'sms_inquiry_helper_dialog.dart';
 import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
@@ -718,6 +719,16 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                     studentId: _student['id'] as int? ?? _studentId,
                     studentName: _student['nom_etudiant'] as String? ?? _studentName,
                     studentClass: _studentClass,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickActionChip(
+                  label: "Inscriptions & Admissions",
+                  icon: Icons.person_add_alt_1_rounded,
+                  color: const Color(0xFF059669),
+                  onTap: () => OnlineAdmissionSheet.show(
+                    context,
+                    defaultParentPhone: _student['telephone_parent'] as String? ?? _student['telephone'] as String?,
                   ),
                 ),
                 const SizedBox(width: 8),
