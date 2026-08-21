@@ -177,6 +177,21 @@ class HostelRepository {
     }
   }
 
+  Future<Map<String, dynamic>> vacateAllocation(int allocationId) async {
+    try {
+      final allocation = await _client
+          .from('hostel_allocations')
+          .select('room_id')
+          .eq('id', allocationId)
+          .maybeSingle();
+      final roomId = (allocation?['room_id'] as num?)?.toInt() ?? 0;
+      return await vacateStudent(allocationId: allocationId, roomId: roomId);
+    } catch (e) {
+      debugPrint('Error vacating allocation: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
   Future<Map<String, dynamic>> deleteRoom(int roomId) async {
     try {
       final allocations = await _client

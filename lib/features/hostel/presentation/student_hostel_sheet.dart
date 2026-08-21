@@ -267,7 +267,7 @@ class _StudentHostelSheetState extends State<StudentHostelSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -408,7 +408,7 @@ class _StudentHostelSheetState extends State<StudentHostelSheet> {
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       "Appel du ${na['date']}",
@@ -435,7 +435,7 @@ class _StudentHostelSheetState extends State<StudentHostelSheet> {
 
         // Exit Permissions Section
         Row(
-          mainAxisAlignment: MainAxisAlignment.between,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Row(
               children: [
@@ -515,7 +515,7 @@ class _StudentHostelSheetState extends State<StudentHostelSheet> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: _isSubmittingPass
-                          ? const SizedBox(size: Size(16, 16), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                           : const Text("Transmettre"),
                     ),
                   ],

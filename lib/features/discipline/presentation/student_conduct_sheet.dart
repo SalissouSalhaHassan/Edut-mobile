@@ -433,7 +433,7 @@ class _StudentConductSheetState extends State<StudentConductSheet> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.between,
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
                                               inc['incident_type'] ?? inc['incidentType'] ?? 'Incident',
@@ -474,7 +474,7 @@ class _StudentConductSheetState extends State<StudentConductSheet> {
                                         ),
                                         const SizedBox(height: 6),
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.between,
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
                                               "Sanction : $sanction",

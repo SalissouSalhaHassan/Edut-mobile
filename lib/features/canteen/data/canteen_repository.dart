@@ -24,7 +24,7 @@ class CanteenRepository {
 
     // Direct Supabase Fallback
     try {
-      final [subRow, walletRow, logsRows] = await Future.wait([
+      final results = await Future.wait([
         _client
             .from('canteen_meal_subscriptions')
             .select('id, plan_type, monthly_price, special_diet, allergies_notice, status')
@@ -43,6 +43,10 @@ class CanteenRepository {
             .order('served_at', ascending: false)
             .limit(10),
       ]);
+
+      final subRow = results[0] as Map<String, dynamic>?;
+      final walletRow = results[1] as Map<String, dynamic>?;
+      final logsRows = results[2] as List<dynamic>?;
 
       return {
         'success': true,
@@ -64,7 +68,7 @@ class CanteenRepository {
           'isLocked': walletRow != null ? (walletRow['is_locked'] == true) : false,
         },
         'todayMenu': null,
-        'recentLogs': List<Map<String, dynamic>>.from(logsRows as List? ?? []),
+        'recentLogs': List<Map<String, dynamic>>.from(logsRows ?? []),
       };
     } catch (e) {
       debugPrint('Supabase fallback error: $e');

@@ -741,7 +741,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   color: const Color(0xFF2563EB),
                   onTap: () => StudentHostelSheet.show(
                     context,
-                    studentId: _student['id'] as int? ?? _studentId,
+                    studentId: (_student['id'] as num?)?.toInt() ?? _studentId ?? 0,
                     studentName: _student['nom_etudiant'] as String? ?? _studentName,
                     studentClass: _studentClass,
                   ),
@@ -753,7 +753,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   color: const Color(0xFF0284C7),
                   onTap: () => StudentTransportSheet.show(
                     context,
-                    studentId: _student['id'] as int? ?? _studentId,
+                    studentId: (_student['id'] as num?)?.toInt() ?? _studentId ?? 0,
                     studentName: _student['nom_etudiant'] as String? ?? _studentName,
                     studentClass: _studentClass,
                   ),
@@ -765,7 +765,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
                   color: const Color(0xFF059669),
                   onTap: () => StudentCanteenSheet.show(
                     context,
-                    studentId: _student['id'] as int? ?? _studentId,
+                    studentId: (_student['id'] as num?)?.toInt() ?? _studentId ?? 0,
                     studentName: _student['nom_etudiant'] as String? ?? _studentName,
                     studentClass: _studentClass,
                   ),

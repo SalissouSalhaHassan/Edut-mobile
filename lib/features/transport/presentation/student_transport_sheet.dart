@@ -275,7 +275,7 @@ class _StudentTransportSheetState extends State<StudentTransportSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Row(
                       children: [
@@ -560,7 +560,7 @@ class _StudentTransportSheetState extends State<StudentTransportSheet> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isBoarding ? Colors.blue.shade50 : Colors.emerald.shade50,
+                          color: isBoarding ? Colors.blue.shade50 : const Color(0xFFECFDF5),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(

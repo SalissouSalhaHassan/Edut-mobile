@@ -229,6 +229,11 @@ class MobileApiClient {
     return _parseBody(response.data);
   }
 
+  Future<Map<String, dynamic>> get(String path) => getJson(path);
+
+  Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? body, Map<String, dynamic>? data}) =>
+      postJson(path, body ?? data ?? const {});
+
   Future<Options> _authOptions() async {
     final token = _supabaseClient.auth.currentSession?.accessToken;
     if (token == null || token.isEmpty) {

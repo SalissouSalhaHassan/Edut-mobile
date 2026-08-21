@@ -499,7 +499,8 @@ class _OnlineAdmissionSheetState extends State<OnlineAdmissionSheet> {
             ),
             child: _isSubmitting
                 ? const SizedBox(
-                    size: Size(20, 20),
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
                 : const Text(
@@ -592,7 +593,7 @@ class _OnlineAdmissionSheetState extends State<OnlineAdmissionSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.between,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     app['application_number'] ?? app['applicationNumber'] ?? 'Dossier',

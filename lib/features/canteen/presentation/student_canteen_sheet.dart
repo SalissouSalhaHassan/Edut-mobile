@@ -208,7 +208,7 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(res['error']?.toString() ?? "Échec de la recharge."),
-                              backgroundColor: Colors.rose,
+                              backgroundColor: const Color(0xFFE11D48),
                             ),
                           );
                         }
@@ -358,7 +358,7 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Row(
                       children: [
@@ -533,7 +533,7 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
           // ─── 3. Today's Nutritious Menu ────────────────────────────────────
           if (_todayMenu != null) ...[
             const Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   "Au Menu Aujourd'hui",
@@ -545,9 +545,8 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Container(
-              width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -555,7 +554,7 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
                 border: Border.all(color: Colors.grey.shade200),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withOpacity(0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -565,47 +564,46 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF059669).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Text(
-                          _todayMenu!['mealType']?.toString() ?? 'Déjeuner',
-                          style: const TextStyle(
-                            color: Color(0xFF059669),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: const Icon(Icons.lunch_dining_rounded, color: Color(0xFFD97706), size: 28),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _todayMenu!['name'] ?? _todayMenu!['title'] ?? 'Plat du Jour Équilibré',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _todayMenu!['description'] ?? 'Riz au gras, sauce tomate et légumes locaux.',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                            ),
+                          ],
                         ),
                       ),
-                      const Spacer(),
-                      if (_todayMenu!['calories'] != null)
-                        Text(
-                          "🔥 ${_todayMenu!['calories']} kcal",
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
-                        ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _todayMenu!['mainDish']?.toString() ?? 'Plat du jour',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
-                  ),
-                  if (_todayMenu!['starterDish'] != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      "• Entrée : ${_todayMenu!['starterDish']}",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                  ],
-                  if (_todayMenu!['dessert'] != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      "• Dessert : ${_todayMenu!['dessert']}",
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  if (_todayMenu!['calories'] != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.local_fire_department_rounded, color: Color(0xFFEA580C), size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${_todayMenu!['calories']} kcal",
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEA580C)),
+                        ),
+                      ],
                     ),
                   ],
                   if (_todayMenu!['allergens'] != null && _todayMenu!['allergens'].toString().isNotEmpty) ...[
@@ -613,13 +611,13 @@ class _StudentCanteenSheetState extends State<StudentCanteenSheet> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.rose.shade50,
+                        color: const Color(0xFFFFF1F2),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.rose.shade200),
+                        border: Border.all(color: const Color(0xFFFECDD3)),
                       ),
                       child: Text(
                         "⚠️ Allergènes : ${_todayMenu!['allergens']}",
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.rose.shade800),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9F1239)),
                       ),
                     ),
                   ],
