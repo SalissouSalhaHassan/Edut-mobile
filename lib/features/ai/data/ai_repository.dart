@@ -198,4 +198,53 @@ class AiRepository {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> gradeExamWithCamera({
+    required String imageBase64,
+    int? examId,
+    int? classId,
+    int? studentId,
+    String? answerKey,
+    String? subjectName,
+    double? maxMarks,
+  }) async {
+    try {
+      final response = await _apiClient.postJson('/api/exams/ai/grade-camera', {
+        'imageBase64': imageBase64,
+        'examId': examId,
+        'classId': classId,
+        'studentId': studentId,
+        'answerKey': answerKey,
+        'subjectName': subjectName,
+        'maxMarks': maxMarks ?? 20.0,
+      });
+      return response['data'] != null ? Map<String, dynamic>.from(response['data']) : null;
+    } catch (e) {
+      debugPrint("AiRepository.gradeExamWithCamera error: $e");
+      return null;
+    }
+  }
+
+  Future<bool> saveGradedExamResult({
+    required int examId,
+    required int studentId,
+    required double marksObtained,
+    String? remarks,
+    bool notifyParent = true,
+  }) async {
+    try {
+      final response = await _apiClient.postJson('/api/mobile/exams/results', {
+        'examId': examId,
+        'studentId': studentId,
+        'marksObtained': marksObtained,
+        'remarks': remarks,
+        'notifyParent': notifyParent,
+      });
+      return response['success'] == true || response['ok'] == true;
+    } catch (e) {
+      debugPrint("AiRepository.saveGradedExamResult error: $e");
+      return false;
+    }
+  }
 }
+

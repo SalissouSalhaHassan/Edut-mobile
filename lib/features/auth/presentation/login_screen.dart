@@ -110,8 +110,121 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
   }
 
+  void _showDemoSandboxDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.science_rounded, color: Color(0xFFD97706), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Environnement Démo Sandbox', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('Choisissez un profil pour tester l\'application instantanément', style: TextStyle(color: Colors.black54, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _demoRoleTile(
+              title: 'Directeur / Fondateur d\'école',
+              email: 'admin@edut.app',
+              role: 'school_admin',
+              icon: Icons.admin_panel_settings_rounded,
+              color: const Color(0xFF4F46E5),
+            ),
+            const SizedBox(height: 8),
+            _demoRoleTile(
+              title: 'Enseignant & Copilote Pédagogique',
+              email: 'prof@edut.app',
+              role: 'teacher',
+              icon: Icons.school_rounded,
+              color: const Color(0xFF059669),
+            ),
+            const SizedBox(height: 8),
+            _demoRoleTile(
+              title: 'Parent & Espace Famille',
+              email: 'parent@edut.app',
+              role: 'parent',
+              icon: Icons.family_restroom_rounded,
+              color: const Color(0xFFD97706),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _demoRoleTile({
+    required String title,
+    required String email,
+    required String role,
+    required IconData icon,
+    required Color color,
+  }) {
+    return InkWell(
+      onTap: () {
+        Navigator.pop(context);
+        setState(() {
+          _emailController.text = email;
+          _passwordController.text = 'edut1234';
+        });
+        _handleLogin();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: color.withOpacity(0.12),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(email, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black26),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -553,7 +666,43 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             ),
                           ),
                         ),
+                        const SizedBox(height: 12),
+
+                        // Interactive Sandbox / Demo Mode Button
+                        Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: _showDemoSandboxDialog,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.science_rounded, size: 18, color: Color(0xFFD97706)),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Mode Démo / Sandbox Interactif',
+                                      style: TextStyle(
+                                        color: Color(0xFFB45309),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 20),
+
 
                         // Footer Security Badge
                         const Center(

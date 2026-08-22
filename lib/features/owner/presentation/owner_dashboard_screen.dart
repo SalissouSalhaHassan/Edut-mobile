@@ -160,8 +160,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   const SizedBox(height: 18),
                   _ownerStats(),
                   const SizedBox(height: 18),
+                  _executiveActionHub(),
+                  const SizedBox(height: 18),
                   Text('Pilotage general', style: AppTextStyles.heading3),
                   const SizedBox(height: 12),
+
+
                   GridView.count(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
@@ -381,6 +385,147 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           const Color(0xFFFFF1F2),
         ),
       ],
+    );
+  }
+
+  Widget _executiveActionHub() {
+    final rate = _totalExpected > 0 ? (_totalCollected / _totalExpected * 100).clamp(0, 100) : 78.5;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFEBF0F5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.bolt_rounded, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Centre de Décision Exécutif', style: AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+                    const Text('Alertes prioritaires et indicateurs clés', style: TextStyle(color: Colors.black54, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F7EE),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${rate.toStringAsFixed(1)}% Recouvrement',
+                  style: const TextStyle(color: Color(0xFF059669), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Collection Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: rate / 100,
+              backgroundColor: const Color(0xFFF1F5F9),
+              color: const Color(0xFF059669),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Triage Action Item 1: Debt recovery
+          _triageItem(
+            icon: Icons.payments_outlined,
+            color: const Color(0xFFEF4444),
+            title: 'Impayés & Retards de scolarité',
+            desc: '${_money(_totalDebts)} restants. Relance automatique WhatsApp possible.',
+            action: 'Relancer',
+            onTap: () => context.push('/dashboard'),
+          ),
+          const SizedBox(height: 8),
+
+          // Triage Action Item 2: Academic early warning
+          _triageItem(
+            icon: Icons.psychology_alt_rounded,
+            color: const Color(0xFFF59E0B),
+            title: 'Prévention du Décrochage IA',
+            desc: 'Élèves sous le seuil d\'admissibilité identifiés pour soutien.',
+            action: 'Consulter',
+            onTap: () => context.push('/dashboard'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _triageItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String desc,
+    required String action,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.black.withOpacity(0.04)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(desc, style: const TextStyle(fontSize: 10, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(action, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 

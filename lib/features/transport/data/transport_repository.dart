@@ -84,4 +84,50 @@ class TransportRepository {
       return {'success': false, 'error': e.toString()};
     }
   }
+
+  /// Driver broadcasts live GPS beacon ping
+  Future<bool> sendGpsPing({
+    required int tripId,
+    required double latitude,
+    required double longitude,
+    double speedKmh = 0.0,
+    double heading = 0.0,
+    String? currentStop,
+    int? estimatedArrivalMinutes,
+  }) async {
+    try {
+      final res = await _apiClient.postJson(
+        '/api/transport/gps/ping',
+        {
+          'tripId': tripId,
+          'latitude': latitude,
+          'longitude': longitude,
+          'speedKmh': speedKmh,
+          'heading': heading,
+          if (currentStop != null) 'currentStop': currentStop,
+          if (estimatedArrivalMinutes != null)
+            'estimatedArrivalMinutes': estimatedArrivalMinutes,
+        },
+      );
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('Error broadcasting GPS ping: $e');
+      return false;
+    }
+  }
+
+  /// Queries live GPS position for a student's active circuit
+  Future<Map<String, dynamic>?> getLiveTripStatus(int tripId) async {
+    try {
+      final res = await _apiClient.getJson('/api/transport/gps/live?tripId=$tripId');
+      if (res['success'] == true && res['trip'] != null) {
+        return Map<String, dynamic>.from(res['trip']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error querying live trip status: $e');
+      return null;
+    }
+  }
 }
+

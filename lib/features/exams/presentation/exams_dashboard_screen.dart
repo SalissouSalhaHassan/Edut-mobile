@@ -4,7 +4,9 @@ import '../../../core/di/injection.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../ai/presentation/ai_exam_grader_screen.dart';
 import '../data/exams_repository.dart';
+
 
 class ExamsDashboardScreen extends StatefulWidget {
   const ExamsDashboardScreen({super.key});
@@ -149,7 +151,22 @@ class _ExamsDashboardScreenState extends State<ExamsDashboardScreen> {
         backgroundColor: const Color(0xFFF8FAFC),
         surfaceTintColor: const Color(0xFFF8FAFC),
         title: const Text('Examens'),
+        actions: [
+          IconButton(
+            tooltip: 'Correcteur IA Caméra',
+            icon: const Icon(Icons.document_scanner_rounded, color: AppColors.primary),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AiExamGraderScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
+
       body: RefreshIndicator(
         onRefresh: _load,
         child: _isLoading

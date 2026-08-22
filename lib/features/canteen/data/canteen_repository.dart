@@ -96,4 +96,62 @@ class CanteenRepository {
       return {'success': false, 'error': e.toString()};
     }
   }
+
+  /// Fetches weekly canteen menus and nutritional information
+  Future<Map<String, dynamic>?> getWeeklyMenu() async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/canteen/menu');
+      if (res['success'] == true && res['data'] != null) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching weekly canteen menu: $e');
+      return null;
+    }
+  }
+
+  /// Preorders a meal for a student
+  Future<bool> preorderMeal({
+    required int studentId,
+    required String mealDate,
+    required String menuDescription,
+    double price = 1200.0,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/canteen/preorder', {
+        'studentId': studentId,
+        'mealDate': mealDate,
+        'menuDescription': menuDescription,
+        'price': price,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('Error preordering canteen meal: $e');
+      return false;
+    }
+  }
+
+  /// Process contactless QR payment
+  Future<Map<String, dynamic>?> processQrPayment({
+    required int studentId,
+    required double amount,
+    String? itemDescription,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/canteen/qr-pay', {
+        'studentId': studentId,
+        'amount': amount,
+        'itemDescription': itemDescription,
+      });
+      if (res['success'] == true && res['data'] != null) {
+        return Map<String, dynamic>.from(res['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error processing QR payment: $e');
+      return null;
+    }
+  }
 }
+
