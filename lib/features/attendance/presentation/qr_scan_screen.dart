@@ -94,11 +94,18 @@ class _QRScanScreenState extends State<QRScanScreen> {
     if (trimmed.startsWith('{')) {
       try {
         final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
-        if (decoded['type'] == 'student_pass' || decoded['student_id'] != null || decoded['num_admission'] != null) {
+        if (decoded['type'] == 'student_pass' ||
+            decoded['student_id'] != null ||
+            decoded['num_admission'] != null ||
+            decoded['id'] != null ||
+            decoded['num'] != null) {
           isStudentPass = true;
-          studentId = int.tryParse(decoded['student_id']?.toString() ?? '');
-          numAdmission = decoded['num_admission']?.toString();
-          studentName = decoded['nom_etudiant']?.toString();
+          studentId = int.tryParse(
+              (decoded['student_id'] ?? decoded['id'])?.toString() ?? '');
+          numAdmission =
+              (decoded['num_admission'] ?? decoded['num'])?.toString();
+          studentName =
+              (decoded['nom_etudiant'] ?? decoded['nom'])?.toString();
           studentClass = decoded['classe']?.toString();
         }
       } catch (_) {}
