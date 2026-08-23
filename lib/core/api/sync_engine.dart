@@ -12,6 +12,8 @@ import '../../features/finance/data/finance_repository.dart';
 import '../../features/students/data/students_repository.dart';
 import '../../features/dashboard/data/dashboard_stats_repository.dart';
 import '../../features/pedagogie/data/pedagogie_repository.dart';
+import '../../features/canteen/data/canteen_repository.dart';
+import '../../features/transport/data/transport_repository.dart';
 
 class SyncEngine {
   final SupabaseClient _client;
@@ -86,6 +88,8 @@ class SyncEngine {
         locator<FinanceRepository>().getStudentFeesList(schoolId: 1, sessionId: 1).catchError((_) => <Map<String, dynamic>>[]),
         locator<PedagogieRepository>().getTeacherClassesAndSubjects().catchError((_) => <Map<String, dynamic>>[]),
         locator<PedagogieRepository>().getSeances().catchError((_) => <Map<String, dynamic>>[]),
+        locator<CanteenRepository>().getWeeklyMenu().catchError((_) => null),
+        locator<TransportRepository>().getDriverRoutes().catchError((_) => <Map<String, dynamic>>[]),
       ]);
       await updateLastSyncTime();
       debugPrint("✅ SyncEngine: Offline cache hydrated successfully.");
