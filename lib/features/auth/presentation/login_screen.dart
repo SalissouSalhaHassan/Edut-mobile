@@ -5,6 +5,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/services/inactivity_lock_service.dart';
+import '../../../core/services/biometric_auth_service.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _canCheckBiometric = false;
   String? _errorMessage;
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
@@ -30,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    _checkBiometricAvailability();
     if (widget.initialUsername != null && widget.initialUsername!.trim().isNotEmpty) {
       _emailController.text = widget.initialUsername!.trim();
     }
@@ -53,6 +56,41 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     ));
 
     _animController.forward();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final bioService = locator<BiometricAuthService>();
+    final available = await bioService.isBiometricAvailable();
+    if (mounted) {
+      setState(() => _canCheckBiometric = available);
+    }
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    final bioService = locator<BiometricAuthService>();
+    final didAuth = await bioService.authenticate(
+      reason: 'Identifiez-vous par empreinte ou Face ID pour accéder à Edut',
+    );
+
+    if (didAuth) {
+      final session = locator<SessionManager>();
+      final email = await session.getEmail();
+      final role = await session.getRole();
+      if (email != null && role != null && email.isNotEmpty) {
+        if (mounted) {
+          RoleRedirect.redirect(context, role);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Veuillez vous connecter manuellement avec mot de passe pour enregistrer votre profil.'),
+              backgroundColor: Color(0xFFD97706),
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -626,6 +664,30 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       ),
                                     ),
                                   ),
+
+                                  // Biometric Login Button
+                                  if (_canCheckBiometric) ...[
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: _handleBiometricLogin,
+                                      icon: const Icon(Icons.fingerprint_rounded, color: Color(0xFF4F46E5), size: 22),
+                                      label: const Text(
+                                        'Connexion par Empreinte / Face ID',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF4F46E5),
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

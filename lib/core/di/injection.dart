@@ -32,10 +32,14 @@ import '../../features/transport/data/transport_repository.dart';
 import '../../features/canteen/data/canteen_repository.dart';
 import '../services/push_notification_service.dart';
 import '../services/inactivity_lock_service.dart';
+import '../services/biometric_auth_service.dart';
 
 final locator = GetIt.instance;
 
 Future<void> setupLocator() async {
+  // Register BiometricAuthService
+  locator.registerLazySingleton<BiometricAuthService>(() => BiometricAuthService());
+
   // Register Supabase client manager
   final supabaseManager = SupabaseClientManager();
   await supabaseManager.init();
