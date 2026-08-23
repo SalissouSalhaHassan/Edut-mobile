@@ -95,6 +95,18 @@ class _AiVoiceAssistantSheetState extends State<AiVoiceAssistantSheet>
         'Quel est le dernier devoir ?',
       ],
     },
+    'AR': {
+      'name': 'العربية 🇸🇦',
+      'label': 'اللغة العربية',
+      'hint': 'تحدث أو اكتب سؤالك هنا...',
+      'greeting': 'مرحباً بك! اسألني عن أي تفاصيل تخص دراسة ابنك في Edut.',
+      'prompts': [
+        'أين توجد الحافلة المدرسية الآن؟',
+        'كم المبلغ المتبقي من الرسوم الدراسية؟',
+        'ما هي الحصص الدراسية اليوم؟',
+        'ما هي آخر الدرجات والواجبات؟',
+      ],
+    },
   };
 
   @override
