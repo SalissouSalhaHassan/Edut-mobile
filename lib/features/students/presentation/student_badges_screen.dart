@@ -232,7 +232,7 @@ class _StudentBadgesScreenState extends State<StudentBadgesScreen> {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 36,
-                            fontWeight: FontWeight.black,
+                            fontWeight: FontWeight.w900,
                             letterSpacing: -1,
                           ),
                         ),

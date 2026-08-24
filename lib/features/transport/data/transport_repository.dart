@@ -129,5 +129,16 @@ class TransportRepository {
       return null;
     }
   }
+
+  /// Fetches assigned routes for driver
+  Future<List<Map<String, dynamic>>> getDriverRoutes() async {
+    try {
+      final res = await _client.from('transport_routes').select('*');
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('Error fetching driver routes: $e');
+      return [];
+    }
+  }
 }
 

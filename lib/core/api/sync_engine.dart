@@ -79,7 +79,7 @@ class SyncEngine {
     if (!isOnlineNotifier.value) return;
     try {
       debugPrint("📦 SyncEngine: Hydrating local Hive cache for offline mode...");
-      await Future.wait([
+      await Future.wait<dynamic>([
         locator<StudentsRepository>().getStudentsList().catchError((_) => <Map<String, dynamic>>[]),
         locator<DashboardStatsRepository>().getSummary().catchError((_) => <String, dynamic>{}),
         locator<AcademicsRepository>().getSessions(1).catchError((_) => <Map<String, dynamic>>[]),

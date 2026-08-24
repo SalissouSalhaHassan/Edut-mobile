@@ -108,7 +108,7 @@ class ReceiptQrDialog extends StatelessWidget {
                     style: const TextStyle(
                       color: Color(0xFF34D399),
                       fontSize: 24,
-                      fontWeight: FontWeight.black,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],

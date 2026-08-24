@@ -328,7 +328,7 @@ class _LmsQuizScreenState extends State<LmsQuizScreen> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 28,
-                    fontWeight: FontWeight.black,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 if (certCode != null) ...[

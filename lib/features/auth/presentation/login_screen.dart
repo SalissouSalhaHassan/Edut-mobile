@@ -78,7 +78,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final role = await session.getRole();
       if (email != null && role != null && email.isNotEmpty) {
         if (mounted) {
-          RoleRedirect.redirect(context, role);
+          locator<InactivityLockService>().unlock();
+          locator<InactivityLockService>().recordActivity();
+          context.go(getHomeRouteForRole(role));
         }
       } else {
         if (mounted) {

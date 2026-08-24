@@ -138,7 +138,7 @@ class _StudentHealthScreenState extends State<StudentHealthScreen> {
                               ),
                               child: Text(
                                 'Groupe $bloodGroup',
-                                style: const TextStyle(color: Color(0xFFE11D48), fontWeight: FontWeight.black, fontSize: 13),
+                                style: const TextStyle(color: Color(0xFFE11D48), fontWeight: FontWeight.w900, fontSize: 13),
                               ),
                             ),
                           ],

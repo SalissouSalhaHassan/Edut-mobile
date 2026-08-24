@@ -255,7 +255,8 @@ class _LmsLessonPlayerScreenState extends State<LmsLessonPlayerScreen> {
               onPressed: _isSaving ? null : _toggleCompleted,
               icon: _isSaving
                   ? const SizedBox(
-                      size: 18,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
                   : Icon(_isCompleted ? Icons.check_circle : Icons.check_circle_outline),

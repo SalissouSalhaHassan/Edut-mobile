@@ -393,7 +393,8 @@ class _AiExamGraderScreenState extends State<AiExamGraderScreen> {
                 onPressed: _isAnalyzing ? null : _analyzeExam,
                 icon: _isAnalyzing
                     ? const SizedBox(
-                        size: 20,
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                       )
                     : const Icon(Icons.auto_awesome),
@@ -585,7 +586,8 @@ class _AiExamGraderScreenState extends State<AiExamGraderScreen> {
                       onPressed: _isSaving || _isSaved ? null : _saveResult,
                       icon: _isSaving
                           ? const SizedBox(
-                              size: 18,
+                              width: 18,
+                              height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
                           : Icon(_isSaved ? Icons.check_circle : Icons.save),

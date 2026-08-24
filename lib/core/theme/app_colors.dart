@@ -28,4 +28,9 @@ class AppColors {
   static const Color bgLight = Color(0xFFF8FAFC);
   static const Color bgCard = Color(0xFFFFFFFF);
   static const Color white = Color(0xFFFFFFFF);
+  static const Color background = bgLight;
+
+  // Text aliases
+  static const Color textPrimary = slate900;
+  static const Color textSecondary = slate500;
 }

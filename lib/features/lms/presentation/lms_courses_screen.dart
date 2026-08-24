@@ -232,7 +232,8 @@ class _LmsCoursesScreenState extends State<LmsCoursesScreen> {
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    size: 56,
+                    width: 56,
+                    height: 56,
                     child: CircularProgressIndicator(
                       value: percentage / 100,
                       backgroundColor: Colors.white24,

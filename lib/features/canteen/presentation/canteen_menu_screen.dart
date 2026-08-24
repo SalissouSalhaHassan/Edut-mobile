@@ -314,7 +314,7 @@ class _CanteenMenuScreenState extends State<CanteenMenuScreen> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
-                    fontWeight: FontWeight.black,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 if (notes.isNotEmpty) ...[

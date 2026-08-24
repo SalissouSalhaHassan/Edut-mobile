@@ -144,7 +144,7 @@ class _DriverGpsBeaconScreenState extends State<DriverGpsBeaconScreen> {
                 color: const Color(0xFF1E293B),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: _isBroadcasting ? Colors.emerald.withOpacity(0.5) : Colors.white10,
+                  color: _isBroadcasting ? AppColors.success.withOpacity(0.5) : Colors.white10,
                 ),
               ),
               child: Column(
@@ -153,21 +153,21 @@ class _DriverGpsBeaconScreenState extends State<DriverGpsBeaconScreen> {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: _isBroadcasting
-                          ? Colors.emerald.withOpacity(0.15)
-                          : Colors.slate.withOpacity(0.15),
+                          ? AppColors.success.withOpacity(0.15)
+                          : AppColors.slate600.withOpacity(0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.cell_tower,
                       size: 48,
-                      color: _isBroadcasting ? Colors.emerald : Colors.white38,
+                      color: _isBroadcasting ? AppColors.success : Colors.white38,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _isBroadcasting ? 'DIFFUSION ACTIVE' : 'BALISE EN PAUSE',
                     style: TextStyle(
-                      color: _isBroadcasting ? Colors.emerald : Colors.white54,
+                      color: _isBroadcasting ? AppColors.success : Colors.white54,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.5,
                       fontSize: 14,
@@ -241,7 +241,7 @@ class _DriverGpsBeaconScreenState extends State<DriverGpsBeaconScreen> {
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isBroadcasting ? Colors.rose : Colors.emerald,
+                backgroundColor: _isBroadcasting ? AppColors.danger : AppColors.success,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(

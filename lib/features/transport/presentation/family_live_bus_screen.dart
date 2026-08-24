@@ -110,24 +110,25 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.emerald.withOpacity(0.2),
+              color: AppColors.success.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.emerald.withOpacity(0.4)),
+              border: Border.all(color: AppColors.success.withOpacity(0.4)),
             ),
             child: Row(
               children: [
                 const SizedBox(
-                  size: Size(8, 8),
+                  width: 8,
+                  height: 8,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.emerald,
+                    color: AppColors.success,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   'EN DIRECT',
                   style: AppTextStyles.caption.copyWith(
-                    color: Colors.emerald,
+                    color: AppColors.success,
                     fontWeight: FontWeight.bold,
                     fontSize: 10,
                   ),
@@ -236,7 +237,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black89,
+                        color: Colors.black87,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: Colors.white24),
                       ),
@@ -265,7 +266,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.speed, color: Colors.emerald, size: 16),
+                        const Icon(Icons.speed, color: AppColors.success, size: 16),
                         const SizedBox(width: 6),
                         Text(
                           '${speed.toStringAsFixed(0)} km/h',
@@ -353,7 +354,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                           icon: const Icon(Icons.phone, size: 16),
                           label: const Text('Chauffeur'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.emerald,
+                            backgroundColor: AppColors.success,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
