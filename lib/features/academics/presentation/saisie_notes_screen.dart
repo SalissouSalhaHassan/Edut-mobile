@@ -54,6 +54,12 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
   double _coefficient = 1.0;
   int _schoolId = 1; // stored to reuse in period/session changes
 
+  // Grade Approval Workflow state
+  String _workflowStatus = 'BROUILLON';
+  String? _workflowObservation;
+  String _userRole = 'teacher';
+  bool _isWorkflowActionLoading = false;
+
   final TextEditingController _searchController = TextEditingController();
 
   // Maps to store inputs in state
@@ -185,8 +191,28 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         _students = rawData
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
-        _filteredStudents = _students;
-        _isEditable = result['is_editable'] as bool? ?? true;
+        // Fetch Grade Approval Workflow
+        final wfResult = await _repository.getGradeWorkflowStatus(
+          classId: widget.classId,
+          subjectId: widget.subjectId,
+          sessionId: _selectedSessionId!,
+          period: _selectedPeriodName,
+        );
+        if (wfResult['success'] == true) {
+          _workflowStatus = wfResult['workflowStatus'] as String? ?? 'BROUILLON';
+          _workflowObservation = wfResult['observation'] as String?;
+          _userRole = wfResult['role'] as String? ?? 'teacher';
+        }
+
+        final isSuperOrAdmin = _userRole.toLowerCase().contains('admin') ||
+            _userRole.toLowerCase().contains('direct') ||
+            _userRole.toLowerCase().contains('owner');
+
+        final periodEditable = result['is_editable'] as bool? ?? true;
+        _isEditable = periodEditable &&
+            (isSuperOrAdmin ||
+                _workflowStatus == 'BROUILLON' ||
+                _workflowStatus == 'CORRECTION_DEMANDEE');
         _lockReason = result['lock_reason'] as String?;
         _isHigherEd = ["Licence", "Master", "Doctorat", "Supérieur", "Université"]
             .contains(result['level']);
@@ -421,6 +447,211 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         );
       }
     }
+  }
+
+  Future<void> _handleWorkflowAction(String targetAction, {String? observation}) async {
+    setState(() => _isWorkflowActionLoading = true);
+    try {
+      final res = await _repository.updateGradeWorkflowStatus(
+        classId: widget.classId,
+        subjectId: widget.subjectId,
+        sessionId: _selectedSessionId!,
+        period: _selectedPeriodName,
+        targetAction: targetAction,
+        observation: observation,
+      );
+
+      if (res['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res['message'] ?? 'Statut mis à jour avec succès.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          _fetchGridData(_schoolId);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res['error'] ?? 'Erreur lors de la mise à jour.'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isWorkflowActionLoading = false);
+    }
+  }
+
+  void _showRequestCorrectionDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_return_rounded, color: AppColors.danger),
+            SizedBox(width: 8),
+            Text("Demander une correction", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Indiquez la raison pour laquelle le professeur doit corriger les notes :",
+              style: TextStyle(fontSize: 13, color: AppColors.slate600),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: "Ex: Notes manquantes, moyenne anormale...",
+                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.trim().isEmpty) return;
+              Navigator.pop(context);
+              _handleWorkflowAction('request_correction', observation: controller.text.trim());
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text("Envoyer la demande", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWorkflowCard() {
+    Color statusColor = AppColors.slate600;
+    String statusTitle = "Saisie Libre (Brouillon)";
+    IconData statusIcon = Icons.edit_note_rounded;
+
+    if (_workflowStatus == 'CORRECTION_DEMANDEE') {
+      statusColor = AppColors.danger;
+      statusTitle = "Correction Demandée par la Direction";
+      statusIcon = Icons.error_outline_rounded;
+    } else if (_workflowStatus == 'SAISIE_TERMINEE') {
+      statusColor = const Color(0xFF2563EB); // Blue
+      statusTitle = "Soumis (En attente contrôle Censeur)";
+      statusIcon = Icons.schedule_rounded;
+    } else if (_workflowStatus == 'CONTROLE_PEDAGOGIQUE' || _workflowStatus == 'VALIDATION_CONSEIL') {
+      statusColor = const Color(0xFFD97706); // Amber
+      statusTitle = "Validé Pédagogique (Prêt pour Conseil)";
+      statusIcon = Icons.verified_user_rounded;
+    } else if (_workflowStatus == 'VERROUILLE') {
+      statusColor = const Color(0xFFDC2626); // Red
+      statusTitle = "Verrouillé & Scellé (Conseil)";
+      statusIcon = Icons.lock_rounded;
+    } else if (_workflowStatus == 'PUBLIE' || _workflowStatus == 'ARCHIVE') {
+      statusColor = AppColors.success;
+      statusTitle = "Publié aux Familles";
+      statusIcon = Icons.public_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "CIRCUIT D'APPROBATION",
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                        color: AppColors.slate400,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusTitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_workflowObservation != null && _workflowObservation!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 13),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "Motif : $_workflowObservation",
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF991B1B), fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   void _showExtensionDialog() {
@@ -793,6 +1024,9 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
           // Overview Stats Panel
           _buildStatsPanel(stats),
 
+          // World-Class Grade Approval Workflow Card
+          _buildWorkflowCard(),
+
           // Lock Banner if Period is Locked or Read-Only
           if (!_isEditable || !_canManageAcademics)
             Container(
@@ -888,38 +1122,163 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         ],
       ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: AppColors.slate100)),
         ),
         child: SafeArea(
-          child: ElevatedButton(
-            onPressed:
-                _isSaving || !_canManageAcademics || !_isEditable ? null : _saveGrades,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 4,
-            ),
-            child: _isSaving
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : const Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // When in BROUILLON or CORRECTION_DEMANDEE: Save + Submit
+              if (_workflowStatus == 'BROUILLON' || _workflowStatus == 'CORRECTION_DEMANDEE') ...[
+                Row(
+                  children: [
+                    // Save Button
+                    Expanded(
+                      flex: 1,
+                      child: OutlinedButton.icon(
+                        onPressed: _isSaving || !_canManageAcademics || !_isEditable ? null : _saveGrades,
+                        icon: _isSaving
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save_outlined, size: 18),
+                        label: const Text("Enregistrer"),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Submit for Review Button
+                    Expanded(
+                      flex: 1,
+                      child: ElevatedButton.icon(
+                        onPressed: _isWorkflowActionLoading
+                            ? null
+                            : () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text("Soumettre les notes ?"),
+                                    content: const Text(
+                                      "Les notes seront transmises au Censeur pour vérification pédagogique. La saisie sera verrouillée temporairement.",
+                                    ),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler")),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                                        child: const Text("Confirmer", style: TextStyle(color: Colors.white)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _handleWorkflowAction('submit');
+                                }
+                              },
+                        icon: _isWorkflowActionLoading
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Icon(Icons.send_rounded, size: 18, color: Colors.white),
+                        label: const Text(
+                          "Soumettre",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (_workflowStatus == 'SAISIE_TERMINEE') ...[
+                // Censeur Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isWorkflowActionLoading ? null : _showRequestCorrectionDialog,
+                        icon: const Icon(Icons.rotate_left, color: AppColors.danger, size: 18),
+                        label: const Text("Demander Correction", style: TextStyle(color: AppColors.danger)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: AppColors.danger),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isWorkflowActionLoading
+                            ? null
+                            : () => _handleWorkflowAction('validate_control'),
+                        icon: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 18),
+                        label: const Text("Valider Contrôle", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (_workflowStatus == 'CONTROLE_PEDAGOGIQUE' || _workflowStatus == 'VALIDATION_CONSEIL') ...[
+                // Director Action: Lock
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isWorkflowActionLoading
+                        ? null
+                        : () => _handleWorkflowAction('lock'),
+                    icon: const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
+                    label: const Text("Verrouiller Définitivement (Conseil)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 3,
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // Locked / Published banner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.slate100,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.save, color: Colors.white),
+                      Icon(Icons.lock_rounded, size: 18, color: AppColors.slate600),
                       SizedBox(width: 8),
                       Text(
-                        "ENREGISTRER LES NOTES",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5),
+                        "Grille scellée et validée",
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.slate700),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

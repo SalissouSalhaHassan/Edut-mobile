@@ -628,4 +628,60 @@ class AcademicsRepository {
       };
     }
   }
+
+  /// Fetches Grade Approval Workflow Status for class & subject
+  Future<Map<String, dynamic>> getGradeWorkflowStatus({
+    required int classId,
+    required int subjectId,
+    required int sessionId,
+    required String period,
+  }) async {
+    try {
+      final response = await _apiClient.getJson(
+        '/api/mobile/academics?action=getWorkflowStatus&classId=$classId&subjectId=$subjectId&sessionId=$sessionId&period=$period',
+      );
+      return response;
+    } catch (e) {
+      debugPrint("Error fetching grade workflow status: $e");
+      return {
+        'success': true,
+        'workflowStatus': 'BROUILLON',
+        'observation': null,
+      };
+    }
+  }
+
+  /// Updates Grade Approval Workflow Status
+  Future<Map<String, dynamic>> updateGradeWorkflowStatus({
+    required int classId,
+    required int subjectId,
+    required int sessionId,
+    required String period,
+    required String targetAction,
+    String? observation,
+  }) async {
+    try {
+      final response = await _apiClient.postJson(
+        '/api/mobile/academics',
+        {
+          'action': 'updateWorkflowStatus',
+          'payload': {
+            'classId': classId,
+            'subjectId': subjectId,
+            'sessionId': sessionId,
+            'period': period,
+            'targetAction': targetAction,
+            'observation': observation,
+          },
+        },
+      );
+      return response;
+    } catch (e) {
+      debugPrint("Error updating grade workflow status: $e");
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
 }
