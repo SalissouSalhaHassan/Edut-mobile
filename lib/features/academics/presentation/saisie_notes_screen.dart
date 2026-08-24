@@ -191,6 +191,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         _students = rawData
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
+        _filteredStudents = _students;
         // Fetch Grade Approval Workflow
         final wfResult = await _repository.getGradeWorkflowStatus(
           classId: widget.classId,
@@ -1102,9 +1103,9 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                         itemCount: _filteredStudents.length,
                         itemBuilder: (context, index) {
                           final student = _filteredStudents[index];
-                          final sId = student['student_id'] as int;
-                          final matricule = student['num_admission'] as String;
-                          final name = student['nom_etudiant'] as String;
+                          final sId = (student['student_id'] as num?)?.toInt() ?? 0;
+                          final matricule = student['num_admission']?.toString() ?? '-';
+                          final name = student['nom_etudiant']?.toString() ?? 'Élève';
                           final rank = liveRanks[sId] ?? 0;
 
                           final rowMetrics = _getRowMetrics(sId);
