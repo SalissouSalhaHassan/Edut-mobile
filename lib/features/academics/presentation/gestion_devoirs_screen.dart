@@ -1,4 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 import '../../../core/di/injection.dart';
 import '../../../core/auth/session_manager.dart';
 import '../../../core/permissions/permission_service.dart';
@@ -31,6 +37,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isExportingPdf = false;
   bool _canManageAcademics = false;
   String? _errorMessage;
 
@@ -42,11 +49,13 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
   int? _selectedSessionId;
   String _selectedSessionName = '';
   String _selectedPeriodName = '';
+  int _coefficient = 1;
   bool _isEditable = true;
   String? _lockReason;
   int _schoolId = 1;
 
   final TextEditingController _searchController = TextEditingController();
+  String _activeFilterStatus = 'all'; // all, evaluated, pending, danger
 
   // Map of studentId -> List of 5 Controllers (for devoir1 to devoir5)
   final Map<int, List<TextEditingController>> _devoirControllers = {};
@@ -81,7 +90,6 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       final employeeIdStr = await sessionManager.getEmployeeId();
       final employeeId = int.tryParse(employeeIdStr ?? '');
       
-      // Default schoolId fallback
       int schoolId = 1;
       if (employeeId != null) {
         final client = SupabaseClientManager().client;
@@ -99,7 +107,6 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       _sessions = await _repository.getSessions(schoolId);
 
       if (_sessions.isNotEmpty) {
-        // Find active session
         final activeSession = _sessions.firstWhere(
           (s) => s['is_active'] == true || (s['status']?.toString().toLowerCase() == 'actif'),
           orElse: () => _sessions.first,
@@ -149,11 +156,11 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       if (result['success'] == true) {
         _isEditable = result['is_editable'] as bool? ?? true;
         _lockReason = result['lock_reason'] as String?;
+        _coefficient = (result['coefficient'] as num?)?.toInt() ?? 1;
         final List rawData = result['data'] is List ? (result['data'] as List) : [];
         _students = rawData
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
-        _filteredStudents = _students;
 
         // Initialize controllers for devoirs
         _devoirControllers.clear();
@@ -172,6 +179,8 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
           _devoirControllers[sId] = controllers;
         }
 
+        _applyFilters();
+
         setState(() {
           _isLoading = false;
         });
@@ -189,19 +198,24 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     }
   }
 
-  void _filterStudents(String query) {
-    if (query.isEmpty) {
-      setState(() {
-        _filteredStudents = _students;
-      });
-      return;
-    }
-    final lowerQuery = query.toLowerCase();
+  void _applyFilters() {
+    final query = _searchController.text.trim().toLowerCase();
     setState(() {
       _filteredStudents = _students.where((s) {
         final name = (s['nom_etudiant'] as String? ?? '').toLowerCase();
         final code = (s['num_admission'] as String? ?? '').toLowerCase();
-        return name.contains(lowerQuery) || code.contains(lowerQuery);
+        final matchesSearch = query.isEmpty || name.contains(query) || code.contains(query);
+        if (!matchesSearch) return false;
+
+        final sId = s['student_id'] as int;
+        final controllers = _devoirControllers[sId];
+        final hasGrade = controllers?.any((c) => c.text.trim().isNotEmpty) ?? false;
+        final avg = _getLiveAverage(sId);
+
+        if (_activeFilterStatus == 'evaluated') return hasGrade;
+        if (_activeFilterStatus == 'pending') return !hasGrade;
+        if (_activeFilterStatus == 'danger') return hasGrade && avg < 10.0;
+        return true;
       }).toList();
     });
   }
@@ -220,6 +234,51 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     if (values.isEmpty) return 0.0;
     final sum = values.reduce((a, b) => a + b);
     return sum / values.length;
+  }
+
+  // Real-time Class Statistics
+  Map<String, dynamic> _calculateClassStats() {
+    int evaluatedCount = 0;
+    double sumAverages = 0.0;
+    double maxScore = 0.0;
+    double minScore = 20.0;
+    String topStudent = '-';
+    int passCount = 0;
+
+    for (var s in _students) {
+      final sId = s['student_id'] as int;
+      final controllers = _devoirControllers[sId];
+      final hasGrade = controllers?.any((c) => c.text.trim().isNotEmpty) ?? false;
+
+      if (hasGrade) {
+        final avg = _getLiveAverage(sId);
+        evaluatedCount++;
+        sumAverages += avg;
+        if (avg >= 10.0) passCount++;
+
+        if (avg > maxScore || evaluatedCount == 1) {
+          maxScore = avg;
+          topStudent = s['nom_etudiant'] as String? ?? '-';
+        }
+        if (avg < minScore || evaluatedCount == 1) {
+          minScore = avg;
+        }
+      }
+    }
+
+    final total = _students.length;
+    final classAvg = evaluatedCount > 0 ? (sumAverages / evaluatedCount) : 0.0;
+    final passRate = evaluatedCount > 0 ? ((passCount / evaluatedCount) * 100) : 0.0;
+
+    return {
+      'total': total,
+      'evaluated': evaluatedCount,
+      'average': classAvg,
+      'passRate': passRate,
+      'max': evaluatedCount > 0 ? maxScore : 0.0,
+      'min': evaluatedCount > 0 ? minScore : 0.0,
+      'topStudent': topStudent,
+    };
   }
 
   Future<void> _saveDevoirs() async {
@@ -262,11 +321,10 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         if (res['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Devoirs enregistrés avec succès !'),
+              content: Text('Devoirs et bulletins synchronisés avec succès !'),
               backgroundColor: AppColors.success,
             ),
           );
-          // Reload under current selected session & period
           setState(() {
             _isLoading = true;
           });
@@ -295,6 +353,278 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     }
   }
 
+  // ─── PDF Export & Print Functionality ─────────────────────────────────────
+  Future<void> _exportPdfReport() async {
+    setState(() {
+      _isExportingPdf = true;
+    });
+
+    try {
+      final stats = _calculateClassStats();
+      final dateStr = DateFormat('dd MMMM yyyy', 'fr_FR').format(DateTime.now());
+
+      final pdf = pw.Document();
+
+      final tableData = _students.asMap().entries.map((entry) {
+        final idx = entry.key + 1;
+        final s = entry.value;
+        final sId = s['student_id'] as int;
+        final matricule = s['num_admission'] as String? ?? '-';
+        final name = s['nom_etudiant'] as String? ?? 'Sans Nom';
+
+        final controllers = _devoirControllers[sId];
+        final d1 = controllers != null && controllers[0].text.isNotEmpty ? controllers[0].text : '-';
+        final d2 = controllers != null && controllers[1].text.isNotEmpty ? controllers[1].text : '-';
+        final d3 = controllers != null && controllers[2].text.isNotEmpty ? controllers[2].text : '-';
+        final d4 = controllers != null && controllers[3].text.isNotEmpty ? controllers[3].text : '-';
+        final d5 = controllers != null && controllers[4].text.isNotEmpty ? controllers[4].text : '-';
+
+        final hasGrade = controllers?.any((c) => c.text.trim().isNotEmpty) ?? false;
+        final avg = _getLiveAverage(sId);
+        final avgStr = hasGrade ? avg.toStringAsFixed(2) : '-';
+        final statut = !hasGrade ? 'En attente' : avg >= 10.0 ? 'Admis' : 'Faible';
+
+        return [
+          idx.toString(),
+          matricule,
+          name,
+          d1,
+          d2,
+          d3,
+          d4,
+          d5,
+          avgStr,
+          statut,
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          header: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Container(height: 4, color: PdfColor.fromHex('#0F172A')),
+                pw.SizedBox(height: 8),
+                pw.Center(
+                  child: pw.Text(
+                    'PROCÈS-VERBAL DES DEVOIRS SURVEILLÉS (DS)',
+                    style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A')),
+                  ),
+                ),
+                pw.Center(
+                  child: pw.Text(
+                    'RELEVÉ OFFICIEL DES ÉVALUATIONS CONTINUES • ${_selectedPeriodName.toUpperCase()}',
+                    style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#475569')),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+
+                // Info Box
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#F8FAFC'),
+                    borderRadius: pw.BorderRadius.circular(6),
+                    border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0'), width: 0.5),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              text: 'Classe : ',
+                              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                              children: [
+                                pw.TextSpan(text: widget.className, style: const pw.TextStyle(fontSize: 8)),
+                              ],
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              text: 'Matière : ',
+                              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                              children: [
+                                pw.TextSpan(text: widget.subjectName, style: const pw.TextStyle(fontSize: 8)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              text: 'Coefficient : ',
+                              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                              children: [
+                                pw.TextSpan(text: '$_coefficient', style: const pw.TextStyle(fontSize: 8)),
+                              ],
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              text: 'Période : ',
+                              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                              children: [
+                                pw.TextSpan(text: _selectedPeriodName, style: const pw.TextStyle(fontSize: 8)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              text: 'Date : ',
+                              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                              children: [
+                                pw.TextSpan(text: dateStr, style: const pw.TextStyle(fontSize: 8)),
+                              ],
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.RichText(
+                            text: pw.TextSpan(
+                              text: 'Moyenne Classe : ',
+                              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                              children: [
+                                pw.TextSpan(
+                                  text: '${(stats['average'] as double).toStringAsFixed(2)} / 20',
+                                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 6),
+
+                // Stats Bar
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#F1F5F9'),
+                    borderRadius: pw.BorderRadius.circular(4),
+                  ),
+                  child: pw.Center(
+                    child: pw.Text(
+                      'Effectif : ${stats['total']}  |  Évalués : ${stats['evaluated']}  |  Taux Réussite : ${(stats['passRate'] as double).toStringAsFixed(1)}%  |  Note Max : ${(stats['max'] as double).toStringAsFixed(2)} (${stats['topStudent']})  |  Note Min : ${(stats['min'] as double).toStringAsFixed(2)}',
+                      style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#334155')),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+              ],
+            );
+          },
+          build: (pw.Context context) {
+            return [
+              pw.TableHelper.fromTextArray(
+                headers: ['#', 'Matricule', 'Nom & Prénom', 'DS 1', 'DS 2', 'DS 3', 'DS 4', 'DS 5', 'Moy. DS', 'Statut'],
+                data: tableData,
+                border: pw.TableBorder.all(color: PdfColor.fromHex('#CBD5E1'), width: 0.5),
+                headerStyle: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#0F172A')),
+                cellStyle: const pw.TextStyle(fontSize: 7.5),
+                cellAlignment: pw.Alignment.center,
+                cellAlignments: {
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerLeft,
+                },
+                columnWidths: {
+                  0: const pw.FixedColumnWidth(16),
+                  1: const pw.FixedColumnWidth(48),
+                  2: const pw.FlexColumnWidth(2),
+                  3: const pw.FixedColumnWidth(24),
+                  4: const pw.FixedColumnWidth(24),
+                  5: const pw.FixedColumnWidth(24),
+                  6: const pw.FixedColumnWidth(24),
+                  7: const pw.FixedColumnWidth(24),
+                  8: const pw.FixedColumnWidth(30),
+                  9: const pw.FixedColumnWidth(34),
+                },
+              ),
+              pw.SizedBox(height: 20),
+
+              // Signature zone
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text("L'Enseignant Titulaire :", style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 2),
+                      pw.Text("Date et Signature", style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 24),
+                      pw.Container(width: 140, height: 0.5, color: PdfColors.grey600),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text("Visa de la Direction des Études :", style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 2),
+                      pw.Text("Cachet officiel et Approbation", style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 24),
+                      pw.Container(width: 140, height: 0.5, color: PdfColors.grey600),
+                    ],
+                  ),
+                ],
+              ),
+            ];
+          },
+          footer: (pw.Context context) {
+            return pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(top: 10),
+              child: pw.Text(
+                'Document officiel Edut Mobile • Page ${context.pageNumber} sur ${context.pagesCount}',
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+              ),
+            );
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+      final cleanClass = widget.className.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+      final cleanSubject = widget.subjectName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+      final fileName = 'PV_Devoirs_${cleanClass}_$cleanSubject.pdf';
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfBytes,
+        name: fileName,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur export PDF: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExportingPdf = false;
+        });
+      }
+    }
+  }
+
   void _showExtensionDialog() {
     final reasonController = TextEditingController();
     showDialog(
@@ -302,8 +632,8 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       builder: (context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: const [
+          title: const Row(
+            children: [
               Icon(Icons.assignment_late_outlined, color: AppColors.warning),
               SizedBox(width: 8),
               Text("Demande de dérogation", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -449,26 +779,16 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                color: const Color(0xFF6366F1).withAlpha(15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF6366F1).withAlpha(40)),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Q${q['id'] ?? '•'} : ${q['question']}",
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                  ),
-                                  if (q['hint'] != null)
-                                    Text(
-                                      "Indice : ${q['hint']}",
-                                      style: const TextStyle(fontSize: 10.5, color: AppColors.slate500),
-                                    ),
-                                ],
+                              child: Text(
+                                q['question']?.toString() ?? '',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                               ),
                             )),
-                      ],
+                      ]
                     ],
                   ),
                 ),
@@ -522,7 +842,6 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                           _periods = [];
                         });
                         
-                        // Load new periods using the correct schoolId
                         final pList = await _repository.getPeriods(_schoolId, val, classId: widget.classId);
                         setModalState(() {
                           _periods = pList;
@@ -588,6 +907,8 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       );
     }
 
+    final stats = _calculateClassStats();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestion des Devoirs (DS)'),
@@ -595,6 +916,17 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         foregroundColor: AppColors.slate900,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: _isExportingPdf
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  )
+                : const Icon(Icons.picture_as_pdf_rounded, color: AppColors.success),
+            onPressed: _isExportingPdf ? null : _exportPdfReport,
+            tooltip: 'Exporter PDF (PV)',
+          ),
           IconButton(
             icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1)),
             onPressed: _showAiQuizGeneratorDialog,
@@ -609,9 +941,9 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       ),
       body: Column(
         children: [
-          // Filter details
+          // Filter details Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: AppColors.slate100)),
@@ -630,24 +962,71 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "$_selectedSessionName • $_selectedPeriodName",
+                        "$_selectedSessionName • $_selectedPeriodName • Coeff : $_coefficient",
                         style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withAlpha(25),
+                    color: AppColors.success.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    "Calcul Continu",
-                    style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 12),
+                    "Sync Directe",
+                    style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 11),
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // ─── Live Analytics Bar ──────────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildStatBadge(
+                    label: "Moy. Classe",
+                    value: "${(stats['average'] as double).toStringAsFixed(2)}/20",
+                    icon: Icons.calculate_rounded,
+                    color: (stats['average'] as double) >= 10 ? AppColors.success : AppColors.danger,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatBadge(
+                    label: "Évalués",
+                    value: "${stats['evaluated']}/${stats['total']}",
+                    icon: Icons.check_circle_outline_rounded,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatBadge(
+                    label: "Réussite",
+                    value: "${(stats['passRate'] as double).toStringAsFixed(1)}%",
+                    icon: Icons.trending_up_rounded,
+                    color: AppColors.success,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatBadge(
+                    label: "Note Max",
+                    value: "${(stats['max'] as double).toStringAsFixed(2)}/20",
+                    icon: Icons.emoji_events_rounded,
+                    color: const Color(0xFF6366F1),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatBadge(
+                    label: "Note Min",
+                    value: "${(stats['min'] as double).toStringAsFixed(2)}/20",
+                    icon: Icons.warning_amber_rounded,
+                    color: AppColors.warning,
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -655,58 +1034,73 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
           if (!_isEditable || !_canManageAcademics)
             Container(
               width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.amber.shade600),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.lock_clock, color: Colors.amber.shade900, size: 22),
-                  const SizedBox(width: 10),
+                  Icon(Icons.lock_clock, color: Colors.amber.shade900, size: 20),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _lockReason ?? (!_canManageAcademics 
                           ? 'Mode lecture seule (Droits d\'édition désactivés).'
-                          : 'Période verrouillée : La date limite de saisie des devoirs est dépassée.'),
+                          : 'Période verrouillée : Modification des devoirs fermée.'),
                       style: TextStyle(
                         color: Colors.amber.shade900,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     ),
                   ),
-                  TextButton.icon(
+                  TextButton(
                     onPressed: _showExtensionDialog,
-                    icon: const Icon(Icons.send_rounded, size: 14, color: AppColors.primary),
-                    label: const Text(
-                      "Dérogation",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
-                    ),
+                    child: const Text("Dérogation", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
                   ),
                 ],
               ),
             ),
 
-          // Search Bar
+          // Search Bar & Filter Chips
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _filterStudents,
-              decoration: InputDecoration(
-                hintText: "Rechercher un élève...",
-                prefixIcon: const Icon(Icons.search, color: AppColors.slate400),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                filled: true,
-                fillColor: AppColors.slate50,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onChanged: (val) => _applyFilters(),
+                  decoration: InputDecoration(
+                    hintText: "Rechercher élève ou matricule...",
+                    prefixIcon: const Icon(Icons.search, color: AppColors.slate400, size: 20),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    filled: true,
+                    fillColor: AppColors.slate50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('all', 'Tous (${_students.length})'),
+                      const SizedBox(width: 6),
+                      _buildFilterChip('evaluated', 'Évalués (${stats['evaluated']})'),
+                      const SizedBox(width: 6),
+                      _buildFilterChip('pending', 'En attente (${stats['total'] - stats['evaluated']})'),
+                      const SizedBox(width: 6),
+                      _buildFilterChip('danger', '< 10/20'),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -722,13 +1116,13 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                 : _filteredStudents.isEmpty
                     ? const Center(child: Text("Aucun élève trouvé"))
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                         itemCount: _filteredStudents.length,
                         itemBuilder: (context, index) {
                           final student = _filteredStudents[index];
                           final sId = student['student_id'] as int;
-                          final matricule = student['num_admission'] as String;
-                          final name = student['nom_etudiant'] as String;
+                          final matricule = student['num_admission'] as String? ?? '-';
+                          final name = student['nom_etudiant'] as String? ?? 'Sans Nom';
 
                           final liveAvg = _getLiveAverage(sId);
 
@@ -757,7 +1151,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 4,
+              elevation: 3,
             ),
             child: _isSaving
                 ? const SizedBox(
@@ -768,11 +1162,11 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                 : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.save, color: Colors.white),
+                      Icon(Icons.sync_rounded, color: Colors.white),
                       SizedBox(width: 8),
                       Text(
-                        "ENREGISTRER LES DEVOIRS",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5),
+                        "ENREGISTRER & SYNCHRONISER",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.3),
                       ),
                     ],
                   ),
@@ -782,21 +1176,82 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     );
   }
 
+  Widget _buildStatBadge({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color)),
+              Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String status, String label) {
+    final isSelected = _activeFilterStatus == status;
+    return ChoiceChip(
+      label: Text(label),
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        color: isSelected ? Colors.white : AppColors.slate700,
+      ),
+      selected: isSelected,
+      selectedColor: AppColors.primary,
+      backgroundColor: AppColors.slate100,
+      onSelected: (val) {
+        setState(() {
+          _activeFilterStatus = status;
+        });
+        _applyFilters();
+      },
+    );
+  }
+
   Widget _buildDevoirCard({
     required int studentId,
     required String matricule,
     required String name,
     required double average,
   }) {
+    final hasGrade = _devoirControllers[studentId]?.any((c) => c.text.trim().isNotEmpty) ?? false;
+    final isPass = average >= 10.0;
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: AppColors.slate100),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: !hasGrade
+              ? AppColors.slate200
+              : isPass
+                  ? AppColors.success.withAlpha(60)
+                  : AppColors.danger.withAlpha(60),
+        ),
       ),
       elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(14.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -807,10 +1262,10 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: AppTextStyles.bodyBold.copyWith(fontSize: 15)),
-                      const SizedBox(height: 4),
+                      Text(name, style: AppTextStyles.bodyBold.copyWith(fontSize: 14)),
+                      const SizedBox(height: 3),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: AppColors.slate50,
                           borderRadius: BorderRadius.circular(6),
@@ -818,7 +1273,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                         ),
                         child: Text(
                           matricule,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.slate500),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.slate600),
                         ),
                       ),
                     ],
@@ -828,47 +1283,78 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      "${average.toStringAsFixed(2)}/20",
+                      hasGrade ? "${average.toStringAsFixed(2)}/20" : "--",
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: average >= 10 ? AppColors.success : AppColors.warning,
+                        fontSize: 16,
+                        fontWeight: FontWeight.black,
+                        color: !hasGrade
+                            ? AppColors.slate400
+                            : isPass
+                                ? AppColors.success
+                                : AppColors.danger,
                       ),
                     ),
-                    const Text("Moy. DS", style: TextStyle(fontSize: 10, color: AppColors.slate400)),
+                    Text(
+                      !hasGrade ? "En attente" : isPass ? "Moy. DS (Admis)" : "Moy. DS (Faible)",
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: !hasGrade ? AppColors.slate400 : isPass ? AppColors.success : AppColors.danger,
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // Horizontal Scrollable Devoir Fields
-            const Text("Notes des Devoirs (1 à 5)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate500)),
-            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Notes des Devoirs (DS 1 à 5)", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.slate500)),
+                if (_canManageAcademics && _isEditable)
+                  InkWell(
+                    onTap: () {
+                      for (int i = 0; i < 5; i++) {
+                        if (_devoirControllers[studentId]?[i].text.trim().isEmpty ?? true) {
+                          _devoirControllers[studentId]?[i].text = "0";
+                        }
+                      }
+                      setState(() {});
+                    },
+                    child: const Text(
+                      "Vides = 0",
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
             SizedBox(
-              height: 60,
+              height: 54,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: 5,
                 itemBuilder: (context, index) {
                   return Container(
-                    width: 60,
-                    margin: const EdgeInsets.only(right: 8),
+                    width: 58,
+                    margin: const EdgeInsets.only(right: 6),
                     child: TextField(
                       controller: _devoirControllers[studentId]?[index],
                       enabled: _canManageAcademics && _isEditable,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       decoration: InputDecoration(
-                        labelText: "Dev. ${index + 1}",
+                        labelText: "DS ${index + 1}",
                         floatingLabelBehavior: FloatingLabelBehavior.always,
-                        labelStyle: const TextStyle(fontSize: 10, color: AppColors.slate400),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        labelStyle: const TextStyle(fontSize: 9.5, color: AppColors.slate500, fontWeight: FontWeight.bold),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 6),
                         fillColor: AppColors.slate50,
                         filled: true,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -881,7 +1367,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                             _devoirControllers[studentId]?[index].text = "20";
                           }
                         }
-                        setState(() {}); // Recalculate average live
+                        setState(() {});
                       },
                     ),
                   );
