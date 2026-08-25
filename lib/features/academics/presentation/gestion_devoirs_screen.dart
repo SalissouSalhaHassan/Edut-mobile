@@ -1243,7 +1243,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: !hasGrade
-              ? AppColors.slate200
+              ? AppColors.slate300
               : isPass
                   ? AppColors.success.withAlpha(60)
                   : AppColors.danger.withAlpha(60),
@@ -1286,7 +1286,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                       hasGrade ? "${average.toStringAsFixed(2)}/20" : "--",
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.black,
+                        fontWeight: FontWeight.w900,
                         color: !hasGrade
                             ? AppColors.slate400
                             : isPass
