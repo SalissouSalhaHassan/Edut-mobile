@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -103,7 +104,7 @@ class _GateScannerScreenState extends State<GateScannerScreen>
             setModalState(() => isSubmitting = true);
             HapticFeedback.heavyImpact();
 
-            await _securityRepo.scanGatePass(
+            final res = await _securityRepo.scanGatePass(
               qrPayload: rawPayload,
               action: action,
             );
@@ -111,10 +112,14 @@ class _GateScannerScreenState extends State<GateScannerScreen>
             setModalState(() => isSubmitting = false);
             if (dialogCtx.mounted) {
               Navigator.pop(dialogCtx);
-              ScaffoldMessenger.of(dialogCtx).showSnackBar(
+              final wa = res['whatsappAlert'] as Map<String, dynamic>?;
+              final waLink = wa?['link']?.toString();
+
+              ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   backgroundColor: action == 'entry' ? AppColors.success : const Color(0xFF6366F1),
                   behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 5),
                   content: Row(
                     children: [
                       Icon(action == 'entry' ? Icons.login : Icons.logout, color: Colors.white),
@@ -122,13 +127,25 @@ class _GateScannerScreenState extends State<GateScannerScreen>
                       Expanded(
                         child: Text(
                           action == 'entry'
-                              ? 'Entrée enregistrée pour ${student?['nom'] ?? 'l\'élève'}'
-                              : 'Sortie enregistrée pour ${student?['nom'] ?? 'l\'élève'}',
+                              ? 'Entrée confirmée • ${student?['nom'] ?? 'Élève'}'
+                              : 'Sortie confirmée • ${student?['nom'] ?? 'Élève'}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
                   ),
+                  action: waLink != null
+                      ? SnackBarAction(
+                          label: 'Alerter WhatsApp',
+                          textColor: const Color(0xFF4ADE80),
+                          onPressed: () async {
+                            final uri = Uri.parse(waLink);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                        )
+                      : null,
                 ),
               );
             }
