@@ -5,6 +5,7 @@ import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../data/finance_repository.dart';
+import '../utils/receipt_generator.dart';
 
 class RecordPaymentScreen extends StatefulWidget {
   final Map<String, dynamic> feeData;
@@ -124,11 +125,41 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
         if (res['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Versement enregistré avec succès !"),
+              content: Text("Versement enregistré avec succès ! Préparation du reçu..."),
               backgroundColor: AppColors.success,
             ),
           );
-          Navigator.pop(context, true); // Returns true to trigger refresh in caller screen
+
+          final student = widget.feeData['students'] as Map<String, dynamic>? ?? {};
+          final paymentRecord = {
+            'id': res['paymentId'] ?? DateTime.now().millisecondsSinceEpoch,
+            'amount': amount,
+            'reduction': reduction,
+            'payment_mode': _paymentMode,
+            'reference': _referenceController.text.trim().isNotEmpty
+                ? _referenceController.text.trim()
+                : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+            'month_concerned': _monthConcerned,
+            'date_paid': DateTime.now().toIso8601String(),
+            'recorded_by': recordedBy,
+          };
+
+          // Automatically pop up official receipt dialog (Print / Share / WhatsApp)
+          await ReceiptGenerator.showFormatAndActionDialog(
+            context: context,
+            student: {
+              'nom_etudiant': student['nom_etudiant'] ?? 'Élève',
+              'num_admission': student['num_admission'] ?? '—',
+              'classe': student['classe'] ?? '—',
+            },
+            payment: paymentRecord,
+            totalExpected: _expected,
+            remainingBalance: _newBalance,
+          );
+
+          if (mounted) {
+            Navigator.pop(context, true); // Returns true to trigger refresh in caller screen
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
