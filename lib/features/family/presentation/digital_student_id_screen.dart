@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -28,6 +29,8 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
   late AnimationController _flipController;
   late Animation<double> _flipAnimation;
   bool _isBack = false;
+  Timer? _liveClockTimer;
+  DateTime _currentTime = DateTime.now();
 
   @override
   void initState() {
@@ -39,6 +42,11 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
     _flipAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _flipController, curve: Curves.easeInOutBack),
     );
+    _liveClockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _currentTime = DateTime.now());
+      }
+    });
     _loadStudent();
   }
 
@@ -132,6 +140,7 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
 
   @override
   void dispose() {
+    _liveClockTimer?.cancel();
     _flipController.dispose();
     super.dispose();
   }
@@ -374,12 +383,32 @@ class _DigitalStudentIdScreenState extends State<DigitalStudentIdScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
                       ),
-                      child: const Text(
-                        'ACTIF 2025/2026',
-                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '${_currentTime.hour.toString().padLeft(2, '0')}:${_currentTime.minute.toString().padLeft(2, '0')}:${_currentTime.second.toString().padLeft(2, '0')} • SÉCURISÉ',
+                            style: const TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 9,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

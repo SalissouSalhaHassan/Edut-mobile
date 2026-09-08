@@ -110,9 +110,9 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.2),
+              color: AppColors.success.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.success.withOpacity(0.4)),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
             ),
             child: Row(
               children: [
@@ -225,7 +225,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.6),
+                            color: AppColors.primary.withValues(alpha: 0.6),
                             blurRadius: 20,
                             spreadRadius: 4,
                           ),
@@ -342,7 +342,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Arrêt de l\'élève : $pickupStop',
+                              'Arrêt de l\'élève : $pickupStop • Chauffeur : $driverName',
                               style: AppTextStyles.caption.copyWith(color: Colors.white70),
                             ),
                           ],
@@ -420,7 +420,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: isStudentStop
-                              ? const Color(0xFF4F46E5).withOpacity(0.2)
+                              ? const Color(0xFF4F46E5).withValues(alpha: 0.2)
                               : const Color(0xFF0F172A),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
@@ -457,7 +457,7 @@ class _FamilyLiveBusScreenState extends State<FamilyLiveBusScreen> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ],
               ),

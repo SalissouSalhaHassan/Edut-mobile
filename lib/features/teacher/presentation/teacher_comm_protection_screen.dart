@@ -200,7 +200,7 @@ class _TeacherCommProtectionScreenState extends State<TeacherCommProtectionScree
                           ),
                           Switch(
                             value: _dndEnabled,
-                            activeColor: const Color(0xFF6D28D9),
+                            activeThumbColor: const Color(0xFF6D28D9),
                             onChanged: (v) => setState(() => _dndEnabled = v),
                           ),
                         ],

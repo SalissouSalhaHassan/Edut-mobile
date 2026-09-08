@@ -30,7 +30,6 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
 
   List<String> _classes = [];
   List<String> _subjects = [];
-  List<Map<String, dynamic>> _rawClassSubjects = [];
 
   final List<String> _difficulties = ['Facile', 'Intermédiaire', 'Examen Officiel / BEPC / BAC', 'Avancé'];
   final List<String> _durations = ['30 min', '45 min', '1 heure', '2 heures'];
@@ -46,7 +45,6 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
   Future<void> _loadTeacherAssignments() async {
     final list = await _teacherRepo.getTeacherClassesAndSubjects();
     setState(() {
-      _rawClassSubjects = list;
       final classNames = <String>{};
       final subjectNames = <String>{};
 
@@ -197,7 +195,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Classe'),
-                          value: _classes.contains(_selectedClass) ? _selectedClass : (_classes.isNotEmpty ? _classes.first : null),
+                          initialValue: _classes.contains(_selectedClass) ? _selectedClass : (_classes.isNotEmpty ? _classes.first : null),
                           items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           onChanged: (v) => setState(() => _selectedClass = v ?? _selectedClass),
                         ),
@@ -206,7 +204,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Matière'),
-                          value: _subjects.contains(_selectedSubject) ? _selectedSubject : (_subjects.isNotEmpty ? _subjects.first : null),
+                          initialValue: _subjects.contains(_selectedSubject) ? _selectedSubject : (_subjects.isNotEmpty ? _subjects.first : null),
                           items: _subjects.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() => _selectedSubject = v ?? _selectedSubject),
                         ),
@@ -232,7 +230,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Niveau'),
-                          value: _selectedDifficulty,
+                          initialValue: _selectedDifficulty,
                           items: _difficulties.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() => _selectedDifficulty = v ?? _selectedDifficulty),
                         ),
@@ -241,7 +239,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: _inputDec('Durée'),
-                          value: _selectedDuration,
+                          initialValue: _selectedDuration,
                           items: _durations.map((dur) => DropdownMenuItem(value: dur, child: Text(dur))).toList(),
                           onChanged: (v) => setState(() => _selectedDuration = v ?? _selectedDuration),
                         ),
@@ -374,6 +372,9 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
           final title = q['title'] ?? 'Exercice';
           final pts = q['points'] ?? 4;
           final prompt = q['prompt'] ?? '';
+          final displayTitle = title.toString().startsWith('Exercice') || title.toString().startsWith('Partie')
+              ? title.toString()
+              : 'Exercice $num : $title';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -389,7 +390,7 @@ class _AiExamGeneratorScreenState extends State<AiExamGeneratorScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF1E293B))),
+                    Text(displayTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF1E293B))),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(

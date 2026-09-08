@@ -235,9 +235,23 @@ class MobileApiClient {
       postJson(path, body ?? data ?? const {});
 
   Future<Options> _authOptions() async {
-    final token = _supabaseClient.auth.currentSession?.accessToken;
-    if (token == null || token.isEmpty) {
+    var session = _supabaseClient.auth.currentSession;
+    if (session == null) {
       throw const MobileApiException('Session mobile absente.');
+    }
+
+    if (session.isExpired) {
+      try {
+        final refreshRes = await _supabaseClient.auth.refreshSession();
+        session = refreshRes.session ?? session;
+      } catch (e) {
+        // Continue with current token if refresh fails
+      }
+    }
+
+    final token = session?.accessToken ?? _supabaseClient.auth.currentSession?.accessToken;
+    if (token == null || token.isEmpty) {
+      throw const MobileApiException('Session mobile absente ou expirée.');
     }
     return Options(headers: {'Authorization': 'Bearer $token'});
   }

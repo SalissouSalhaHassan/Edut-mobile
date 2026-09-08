@@ -6,6 +6,8 @@ import 'package:hive/hive.dart';
 import '../di/injection.dart';
 import 'offline_queue_manager.dart';
 import 'supabase_client.dart';
+import 'mobile_api_client.dart';
+import '../auth/session_manager.dart';
 import '../../features/attendance/data/attendance_repository.dart';
 import '../../features/academics/data/academics_repository.dart';
 import '../../features/finance/data/finance_repository.dart';
@@ -62,15 +64,65 @@ class SyncEngine {
     }
   }
 
-  void _handleConnectionChange(List<ConnectivityResult> results) {
+  void _handleConnectionChange(List<ConnectivityResult> results) async {
     final wasOffline = !isOnlineNotifier.value;
     _updateConnectionStatus(results);
     
     // Trigger sync when transitioning from offline to online
     if (isOnlineNotifier.value && wasOffline) {
-      debugPrint("🔌 Connection Restored! Starting synchronization...");
+      debugPrint("🔌 Connection Restored! Refreshing auth session and starting synchronization...");
+      await _ensureFreshAuthToken();
       triggerSync();
       preloadAllOfflineData();
+    }
+  }
+
+  /// Ensures the Supabase access token is fresh before replaying queued operations
+  Future<void> _ensureFreshAuthToken() async {
+    try {
+      final currentSession = _client.auth.currentSession;
+      if (currentSession != null) {
+        final expiresAt = currentSession.expiresAt;
+        final isNearExpiry = expiresAt != null &&
+            DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000)
+                .isBefore(DateTime.now().add(const Duration(minutes: 5)));
+
+        if (currentSession.isExpired || isNearExpiry) {
+          debugPrint("🔑 SyncEngine: Refreshing expired/near-expiry session token...");
+          final response = await _client.auth.refreshSession();
+          final newAccessToken = response.session?.accessToken;
+          if (newAccessToken != null && newAccessToken.isNotEmpty) {
+            if (locator.isRegistered<SessionManager>()) {
+              final sessionManager = locator<SessionManager>();
+              final email = await sessionManager.getEmail() ?? '';
+              final role = await sessionManager.getRole() ?? 'staff';
+              final employeeId = await sessionManager.getEmployeeId() ?? '';
+              final userId = await sessionManager.getUserId();
+              final schoolId = await sessionManager.getSchoolId();
+              final studentId = await sessionManager.getStudentId();
+              final studentName = await sessionManager.getStudentName();
+              final studentClass = await sessionManager.getStudentClass();
+              final permissions = await sessionManager.getPermissions();
+
+              await sessionManager.saveSession(
+                token: newAccessToken,
+                email: email,
+                role: role,
+                employeeId: employeeId,
+                userId: userId,
+                schoolId: schoolId,
+                studentId: studentId,
+                studentName: studentName,
+                studentClass: studentClass,
+                permissions: permissions,
+              );
+            }
+            debugPrint("✅ SyncEngine: Access token refreshed successfully.");
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("⚠️ SyncEngine: Token refresh warning: $e");
     }
   }
 
@@ -125,6 +177,9 @@ class SyncEngine {
       await updateLastSyncTime();
       return;
     }
+
+    // Refresh token before draining queue to ensure valid authorization
+    await _ensureFreshAuthToken();
 
     isSyncingNotifier.value = true;
     debugPrint("🔄 SyncEngine: Starting sync for ${pending.length} pending operations.");
@@ -298,10 +353,47 @@ class SyncEngine {
         return res['success'] == true;
       } 
       
-      // Fallback: simple upsert in Supabase table
+      // Handle direct HTTP API requests queued offline
+      else if (op.table.startsWith('/api/') || op.table.startsWith('api/')) {
+        final client = locator.isRegistered<MobileApiClient>()
+            ? locator<MobileApiClient>()
+            : MobileApiClient();
+        final path = op.table.startsWith('/') ? op.table : '/${op.table}';
+        
+        switch (op.action.toUpperCase()) {
+          case 'POST':
+            await client.postJson(path, op.data);
+            return true;
+          case 'PUT':
+            await client.putJson(path, op.data);
+            return true;
+          case 'PATCH':
+            await client.patchJson(path, op.data);
+            return true;
+          case 'DELETE':
+            await client.deleteJson(path);
+            return true;
+          default:
+            await client.postJson(path, op.data);
+            return true;
+        }
+      }
+
+      // Unified REST API Sync endpoint with Server-side Validation & RLS/Tenant verification
       else {
-        await _client.from(op.table).upsert(op.data);
-        return true;
+        final client = locator.isRegistered<MobileApiClient>()
+            ? locator<MobileApiClient>()
+            : MobileApiClient();
+
+        final response = await client.postJson('/api/mobile/sync', {
+          'table': op.table,
+          'action': op.action,
+          'data': op.data,
+          'id': op.id,
+          'timestamp': op.timestamp,
+        });
+
+        return response['success'] == true;
       }
     } catch (e) {
       debugPrint("❌ Error replaying operation ${op.id}: $e");

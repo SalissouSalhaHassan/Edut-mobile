@@ -58,6 +58,7 @@ class _StudentsManagementScreenState extends State<StudentsManagementScreen> {
     if (!mounted) return;
     setState(() {
       _students = students;
+      _recomputeMetadata();
       _isLoading = false;
     });
     _applyFilters();
@@ -107,50 +108,58 @@ class _StudentsManagementScreenState extends State<StudentsManagementScreen> {
     });
   }
 
-  int get _activeCount => _students
-      .where((student) =>
-          (student['statut'] ?? '').toString().toUpperCase().contains('ACTIF'))
-      .length;
+  int _activeCount = 0;
+  int _classesCount = 0;
+  List<String> _levels = ['Tous'];
+  List<String> _classes = ['Tous'];
+  List<String> _sections = ['Tous'];
 
-  int get _classesCount => _students
-      .map((student) => student['classe']?.toString())
-      .whereType<String>()
-      .where((value) => value.isNotEmpty)
-      .toSet()
-      .length;
+  void _recomputeMetadata() {
+    _activeCount = _students
+        .where((student) =>
+            (student['statut'] ?? '').toString().toUpperCase().contains('ACTIF'))
+        .length;
 
-  List<String> get _levels => [
-        'Tous',
-        ..._students
-            .map((student) => student['educational_level']?.toString())
-            .whereType<String>()
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort(),
-      ];
+    _classesCount = _students
+        .map((student) => student['classe']?.toString())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .length;
 
-  List<String> get _classes => [
-        'Tous',
-        ..._students
-            .map((student) => student['classe']?.toString())
-            .whereType<String>()
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort(),
-      ];
+    _levels = [
+      'Tous',
+      ..._students
+          .map((student) => student['educational_level']?.toString())
+          .whereType<String>()
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort(),
+    ];
 
-  List<String> get _sections => [
-        'Tous',
-        ..._students
-            .map((student) => student['section']?.toString())
-            .whereType<String>()
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort(),
-      ];
+    _classes = [
+      'Tous',
+      ..._students
+          .map((student) => student['classe']?.toString())
+          .whereType<String>()
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort(),
+    ];
+
+    _sections = [
+      'Tous',
+      ..._students
+          .map((student) => student['section']?.toString())
+          .whereType<String>()
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort(),
+    ];
+  }
 
   int get _newThisMonthCount {
     final now = DateTime.now();

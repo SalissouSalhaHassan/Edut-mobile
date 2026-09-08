@@ -144,7 +144,7 @@ class _DriverGpsBeaconScreenState extends State<DriverGpsBeaconScreen> {
                 color: const Color(0xFF1E293B),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: _isBroadcasting ? AppColors.success.withOpacity(0.5) : Colors.white10,
+                  color: _isBroadcasting ? AppColors.success.withValues(alpha: 0.5) : Colors.white10,
                 ),
               ),
               child: Column(
@@ -153,8 +153,8 @@ class _DriverGpsBeaconScreenState extends State<DriverGpsBeaconScreen> {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: _isBroadcasting
-                          ? AppColors.success.withOpacity(0.15)
-                          : AppColors.slate600.withOpacity(0.15),
+                          ? AppColors.success.withValues(alpha: 0.15)
+                          : AppColors.slate600.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(

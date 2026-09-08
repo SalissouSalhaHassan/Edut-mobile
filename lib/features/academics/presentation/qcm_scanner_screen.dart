@@ -47,6 +47,11 @@ class _QcmScannerScreenState extends State<QcmScannerScreen> {
 
       final res = await _apiClient.postJson('/api/mobile/ai/qcm-grader', {
         'totalQuestions': 20,
+        'subjectName': widget.subjectName,
+        'className': widget.className,
+        'studentName': widget.studentName,
+        'saveToDatabase': true,
+        'notifyParent': true,
       });
 
       if (res['success'] == true && res['data'] != null) {
@@ -55,6 +60,16 @@ class _QcmScannerScreenState extends State<QcmScannerScreen> {
           _hasResult = true;
           _isScanning = false;
         });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Note enregistrée dans le bulletin & Notification envoyée au parent !'),
+              backgroundColor: Color(0xFF10B981),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
       } else {
         throw Exception(res['error'] ?? 'Échec de l\'analyse optique');
       }

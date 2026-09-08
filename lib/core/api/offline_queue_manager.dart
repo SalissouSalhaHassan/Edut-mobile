@@ -67,6 +67,7 @@ class OfflineQueueManager {
         await Hive.openBox(boxDeadLetterName);
       }
       _updatePendingCount();
+      await purgeOldDeadLetterOperations(retentionDays: 7);
       debugPrint("✅ OfflineQueueManager: Queue Hive box initialized successfully.");
     } catch (e) {
       debugPrint("❌ OfflineQueueManager Initialization Error: $e");
@@ -211,6 +212,41 @@ class OfflineQueueManager {
       }
     } catch (e) {
       debugPrint("❌ Error clearing queue: $e");
+    }
+  }
+
+  /// Automatically purge DLQ records older than retentionDays (default: 7 days)
+  Future<int> purgeOldDeadLetterOperations({int retentionDays = 7}) async {
+    try {
+      if (!Hive.isBoxOpen(boxDeadLetterName)) return 0;
+      final box = Hive.box(boxDeadLetterName);
+      final cutoff = DateTime.now().subtract(Duration(days: retentionDays));
+
+      final keysToDelete = <dynamic>[];
+      for (var key in box.keys) {
+        final val = box.get(key);
+        if (val is Map) {
+          final timestampStr = val['timestamp'] as String?;
+          if (timestampStr != null) {
+            final opDate = DateTime.tryParse(timestampStr);
+            if (opDate != null && opDate.isBefore(cutoff)) {
+              keysToDelete.add(key);
+            }
+          }
+        }
+      }
+
+      for (var k in keysToDelete) {
+        await box.delete(k);
+      }
+
+      if (keysToDelete.isNotEmpty) {
+        debugPrint("🧹 OfflineQueueManager: Purged ${keysToDelete.length} DLQ records older than $retentionDays days.");
+      }
+      return keysToDelete.length;
+    } catch (e) {
+      debugPrint("❌ Error purging old DLQ operations: $e");
+      return 0;
     }
   }
 }

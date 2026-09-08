@@ -30,6 +30,7 @@ import '../../features/discipline/data/discipline_repository.dart';
 import '../../features/admissions/data/admissions_repository.dart';
 import '../../features/transport/data/transport_repository.dart';
 import '../../features/canteen/data/canteen_repository.dart';
+import '../../features/security/data/gate_security_repository.dart';
 import '../services/push_notification_service.dart';
 import '../services/inactivity_lock_service.dart';
 import '../services/biometric_auth_service.dart';
@@ -184,5 +185,9 @@ Future<void> setupLocator() async {
 
   locator.registerLazySingleton<InactivityLockService>(
     () => InactivityLockService(),
+  );
+
+  locator.registerLazySingleton<GateSecurityRepository>(
+    () => GateSecurityRepository(apiClient: locator<MobileApiClient>()),
   );
 }

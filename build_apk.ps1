@@ -4,6 +4,9 @@ Write-Host "===================================================" -ForegroundColo
 
 Set-Location -Path "C:\Users\User\Desktop\Edut\mobile"
 
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:PATH = "$env:JAVA_HOME\bin;" + $env:PATH
+
 $flutterCmd = "flutter"
 if (Test-Path "C:\src\flutter\bin\flutter.bat") {
     $flutterCmd = "C:\src\flutter\bin\flutter.bat"

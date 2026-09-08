@@ -54,7 +54,6 @@ import '../../features/pedagogie/presentation/cahier_textes_screen.dart';
 import '../../features/pedagogie/presentation/planification_screen.dart';
 import '../../features/pedagogie/presentation/progression_screen.dart';
 import '../../features/health/presentation/school_clinic_screen.dart';
-import '../../features/library/presentation/past_exams_screen.dart';
 import '../../features/teacher/presentation/teacher_cockpit_screen.dart';
 import '../../features/teacher/presentation/ai_exam_generator_screen.dart';
 import '../../features/teacher/presentation/ai_fiche_pedagogique_screen.dart';
@@ -64,10 +63,10 @@ import '../../features/teacher/presentation/teacher_self_service_hr_screen.dart'
 import '../../features/teacher/presentation/teacher_comm_protection_screen.dart';
 import '../../features/hr/presentation/director_cockpit_screen.dart';
 import '../../features/ai/presentation/exam_predictor_screen.dart';
-import '../../features/family/presentation/family_transport_screen.dart';
 import '../../features/finance/presentation/smart_fee_reminders_screen.dart';
 import '../../features/sync/presentation/offline_sync_screen.dart';
 import '../../features/security/presentation/connected_devices_screen.dart';
+import '../../features/security/presentation/gate_scanner_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
 
@@ -584,6 +583,14 @@ class AppRouter {
       GoRoute(
         path: '/connected-devices',
         builder: (context, state) => const ConnectedDevicesScreen(),
+      ),
+      GoRoute(
+        path: '/security/gate-scanner',
+        builder: (context, state) => const GateScannerScreen(),
+      ),
+      GoRoute(
+        path: '/gate-scanner',
+        builder: (context, state) => const GateScannerScreen(),
       ),
       GoRoute(
         path: '/library',
