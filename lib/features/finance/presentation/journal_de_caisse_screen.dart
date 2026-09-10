@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -398,17 +399,15 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
       final bytes = Uint8List.fromList(utf8.encode(buffer.toString()));
       final fileName = 'journal_de_caisse_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
 
-      await SharePlus.instance.share(
-        ShareParams(
-          text: 'Export CSV — Journal de Caisse',
-          files: [
-            XFile.fromData(
-              bytes,
-              mimeType: 'text/csv',
-              name: fileName,
-            ),
-          ],
-        ),
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            bytes,
+            mimeType: 'text/csv',
+            name: fileName,
+          ),
+        ],
+        text: 'Export CSV — Journal de Caisse',
       );
     } catch (e) {
       if (mounted) {
