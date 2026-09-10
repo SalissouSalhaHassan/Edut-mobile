@@ -471,8 +471,24 @@ class OfficialBulletinPdfGenerator {
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          buildBackground: (context) {
+            if (leftLogoImage != null) {
+              return pw.FullPage(
+                ignoreMargins: true,
+                child: pw.Center(
+                  child: pw.Opacity(
+                    opacity: 0.12,
+                    child: pw.Image(leftLogoImage, width: 380, height: 380),
+                  ),
+                ),
+              );
+            }
+            return pw.SizedBox();
+          },
+        ),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
