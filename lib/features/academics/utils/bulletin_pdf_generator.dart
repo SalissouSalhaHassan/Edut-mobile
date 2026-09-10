@@ -699,6 +699,11 @@ class OfficialBulletinPdfGenerator {
     PdfColor bannerColor;
 
     switch (stage) {
+      case EducationalStage.maternelle:
+        title = 'CARNET DE SUIVI & ÉVALUATIONS (MATERNELLE)';
+        subTitle = 'PÉRIODE : ${period.toUpperCase()}';
+        bannerColor = PdfColors.pink800;
+        break;
       case EducationalStage.primaire:
         title = 'CARNET DE NOTES & COMPÉTENCES (PRIMAIRE)';
         subTitle = 'PÉRIODE : ${period.toUpperCase()}';
@@ -828,6 +833,7 @@ class OfficialBulletinPdfGenerator {
   // ───────────────────────────────────────────────────────────────────────────
   static pw.Widget _buildGradesTable(EducationalStage stage, List<Map<String, dynamic>> grades) {
     switch (stage) {
+      case EducationalStage.maternelle:
       case EducationalStage.primaire:
         return _buildPrimaireTable(grades);
       case EducationalStage.college:
@@ -1093,7 +1099,10 @@ class OfficialBulletinPdfGenerator {
     String sig1 = 'Le Maître / Enseignant';
     String sig2 = 'Le Directeur de l\'École';
 
-    if (stage == EducationalStage.college) {
+    if (stage == EducationalStage.maternelle) {
+      sig1 = 'L\'Éducateur / Éducatrice';
+      sig2 = 'La Direction de l\'Établissement';
+    } else if (stage == EducationalStage.college) {
       sig1 = 'Le Professeur Principal';
       sig2 = 'Le Principal du Collège';
     } else if (stage == EducationalStage.lycee) {
