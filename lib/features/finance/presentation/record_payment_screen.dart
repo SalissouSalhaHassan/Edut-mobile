@@ -131,6 +131,17 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
           );
 
           final student = widget.feeData['students'] as Map<String, dynamic>? ?? {};
+
+          Map<String, dynamic>? headerConfig;
+          try {
+            final headerRes = await _repository.getDocumentHeader(_schoolId);
+            if (headerRes['success'] == true) {
+              headerConfig = headerRes['data'] as Map<String, dynamic>?;
+            }
+          } catch (e) {
+            debugPrint("Error fetching document header: $e");
+          }
+
           final paymentRecord = {
             'id': res['paymentId'] ?? DateTime.now().millisecondsSinceEpoch,
             'amount': amount,
@@ -148,13 +159,16 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
           await ReceiptGenerator.showFormatAndActionDialog(
             context: context,
             student: {
+              ...student,
               'nom_etudiant': student['nom_etudiant'] ?? 'Élève',
-              'num_admission': student['num_admission'] ?? '—',
+              'num_admission': student['num_admission'] ?? student['matricule'] ?? '—',
               'classe': student['classe'] ?? '—',
+              'educational_level': student['educational_level'] ?? student['educationalLevel'] ?? student['niveau'],
             },
             payment: paymentRecord,
             totalExpected: _expected,
             remainingBalance: _newBalance,
+            headerConfig: headerConfig,
           );
 
           if (mounted) {

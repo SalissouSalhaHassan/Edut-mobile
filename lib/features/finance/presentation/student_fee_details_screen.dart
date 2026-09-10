@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../data/finance_repository.dart';
 import '../utils/receipt_generator.dart';
+import '../../../core/utils/educational_level_helper.dart';
 
 class StudentFeeDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> feeData;
@@ -164,8 +165,16 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     final balFmt = balance.toStringAsFixed(0);
     final refStr = ref.toString().isNotEmpty ? " (Réf: $ref)" : "";
 
+    final stage = EducationalLevelHelper.inferEducationalStage(
+      educationalLevel: student['educational_level']?.toString() ?? student['educationalLevel']?.toString(),
+      className: student['classe']?.toString(),
+    );
+    final isUniv = stage == EducationalStage.universite;
+    final recipient = isUniv ? "Cher(e) Étudiant(e) / Parent" : "Cher Parent";
+    final beneficiary = isUniv ? "l'étudiant(e)" : "l'élève";
+
     final text = "✅ *Confirmation de Paiement - Edut Pro*\n\n"
-        "Cher Parent, nous confirmons la réception d'un versement de *$amountFmt FCFA* pour l'élève *$name*$refStr.\n\n"
+        "$recipient, nous confirmons la réception d'un versement de *$amountFmt FCFA* pour $beneficiary *$name*$refStr.\n\n"
         "Solde restant : *$balFmt FCFA*.\n\n"
         "Merci pour votre confiance.";
 

@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/educational_level_helper.dart';
 
 class ReceiptGenerator {
   static Future<Uint8List> generatePdfBytes({
@@ -27,8 +28,25 @@ class ReceiptGenerator {
 
     final studentName = student['nom_etudiant'] ?? student['name'] ?? 'Élève';
     final admissionNo = student['num_admission'] ?? student['matricule'] ?? '—';
-    final className = student['classe'] ?? '—';
+    final className = student['classe'] ?? student['className'] ?? '—';
+    final rawLevel = student['educational_level']?.toString() ??
+        student['educationalLevel']?.toString() ??
+        student['niveau']?.toString() ??
+        '';
     final schoolYear = student['session_name'] ?? student['school_year'] ?? '2024–2025';
+
+    final stage = EducationalLevelHelper.inferEducationalStage(
+      educationalLevel: rawLevel,
+      className: className,
+      sectionName: student['section']?.toString(),
+      filiere: student['filiere']?.toString(),
+    );
+
+    // Resolve matching level profile from headerConfig
+    final resolvedHeader = EducationalLevelHelper.getActiveLevelHeaderConfig(
+      headerConfig,
+      targetLevel: rawLevel.isNotEmpty ? rawLevel : className,
+    );
 
     final paymentId = payment['id'] ?? 1;
     final totalPaid = totalExpected - remainingBalance > 0
@@ -48,7 +66,13 @@ class ReceiptGenerator {
 
     // Decode logos
     pw.MemoryImage? centerLogoImage;
-    final logoSource = headerConfig?['centerLogo'] ?? headerConfig?['leftLogo'] ?? headerConfig?['logoPath'];
+    final logoSource = resolvedHeader['centerLogo'] ??
+        resolvedHeader['leftLogo'] ??
+        resolvedHeader['customLogo'] ??
+        resolvedHeader['logoPath'] ??
+        headerConfig?['centerLogo'] ??
+        headerConfig?['leftLogo'] ??
+        headerConfig?['logoPath'];
     if (logoSource != null && logoSource.toString().startsWith('data:image/')) {
       try {
         final base64Str = logoSource.toString().split(',').last;
@@ -71,19 +95,36 @@ class ReceiptGenerator {
           const lightBorder = PdfColor.fromInt(0xFFE2E8F0);
           const lightBg = PdfColor.fromInt(0xFFF8FAFC);
 
-          // 1. Header layout
-          final country = headerConfig?['country'] ?? 'RÉPUBLIQUE DU NIGER';
-          final ministry = headerConfig?['ministry'] ?? 'MINISTÈRE DE L\'ÉDUCATION NATIONALE';
-          final school = headerConfig?['schoolName'] ?? 'ÉCOLE EXCELLENCE';
-          final service = headerConfig?['service'] ?? 'Service de la Scolarité';
-          final phone = headerConfig?['schoolPhone'] ?? '+227 90 12 34 56';
-          final email = headerConfig?['schoolEmail'] ?? 'contact@edutacademy.ne';
+          // 1. Header layout (level-aware)
+          final country = resolvedHeader['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
+          final ministry = resolvedHeader['ministry']?.toString() ??
+              EducationalLevelHelper.getDefaultMinistry(stage, isArabic: false);
+          final school = resolvedHeader['schoolName']?.toString() ??
+              (stage == EducationalStage.universite ? 'UNIVERSITÉ EXCELLENCE' : 'ÉCOLE EXCELLENCE');
+          final service = resolvedHeader['service']?.toString() ??
+              EducationalLevelHelper.getDefaultService(stage, isArabic: false);
+          final phone = resolvedHeader['phone']?.toString() ??
+              resolvedHeader['schoolPhone']?.toString() ??
+              '+227 90 12 34 56';
+          final email = resolvedHeader['email']?.toString() ??
+              resolvedHeader['schoolEmail']?.toString() ??
+              'contact@edutacademy.ne';
 
-          final countryAr = headerConfig?['countryAr'] ?? 'جمهورية النيجر';
-          final ministryAr = headerConfig?['ministryAr'] ?? 'وزارة التربية الوطنية';
-          final schoolAr = headerConfig?['schoolNameAr'] ?? 'ÉCOLE EXCELLENCE';
-          final phoneAr = headerConfig?['schoolPhoneAr'] ?? 'الهاتف: 56 34 12 90 227+';
-          final emailAr = headerConfig?['schoolEmailAr'] ?? 'البريد: contact@edutacademy.ne';
+          final countryAr = resolvedHeader['countryAr']?.toString() ?? 'جمهورية النيجر';
+          final ministryAr = resolvedHeader['ministryAr']?.toString() ??
+              EducationalLevelHelper.getDefaultMinistry(stage, isArabic: true);
+          final schoolAr = resolvedHeader['schoolNameAr']?.toString() ?? school;
+          final serviceAr = resolvedHeader['serviceAr']?.toString() ??
+              EducationalLevelHelper.getDefaultService(stage, isArabic: true);
+          final phoneAr = resolvedHeader['phoneAr']?.toString() ??
+              resolvedHeader['schoolPhoneAr']?.toString() ??
+              'الهاتف: 56 34 12 90 227+';
+          final emailAr = resolvedHeader['emailAr']?.toString() ??
+              resolvedHeader['schoolEmailAr']?.toString() ??
+              'البريد: contact@edutacademy.ne';
+
+          final receiptTitle = EducationalLevelHelper.getReceiptTitle(stage);
+          final receiptSubtitle = EducationalLevelHelper.getReceiptSubtitle(stage);
 
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -131,6 +172,7 @@ class ReceiptGenerator {
                         pw.Text(ministryAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 7, color: greyColor)),
                         pw.SizedBox(height: 1),
                         pw.Text(schoolAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 7 : 8.5, color: darkNavy)),
+                        if (serviceAr.isNotEmpty) pw.Text(serviceAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
                         pw.Text(phoneAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
                         pw.Text(emailAr, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5.5 : 6.5, color: greyColor)),
                       ],
@@ -141,7 +183,7 @@ class ReceiptGenerator {
 
               pw.SizedBox(height: isA5 ? 6 : 8),
 
-              // Title Banner: REÇU DE PAIEMENT + ORIGINAL Badge
+              // Title Banner: Stage-Aware REÇU DE PAIEMENT + ORIGINAL Badge
               pw.Container(
                 padding: pw.EdgeInsets.symmetric(horizontal: isA5 ? 8 : 12, vertical: isA5 ? 5 : 7),
                 decoration: const pw.BoxDecoration(
@@ -155,19 +197,19 @@ class ReceiptGenerator {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'REÇU DE PAIEMENT',
+                          receiptTitle,
                           style: pw.TextStyle(
                             font: amiriBold,
-                            fontSize: isA5 ? 10 : 12,
+                            fontSize: isA5 ? 9.5 : 11.5,
                             color: PdfColors.white,
                             letterSpacing: 0.8,
                           ),
                         ),
                         pw.Text(
-                          'Preuve officielle de paiement des frais scolaires',
+                          receiptSubtitle,
                           style: pw.TextStyle(
                             font: amiriFont,
-                            fontSize: isA5 ? 6 : 7,
+                            fontSize: isA5 ? 5.5 : 6.5,
                             color: const PdfColor.fromInt(0xFFCBD5E1),
                           ),
                         ),
@@ -234,7 +276,7 @@ class ReceiptGenerator {
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
                           pw.Text(
-                            'INFORMATIONS ÉLÈVE',
+                            EducationalLevelHelper.getReceiptStudentSectionTitle(stage),
                             style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6.5 : 7.5, color: primaryIndigo),
                           ),
                           pw.SizedBox(height: 2),
@@ -243,11 +285,11 @@ class ReceiptGenerator {
                             style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 9.5 : 11, color: darkNavy),
                           ),
                           pw.SizedBox(height: 3),
-                          _buildDetailRow('Classe', className, amiriFont, amiriBold, isA5: isA5),
+                          _buildDetailRow(EducationalLevelHelper.getReceiptClassLabel(stage), className, amiriFont, amiriBold, isA5: isA5),
                           pw.SizedBox(height: 1.5),
                           _buildDetailRow('Matricule', admissionNo, amiriFont, amiriBold, isA5: isA5),
                           pw.SizedBox(height: 1.5),
-                          _buildDetailRow('Année Scolaire', schoolYear, amiriFont, amiriBold, isA5: isA5),
+                          _buildDetailRow(EducationalLevelHelper.getReceiptYearLabel(stage), schoolYear, amiriFont, amiriBold, isA5: isA5),
                         ],
                       ),
                     ),
@@ -276,7 +318,7 @@ class ReceiptGenerator {
                             style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 9.5 : 11, color: darkNavy),
                           ),
                           pw.SizedBox(height: 3),
-                          _buildDetailRow('Total Attendu (Frais annuels)', _formatCfa(totalExpected), amiriFont, amiriBold, isA5: isA5),
+                          _buildDetailRow(EducationalLevelHelper.getReceiptExpectedFeeLabel(stage), _formatCfa(totalExpected), amiriFont, amiriBold, isA5: isA5),
                           pw.SizedBox(height: 1.5),
                           _buildDetailRow('Total Déjà Payé', _formatCfa(totalPaid), amiriFont, amiriBold, isA5: isA5),
                           pw.SizedBox(height: 2.5),
@@ -399,7 +441,7 @@ class ReceiptGenerator {
                         children: [
                           pw.Text('CERTIFICATION', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: royalBlue)),
                           pw.Text(
-                            'Nous certifions que le montant indiqué ci-dessus a été reçu de l\'élève mentionné.',
+                            EducationalLevelHelper.getReceiptCertificationText(stage),
                             style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor),
                           ),
                           pw.Center(
@@ -430,7 +472,7 @@ class ReceiptGenerator {
                         ),
                         child: pw.Center(
                           child: pw.Text(
-                            '★ ${school.toUpperCase()} ★\nSERVICE SCOLARITÉ',
+                            EducationalLevelHelper.getReceiptStampText(stage, school),
                             textAlign: pw.TextAlign.center,
                             style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 4 : 5, color: const PdfColor(0.06, 0.09, 0.16, 0.45)),
                           ),
@@ -670,9 +712,20 @@ class ReceiptGenerator {
       pageFormat: pageFormat,
     );
 
+    final rawLevel = student['educational_level']?.toString() ??
+        student['educationalLevel']?.toString() ??
+        student['niveau']?.toString() ??
+        '';
+    final className = student['classe'] ?? student['className'] ?? '';
+    final stage = EducationalLevelHelper.inferEducationalStage(
+      educationalLevel: rawLevel,
+      className: className,
+    );
+    final prefix = stage == EducationalStage.universite ? 'recu_universitaire' : 'recu_scolaire';
+
     await Printing.layoutPdf(
       onLayout: (format) async => bytes,
-      name: 'recu_paiement_REC-$paymentId.pdf',
+      name: '${prefix}_REC-$paymentId.pdf',
     );
   }
 
@@ -696,14 +749,29 @@ class ReceiptGenerator {
       pageFormat: pageFormat,
     );
 
+    final rawLevel = student['educational_level']?.toString() ??
+        student['educationalLevel']?.toString() ??
+        student['niveau']?.toString() ??
+        '';
+    final className = student['classe'] ?? student['className'] ?? '';
+    final stage = EducationalLevelHelper.inferEducationalStage(
+      educationalLevel: rawLevel,
+      className: className,
+    );
+    final isUniv = stage == EducationalStage.universite;
+    final prefix = isUniv ? 'recu_universitaire' : 'recu_scolaire';
+    final shareText = isUniv
+        ? 'Reçu officiel de paiement des droits universitaires'
+        : 'Reçu officiel de paiement des frais scolaires';
+
     await SharePlus.instance.share(
       ShareParams(
-        text: 'Recu de paiement scolaire',
+        text: shareText,
         files: [
           XFile.fromData(
             bytes,
             mimeType: 'application/pdf',
-            name: 'recu_paiement_REC-$paymentId.pdf',
+            name: '${prefix}_REC-$paymentId.pdf',
           ),
         ],
       ),

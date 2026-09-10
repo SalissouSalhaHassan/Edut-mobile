@@ -28,6 +28,7 @@ import 'sms_inquiry_helper_dialog.dart';
 import 'mobile_money_payment_dialog.dart';
 import '../../academics/utils/bulletin_pdf_generator.dart';
 import '../../academics/utils/timetable_pdf_generator.dart';
+import '../../finance/data/finance_repository.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -1080,6 +1081,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
 
       final gradesToUse = filteredGrades.isNotEmpty ? filteredGrades : _grades;
 
+      Map<String, dynamic>? headerConfig;
+      if (_schoolId != null) {
+        try {
+          final headerRes = await locator<FinanceRepository>().getDocumentHeader(_schoolId!);
+          if (headerRes['success'] == true) {
+            headerConfig = headerRes['data'] as Map<String, dynamic>?;
+          }
+        } catch (e) {
+          debugPrint("Error fetching document header for report card: $e");
+        }
+      }
+
       final pdfBytes = await OfficialBulletinPdfGenerator.generateBulletinBytes(
         student: _student.isNotEmpty ? _student : {
           'nom_etudiant': _studentName,
@@ -1090,6 +1103,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         summary: _gradeSummary,
         period: period,
         sessionName: _selectedSessionName.isNotEmpty ? _selectedSessionName : '2024-2025',
+        headerConfig: headerConfig,
       );
 
       await Printing.layoutPdf(

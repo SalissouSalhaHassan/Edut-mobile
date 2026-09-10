@@ -6,71 +6,24 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../../core/utils/educational_level_helper.dart';
 
-enum EducationalStage {
-  primaire,
-  college,
-  lycee,
-  universite,
-}
+export '../../../core/utils/educational_level_helper.dart' show EducationalStage;
 
 class OfficialBulletinPdfGenerator {
   /// Detect the educational stage from student data or class name
   static EducationalStage detectStage({
     String? educationalLevel,
     String? className,
+    String? sectionName,
+    String? filiere,
   }) {
-    final lvl = (educationalLevel ?? '').toLowerCase().trim();
-    final cls = (className ?? '').toLowerCase().trim();
-
-    // 1. Check University / Higher Ed
-    if (lvl.contains('universit') ||
-        lvl.contains('licence') ||
-        lvl.contains('master') ||
-        lvl.contains('doctorat') ||
-        lvl.contains('supérieur') ||
-        lvl.contains('superieur') ||
-        cls.startsWith('l1') ||
-        cls.startsWith('l2') ||
-        cls.startsWith('l3') ||
-        cls.startsWith('m1') ||
-        cls.startsWith('m2') ||
-        cls.contains('licence') ||
-        cls.contains('master')) {
-      return EducationalStage.universite;
-    }
-
-    // 2. Check Lycée (High School)
-    if (lvl.contains('lycée') ||
-        lvl.contains('lycee') ||
-        lvl.contains('secondaire') ||
-        lvl.contains('second cycle') ||
-        cls.contains('2nde') ||
-        cls.contains('seconde') ||
-        cls.contains('1ère') ||
-        cls.contains('premiere') ||
-        cls.contains('tle') ||
-        cls.contains('terminale')) {
-      return EducationalStage.lycee;
-    }
-
-    // 3. Check Primary / Kindergarten
-    if (lvl.contains('primaire') ||
-        lvl.contains('maternelle') ||
-        lvl.contains('elementaire') ||
-        lvl.contains('élémentaire') ||
-        cls.contains('ci') ||
-        cls.contains('cp') ||
-        cls.contains('ce1') ||
-        cls.contains('ce2') ||
-        cls.contains('cm1') ||
-        cls.contains('cm2') ||
-        cls.contains('maternelle')) {
-      return EducationalStage.primaire;
-    }
-
-    // 4. Default to Collège (Middle School)
-    return EducationalStage.college;
+    return EducationalLevelHelper.inferEducationalStage(
+      educationalLevel: educationalLevel,
+      className: className,
+      sectionName: sectionName,
+      filiere: filiere,
+    );
   }
 
   /// Generate Official Multi-Stage Bulletin PDF
@@ -85,7 +38,6 @@ class OfficialBulletinPdfGenerator {
     final pdf = pw.Document();
 
     // Fonts for Unicode / Arabic
-    final amiriRegular = await PdfGoogleFonts.amiriRegular();
     final amiriBold = await PdfGoogleFonts.amiriBold();
 
     final studentName = student['nom_etudiant']?.toString() ?? 'Sans Nom';
@@ -98,26 +50,39 @@ class OfficialBulletinPdfGenerator {
     final birthPlace = student['lieu_naissance']?.toString() ?? '-';
     final gender = student['sexe']?.toString() ?? 'M';
 
-    final stage = detectStage(educationalLevel: rawLevel, className: className);
+    final stage = detectStage(
+      educationalLevel: rawLevel,
+      className: className,
+      sectionName: student['section']?.toString(),
+      filiere: student['filiere']?.toString(),
+    );
+
+    // Resolve matching level profile from headerConfig
+    final resolvedHeader = EducationalLevelHelper.getActiveLevelHeaderConfig(
+      headerConfig,
+      targetLevel: rawLevel.isNotEmpty ? rawLevel : className,
+    );
 
     // School Header Logos
     pw.MemoryImage? leftLogoImage;
-    if (headerConfig?['leftLogo'] != null &&
-        headerConfig!['leftLogo'].toString().startsWith('data:image/')) {
+    final logoSource = resolvedHeader['leftLogo'] ??
+        resolvedHeader['centerLogo'] ??
+        resolvedHeader['customLogo'] ??
+        headerConfig?['leftLogo'];
+    if (logoSource != null && logoSource.toString().startsWith('data:image/')) {
       try {
-        final base64Str = headerConfig['leftLogo'].toString().split(',').last;
+        final base64Str = logoSource.toString().split(',').last;
         leftLogoImage = pw.MemoryImage(base64.decode(base64Str));
       } catch (_) {}
     }
 
-    final schoolName = headerConfig?['schoolName']?.toString() ?? 'ÉCOLE EXCELLENCE';
-    final country = headerConfig?['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
-    final ministry = headerConfig?['ministry']?.toString() ??
-        (stage == EducationalStage.universite
-            ? 'MINISTÈRE DE L\'ENSEIGNEMENT SUPÉRIEUR ET DE LA RECHERCHE'
-            : 'MINISTÈRE DE L\'ÉDUCATION NATIONALE');
-    final address = headerConfig?['address']?.toString() ?? '';
-    final phone = headerConfig?['phone']?.toString() ?? '';
+    final schoolName = resolvedHeader['schoolName']?.toString() ??
+        (stage == EducationalStage.universite ? 'UNIVERSITÉ EXCELLENCE' : 'ÉCOLE EXCELLENCE');
+    final country = resolvedHeader['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
+    final ministry = resolvedHeader['ministry']?.toString() ??
+        EducationalLevelHelper.getDefaultMinistry(stage);
+    final address = resolvedHeader['address']?.toString() ?? '';
+    final phone = resolvedHeader['phone']?.toString() ?? '';
 
     if (stage == EducationalStage.universite) {
       return _generateUniversityReleveBytes(
@@ -126,7 +91,7 @@ class OfficialBulletinPdfGenerator {
         summary: summary,
         period: period,
         sessionName: sessionName,
-        headerConfig: headerConfig,
+        headerConfig: resolvedHeader,
         amiriBold: amiriBold,
       );
     }
@@ -213,26 +178,35 @@ class OfficialBulletinPdfGenerator {
         student['matricule']?.toString() ??
         'N/A';
     final className = student['classe']?.toString() ?? 'Classe';
+    final rawLevel = student['educational_level']?.toString() ?? '';
     final rawDob = student['date_naissance']?.toString() ?? '-';
     final rawPob = student['lieu_naissance']?.toString() ?? '-';
     final birthInfo = rawPob != '-' ? '$rawDob à $rawPob' : rawDob;
 
+    final resolvedHeader = EducationalLevelHelper.getActiveLevelHeaderConfig(
+      headerConfig,
+      targetLevel: rawLevel.isNotEmpty ? rawLevel : className,
+    );
+
     // School Header Logos
     pw.MemoryImage? leftLogoImage;
-    if (headerConfig?['leftLogo'] != null &&
-        headerConfig!['leftLogo'].toString().startsWith('data:image/')) {
+    final logoSource = resolvedHeader['leftLogo'] ??
+        resolvedHeader['centerLogo'] ??
+        resolvedHeader['customLogo'] ??
+        headerConfig?['leftLogo'];
+    if (logoSource != null && logoSource.toString().startsWith('data:image/')) {
       try {
-        final base64Str = headerConfig['leftLogo'].toString().split(',').last;
+        final base64Str = logoSource.toString().split(',').last;
         leftLogoImage = pw.MemoryImage(base64.decode(base64Str));
       } catch (_) {}
     }
 
-    final schoolName = headerConfig?['schoolName']?.toString() ?? 'UNIVERSITÉ EXCELLENCE';
-    final country = headerConfig?['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
-    final ministry = headerConfig?['ministry']?.toString() ??
-        'MINISTÈRE DE L\'ENSEIGNEMENT SUPÉRIEUR ET DE LA RECHERCHE';
-    final address = headerConfig?['address']?.toString() ?? '';
-    final phone = headerConfig?['phone']?.toString() ?? '';
+    final schoolName = resolvedHeader['schoolName']?.toString() ?? 'UNIVERSITÉ EXCELLENCE';
+    final country = resolvedHeader['country']?.toString() ?? 'RÉPUBLIQUE DU NIGER';
+    final ministry = resolvedHeader['ministry']?.toString() ??
+        EducationalLevelHelper.getDefaultMinistry(EducationalStage.universite);
+    final address = resolvedHeader['address']?.toString() ?? '';
+    final phone = resolvedHeader['phone']?.toString() ?? '';
 
     // Split grades into Semestre 1 and Semestre 2
     final s1Grades = <Map<String, dynamic>>[];
@@ -1053,6 +1027,7 @@ class OfficialBulletinPdfGenerator {
     final totalCoef = (summary['totalCoef'] as num?)?.toInt() ?? 1;
     final rank = summary['rank']?.toString() ?? '1er';
     final classAvg = (summary['classAvg'] as num?)?.toDouble() ?? 12.0;
+    final pointsInfo = totalPoints > 0 ? ' | Total: ${totalPoints.toStringAsFixed(1)} (Coef: $totalCoef)' : '';
 
     String mention = 'Passable';
     if (avg >= 16) {
@@ -1090,7 +1065,7 @@ class OfficialBulletinPdfGenerator {
                 ],
               ),
               pw.SizedBox(height: 3),
-              pw.Text('Moyenne de la classe : ${classAvg.toStringAsFixed(2)} / 20 | Rang : $rank', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+              pw.Text('Moyenne de la classe : ${classAvg.toStringAsFixed(2)} / 20 | Rang : $rank$pointsInfo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
             ],
           ),
           pw.Column(

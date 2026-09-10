@@ -179,13 +179,16 @@ class _FamilyFinanceScreenState extends State<FamilyFinanceScreen> {
     final studentIdStr = _studentId != null ? 'CARD-EDUT-$_studentId' : '—';
 
     if (!mounted) return;
+    final feeStudent = fee['students'] as Map<String, dynamic>? ?? {};
     await ReceiptGenerator.showFormatAndActionDialog(
       context: context,
       student: {
+        ...feeStudent,
         'nom_etudiant': _studentName,
         'classe': _studentClass,
         'num_admission': studentIdStr,
-        'session_name': fee['session_id'] != null ? 'Session ${fee['session_id']}' : '2024–2025',
+        'educational_level': feeStudent['educational_level'] ?? fee['educational_level'] ?? '',
+        'session_name': fee['session_name'] ?? (fee['session_id'] != null ? 'Session ${fee['session_id']}' : '2024–2025'),
       },
       payment: payment,
       totalExpected: (fee['total_expected'] as num?)?.toDouble() ?? (_summary['totalExpected'] as num?)?.toDouble() ?? 0,
