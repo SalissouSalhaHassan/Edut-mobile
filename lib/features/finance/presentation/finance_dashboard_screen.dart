@@ -337,6 +337,11 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.receipt_long_rounded, color: Color(0xFF10B981)),
+            onPressed: () => context.push('/finance/journal'),
+            tooltip: "Journal de caisse & Encaissements",
+          ),
+          IconButton(
             icon: const Icon(Icons.analytics_rounded, color: Color(0xFF6366F1)),
             onPressed: () => context.push('/finance/forecast'),
             tooltip: "Prévisions de Trésorerie & Cashflow",
@@ -482,6 +487,36 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                 child: _buildMetricItem("Solde/Dettes", debts, const Color(0xFFFCA5A5)),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: () => context.push('/finance/journal'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(35),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withAlpha(55)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.receipt_long_rounded, color: Color(0xFF34D399), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    "Ouvrir le Journal de Caisse & Rapports",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 12),
+                ],
+              ),
+            ),
           ),
         ],
       ),

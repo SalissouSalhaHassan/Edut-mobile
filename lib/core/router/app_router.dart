@@ -28,6 +28,7 @@ import '../../features/academics/presentation/ai_timetable_generator_sheet.dart'
 import '../../features/library/presentation/past_exams_screen.dart';
 import '../../features/academics/presentation/qcm_scanner_screen.dart';
 import '../../features/finance/presentation/finance_dashboard_screen.dart';
+import '../../features/finance/presentation/journal_de_caisse_screen.dart';
 import '../../features/finance/presentation/cashflow_forecast_screen.dart';
 import '../../features/finance/presentation/student_fee_details_screen.dart';
 import '../../features/finance/presentation/record_payment_screen.dart';
@@ -361,6 +362,13 @@ class AppRouter {
         builder: (context, state) => const GuardedScreen(
           permission: AppPermissions.financeView,
           child: FinanceDashboardScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/finance/journal',
+        builder: (context, state) => const GuardedScreen(
+          permission: AppPermissions.financeView,
+          child: JournalDeCaisseScreen(),
         ),
       ),
       GoRoute(

@@ -263,6 +263,48 @@ class FinanceRepository {
     }
   }
 
+  String _journalCacheKey(int schoolId, int? sessionId) =>
+      "payments_journal_${schoolId}_${sessionId ?? 'all'}";
+
+  /// Fetch full payments journal (Journal de caisse)
+  Future<List<Map<String, dynamic>>> getPaymentsJournal({
+    required int schoolId,
+    int? sessionId,
+  }) async {
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = _journalCacheKey(schoolId, sessionId);
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("Offline Mode: Fetching payments journal from local cache.");
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxFeePayments,
+        key: cacheKey,
+      );
+    }
+
+    try {
+      final sessionParam = sessionId != null ? '&sessionId=$sessionId' : '';
+      final response = await _apiClient.getJson(
+        '/api/mobile/finance/payments?action=getPaymentsJournal&schoolId=$schoolId$sessionParam',
+      );
+
+      final list = List<Map<String, dynamic>>.from(response['data'] ?? []);
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxFeePayments,
+        key: cacheKey,
+        data: list,
+      );
+      return list;
+    } catch (e) {
+      debugPrint("Error fetching payments journal: $e");
+      return cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxFeePayments,
+        key: cacheKey,
+      );
+    }
+  }
+
   /// Record a payment and update the student fee balance
   Future<Map<String, dynamic>> recordPayment({
     required int feeId,
