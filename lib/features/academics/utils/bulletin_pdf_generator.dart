@@ -292,7 +292,7 @@ class OfficialBulletinPdfGenerator {
           ),
           pw.SizedBox(height: 3),
           pw.Table(
-            border: pw.TableBorder.all(color: borderColor, width: 0.5),
+            border: pw.TableBorder.all(color: borderColor, width: 0.8),
             columnWidths: const {
               0: pw.FlexColumnWidth(1.4),
               1: pw.FlexColumnWidth(3.8),
