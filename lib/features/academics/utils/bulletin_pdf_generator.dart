@@ -573,8 +573,8 @@ class OfficialBulletinPdfGenerator {
                     ),
                   ),
                   pw.Container(
-                    width: 44,
-                    height: 44,
+                    width: 70,
+                    height: 70,
                     child: pw.BarcodeWidget(
                       barcode: pw.Barcode.qrCode(),
                       data: qrData,
