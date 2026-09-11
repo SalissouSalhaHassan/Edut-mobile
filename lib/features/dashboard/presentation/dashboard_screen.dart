@@ -19,6 +19,7 @@ import '../../teacher/presentation/teacher_cockpit_widget.dart';
 import '../../teacher/presentation/classroom_tools_modal.dart';
 import 'dart:async';
 import '../../../core/services/push_notification_service.dart';
+import '../../../core/utils/educational_level_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -273,6 +274,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final employeeIdStr = await session.getEmployeeId();
     final employeeId = int.tryParse(employeeIdStr ?? '');
     final role = await session.getRole() ?? 'staff';
+    final userEducationalLevel = await session.getEducationalLevel();
 
     final roleStr = role.toLowerCase().trim();
     final isTeacher =
@@ -298,7 +300,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               (c) => {
                 'class_id': c['id'],
                 'subject_id': null,
-                'school_classes': {'class_name': c['class_name']},
+                'school_classes': {
+                  'class_name': c['class_name'],
+                  'educational_level': c['educational_level'],
+                  'section_name': c['section_name'],
+                },
                 'school_subjects': null,
               },
             )
@@ -308,13 +314,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       debugPrint("Error loading classes for roll: $e");
     }
 
+    // Scoping for Level Director (e.g. University, Primary, College, Lycee)
+    if (!isTeacher &&
+        userEducationalLevel != null &&
+        !EducationalLevelHelper.hasAllEducationalLevels(userEducationalLevel)) {
+      classes = classes.where((item) {
+        final className = item['school_classes']?['class_name']?.toString() ??
+            item['class_name']?.toString();
+        final educationalLevel = item['school_classes']?['school_sections']?['educational_level']?.toString() ??
+            item['school_classes']?['educational_level']?.toString() ??
+            item['educational_level']?.toString();
+        final sectionName = item['school_classes']?['school_sections']?['section_name']?.toString() ??
+            item['school_classes']?['section_name']?.toString() ??
+            item['section_name']?.toString();
+        final filiere = item['school_classes']?['filiere']?.toString() ??
+            item['filiere']?.toString();
+
+        return EducationalLevelHelper.isStudentInEducationalLevel(
+          educationalLevel: educationalLevel,
+          className: className,
+          sectionName: sectionName,
+          filiere: filiere,
+          activeLevel: userEducationalLevel,
+        );
+      }).toList();
+    }
+
     if (mounted) {
       Navigator.pop(context); // Close loading dialog
 
       if (classes.isEmpty) {
         final errorMsg = isTeacher
             ? 'Aucune classe ou matière n’est assignée à ce compte enseignant.'
-            : 'Aucune classe disponible';
+            : 'Aucune classe disponible pour votre niveau.';
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMsg)));
@@ -323,85 +355,157 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         builder: (context) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.slate300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Text(
-                      "Sélectionner une classe",
-                      style: AppTextStyles.heading3,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.4,
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: classes.length,
-                      itemBuilder: (context, index) {
-                        final item = classes[index];
-                        final classId = item['class_id'] as int;
-                        final className =
-                            item['school_classes']?['class_name'] ?? 'Classe';
-                        final subjectId = item['subject_id'] as int?;
-                        final subjectName =
-                            item['school_subjects']?['subject_name'] as String?;
+          String searchQuery = '';
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              final filteredClasses = classes.where((item) {
+                if (searchQuery.trim().isEmpty) return true;
+                final q = searchQuery.trim().toLowerCase();
+                final className = (item['school_classes']?['class_name'] ?? item['class_name'] ?? '').toString().toLowerCase();
+                final subjectName = (item['school_subjects']?['subject_name'] ?? item['subject_name'] ?? '').toString().toLowerCase();
+                return className.contains(q) || subjectName.contains(q);
+              }).toList();
 
-                        return ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: AppColors.primaryLight,
-                            child: Icon(
-                              Icons.class_,
-                              color: AppColors.primary,
-                              size: 20,
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.slate300,
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                          title: Text(className, style: AppTextStyles.bodyBold),
-                          subtitle: subjectName != null
-                              ? Text(subjectName)
-                              : const Text("Appel Général Journée"),
-                          onTap: () {
-                            Navigator.pop(context);
-                            context.push(
-                              '/attendance/student-roll',
-                              extra: {
-                                'classId': classId,
-                                'className': className,
-                                'subjectId': subjectId,
-                                'subjectName': subjectName,
-                              },
-                            );
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          "Sélectionner une classe",
+                          style: AppTextStyles.heading3,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          autofocus: false,
+                          decoration: InputDecoration(
+                            hintText: "Rechercher une classe...",
+                            hintStyle: const TextStyle(color: AppColors.slate400, fontSize: 13),
+                            prefixIcon: const Icon(Icons.search, color: AppColors.slate400, size: 20),
+                            suffixIcon: searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18, color: AppColors.slate400),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: const Color(0xFFF1F5F9),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                            ),
+                          ),
+                          onChanged: (val) {
+                            setModalState(() {
+                              searchQuery = val;
+                            });
                           },
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 10),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.45,
+                          ),
+                          child: filteredClasses.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.search_off_rounded, size: 40, color: AppColors.slate300),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        "Aucune classe trouvée",
+                                        style: TextStyle(color: AppColors.slate400, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: filteredClasses.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                  itemBuilder: (context, index) {
+                                    final item = filteredClasses[index];
+                                    final classId = item['class_id'] as int;
+                                    final className =
+                                        item['school_classes']?['class_name'] ?? 'Classe';
+                                    final subjectId = item['subject_id'] as int?;
+                                    final subjectName =
+                                        item['school_subjects']?['subject_name'] as String?;
+
+                                    return ListTile(
+                                      leading: const CircleAvatar(
+                                        backgroundColor: AppColors.primaryLight,
+                                        child: Icon(
+                                          Icons.class_,
+                                          color: AppColors.primary,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(className, style: AppTextStyles.bodyBold),
+                                      subtitle: subjectName != null
+                                          ? Text(subjectName)
+                                          : const Text("Appel Général Journée"),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        context.push(
+                                          '/attendance/student-roll',
+                                          extra: {
+                                            'classId': classId,
+                                            'className': className,
+                                            'subjectId': subjectId,
+                                            'subjectName': subjectName,
+                                          },
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       );
@@ -419,6 +523,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final employeeIdStr = await session.getEmployeeId();
     final employeeId = int.tryParse(employeeIdStr ?? '');
     final role = await session.getRole() ?? 'staff';
+    final userEducationalLevel = await session.getEducationalLevel();
 
     final roleStr2 = role.toLowerCase().trim();
     final isTeacher =
@@ -446,6 +551,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       debugPrint("Error loading classes for academics: $e");
     }
+
+    // Scoping for Level Director
+    if (!isTeacher &&
+        userEducationalLevel != null &&
+        !EducationalLevelHelper.hasAllEducationalLevels(userEducationalLevel)) {
+      classes = classes.where((item) {
+        final className = item['school_classes']?['class_name']?.toString() ??
+            item['class_name']?.toString();
+        final educationalLevel = item['school_classes']?['school_sections']?['educational_level']?.toString() ??
+            item['school_classes']?['educational_level']?.toString() ??
+            item['educational_level']?.toString();
+        final sectionName = item['school_classes']?['school_sections']?['section_name']?.toString() ??
+            item['school_classes']?['section_name']?.toString() ??
+            item['section_name']?.toString();
+        final filiere = item['school_classes']?['filiere']?.toString() ??
+            item['filiere']?.toString();
+
+        return EducationalLevelHelper.isStudentInEducationalLevel(
+          educationalLevel: educationalLevel,
+          className: className,
+          sectionName: sectionName,
+          filiere: filiere,
+          activeLevel: userEducationalLevel,
+        );
+      }).toList();
+    }
+
     if (mounted) {
       Navigator.pop(context); // Close loading dialog
 
@@ -456,7 +588,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (validClasses.isEmpty) {
         final errorMsg = isTeacher
             ? 'Aucune classe ou matière n’est assignée à ce compte enseignant.'
-            : 'Aucune classe/matière disponible';
+            : 'Aucune classe/matière disponible pour votre niveau.';
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMsg)));
@@ -465,88 +597,160 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         builder: (context) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.slate300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Text(
-                      "Sélectionner Classe & Matière",
-                      style: AppTextStyles.heading3,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.4,
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: validClasses.length,
-                      itemBuilder: (context, index) {
-                        final item = validClasses[index];
-                        final classId = item['class_id'] as int;
-                        final className =
-                            item['school_classes']?['class_name'] ?? 'Classe';
-                        final subjectId = item['subject_id'] as int;
-                        final subjectName =
-                            item['school_subjects']?['subject_name']
-                                as String? ??
-                            'Matière';
+          String searchQuery = '';
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              final filteredClasses = validClasses.where((item) {
+                if (searchQuery.trim().isEmpty) return true;
+                final q = searchQuery.trim().toLowerCase();
+                final className = (item['school_classes']?['class_name'] ?? item['class_name'] ?? '').toString().toLowerCase();
+                final subjectName = (item['school_subjects']?['subject_name'] ?? item['subject_name'] ?? '').toString().toLowerCase();
+                return className.contains(q) || subjectName.contains(q);
+              }).toList();
 
-                        return ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: AppColors.primaryLight,
-                            child: Icon(
-                              Icons.class_,
-                              color: AppColors.primary,
-                              size: 20,
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.slate300,
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                          title: Text(className, style: AppTextStyles.bodyBold),
-                          subtitle: Text(subjectName),
-                          onTap: () {
-                            Navigator.pop(context);
-                            final path = isDevoirs
-                                ? '/academics/gestion-devoirs'
-                                : '/academics/saisie-notes';
-                            context.push(
-                              path,
-                              extra: {
-                                'classId': classId,
-                                'className': className,
-                                'subjectId': subjectId,
-                                'subjectName': subjectName,
-                              },
-                            );
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          "Sélectionner Classe & Matière",
+                          style: AppTextStyles.heading3,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          autofocus: false,
+                          decoration: InputDecoration(
+                            hintText: "Rechercher classe ou matière...",
+                            hintStyle: const TextStyle(color: AppColors.slate400, fontSize: 13),
+                            prefixIcon: const Icon(Icons.search, color: AppColors.slate400, size: 20),
+                            suffixIcon: searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18, color: AppColors.slate400),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: const Color(0xFFF1F5F9),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                            ),
+                          ),
+                          onChanged: (val) {
+                            setModalState(() {
+                              searchQuery = val;
+                            });
                           },
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 10),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.45,
+                          ),
+                          child: filteredClasses.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.search_off_rounded, size: 40, color: AppColors.slate300),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        "Aucune classe ou matière trouvée",
+                                        style: TextStyle(color: AppColors.slate400, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: filteredClasses.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                  itemBuilder: (context, index) {
+                                    final item = filteredClasses[index];
+                                    final classId = item['class_id'] as int;
+                                    final className =
+                                        item['school_classes']?['class_name'] ?? 'Classe';
+                                    final subjectId = item['subject_id'] as int;
+                                    final subjectName =
+                                        item['school_subjects']?['subject_name']
+                                            as String? ??
+                                        'Matière';
+
+                                    return ListTile(
+                                      leading: const CircleAvatar(
+                                        backgroundColor: AppColors.primaryLight,
+                                        child: Icon(
+                                          Icons.class_,
+                                          color: AppColors.primary,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(className, style: AppTextStyles.bodyBold),
+                                      subtitle: Text(subjectName),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        final path = isDevoirs
+                                            ? '/academics/gestion-devoirs'
+                                            : '/academics/saisie-notes';
+                                        context.push(
+                                          path,
+                                          extra: {
+                                            'classId': classId,
+                                            'className': className,
+                                            'subjectId': subjectId,
+                                            'subjectName': subjectName,
+                                          },
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       );
