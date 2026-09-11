@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/api/supabase_client.dart';
 import '../../../core/auth/session_manager.dart';
@@ -177,7 +178,20 @@ class StudentsRepository {
       return response;
     } catch (e) {
       debugPrint('Error saving student: $e');
-      return {'success': false, 'error': '$e'};
+      String msg = 'Erreur lors de l’enregistrement de l’élève.';
+      if (e is DioException) {
+        final resData = e.response?.data;
+        if (resData is Map && resData['error'] != null) {
+          msg = resData['error'].toString();
+        } else if (e.response?.statusCode == 403) {
+          msg = 'Accès refusé. Privilèges insuffisants.';
+        } else if (e.message != null && e.message!.isNotEmpty) {
+          msg = e.message!;
+        }
+      } else {
+        msg = e.toString();
+      }
+      return {'success': false, 'error': msg};
     }
   }
 
