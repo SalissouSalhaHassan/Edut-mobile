@@ -261,9 +261,9 @@ class OfficialBulletinPdfGenerator {
         totalPoints += (score * credits);
         totalCredits += credits;
 
-        final scoreColor = score >= 16
-            ? PdfColors.green800
-            : (score >= 10 ? PdfColors.blue800 : PdfColors.red800);
+        final scoreColor = score >= 14
+            ? PdfColors.blue800
+            : (score < 10 ? PdfColors.red800 : PdfColors.black);
 
         return [
           subCode,
@@ -277,6 +277,9 @@ class OfficialBulletinPdfGenerator {
 
       final semesterAvg = totalCredits > 0 ? (totalPoints / totalCredits) : 0.0;
       final semesterDecision = getDecision(semesterAvg);
+
+      final isDense = semesterGrades.length > 7;
+      final matiereFontSize = isDense ? 9.0 : 11.0;
 
       const headerBg = PdfColor(0.824, 0.902, 0.824); // #D2E6D2
       const borderColor = PdfColors.black;
@@ -306,24 +309,24 @@ class OfficialBulletinPdfGenerator {
                 decoration: const pw.BoxDecoration(color: headerBg),
                 children: [
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(3),
-                    child: pw.Text('Code', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('Code', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: const PdfColor(0, 0.2, 0))),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(3),
-                    child: pw.Text('Matières', textAlign: pw.TextAlign.left, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('Matières', textAlign: pw.TextAlign.left, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: const PdfColor(0, 0.2, 0))),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(3),
-                    child: pw.Text('Crédits', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('Crédits', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: const PdfColor(0, 0.2, 0))),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(3),
-                    child: pw.Text('Notes/20', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('Notes/20', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: const PdfColor(0, 0.2, 0))),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(3),
-                    child: pw.Text('Mention', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                    padding: const pw.EdgeInsets.all(2.5),
+                    child: pw.Text('Mention', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: const PdfColor(0, 0.2, 0))),
                   ),
                 ],
               ),
@@ -332,23 +335,23 @@ class OfficialBulletinPdfGenerator {
                 pw.TableRow(
                   children: [
                     pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
+                      padding: const pw.EdgeInsets.all(4),
                       child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
+                      padding: const pw.EdgeInsets.all(4),
                       child: pw.Text('Aucune note saisie pour ce semestre', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
+                      padding: const pw.EdgeInsets.all(4),
                       child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
+                      padding: const pw.EdgeInsets.all(4),
                       child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
+                      padding: const pw.EdgeInsets.all(4),
                       child: pw.Text('-', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
                     ),
                   ],
@@ -358,28 +361,28 @@ class OfficialBulletinPdfGenerator {
                   (r) => pw.TableRow(
                     children: [
                       pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
-                        child: pw.Text(r[0] as String, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 1.2, horizontal: 3),
+                        child: pw.Text(r[0] as String, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: PdfColors.black)),
                       ),
                       pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
-                        child: pw.Text(r[1] as String, style: const pw.TextStyle(fontSize: 7.5)),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 1.2, horizontal: 3),
+                        child: pw.Text(r[1] as String, style: pw.TextStyle(fontSize: matiereFontSize, color: PdfColors.black)),
                       ),
                       pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
-                        child: pw.Text(r[2] as String, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 1.2, horizontal: 3),
+                        child: pw.Text(r[2] as String, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 10.0, color: PdfColors.black)),
                       ),
                       pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 1.2, horizontal: 3),
                         child: pw.Text(
                           r[3] as String,
                           textAlign: pw.TextAlign.center,
-                          style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: r[5] as PdfColor),
+                          style: pw.TextStyle(fontSize: 10.0, fontWeight: pw.FontWeight.bold, color: r[5] as PdfColor),
                         ),
                       ),
                       pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
-                        child: pw.Text(r[4] as String, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 1.2, horizontal: 3),
+                        child: pw.Text(r[4] as String, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 10.0, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
                       ),
                     ],
                   ),
@@ -389,23 +392,23 @@ class OfficialBulletinPdfGenerator {
                 decoration: const pw.BoxDecoration(color: PdfColor(0.92, 0.96, 0.92)),
                 children: [
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text('TOTAL', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text('TOTAL', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isDense ? 8.5 : 9.0)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text(totalCredits.toString(), textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text(totalCredits.toString(), textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isDense ? 8.5 : 9.0)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text(totalPoints.toStringAsFixed(2), textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text(totalPoints.toStringAsFixed(2), textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isDense ? 8.5 : 9.0)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                 ],
@@ -414,23 +417,23 @@ class OfficialBulletinPdfGenerator {
               pw.TableRow(
                 children: [
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text('Moyenne Semestrielle', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text('Moyenne Semestrielle', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isDense ? 9.5 : 10.0)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text(rows.isNotEmpty ? semesterAvg.toStringAsFixed(2) : '—', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8, color: semesterAvg >= 10 ? PdfColors.green800 : PdfColors.red800)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text(rows.isNotEmpty ? semesterAvg.toStringAsFixed(2) : '—', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isDense ? 9.5 : 10.0, color: semesterAvg >= 10 ? PdfColors.green800 : PdfColors.red800)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                 ],
@@ -440,23 +443,23 @@ class OfficialBulletinPdfGenerator {
                 decoration: const pw.BoxDecoration(color: PdfColor(0.85, 0.93, 0.85)),
                 children: [
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text('DECISION DU JURY', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text('DECISION DU JURY', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.0)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(1.8),
-                    child: pw.Text(rows.isNotEmpty ? semesterDecision : '—', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5, color: semesterAvg >= 10 ? PdfColors.green900 : PdfColors.red900)),
+                    padding: const pw.EdgeInsets.all(1.5),
+                    child: pw.Text(rows.isNotEmpty ? semesterDecision : '—', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.0, color: semesterAvg >= 10 ? PdfColors.green900 : PdfColors.red900)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(2.5),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(2.5),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                   pw.Padding(
-                    padding: const pw.EdgeInsets.all(2.5),
+                    padding: const pw.EdgeInsets.all(1.5),
                     child: pw.Text('', style: const pw.TextStyle(fontSize: 7.5)),
                   ),
                 ],
