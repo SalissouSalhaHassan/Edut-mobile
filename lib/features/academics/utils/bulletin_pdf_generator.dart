@@ -548,21 +548,21 @@ class OfficialBulletinPdfGenerator {
                             pw.Text(birthInfo, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
                           ],
                         ),
-                        pw.SizedBox(height: 2.5),
+                        pw.SizedBox(height: 3.5),
                         pw.Row(
                           children: [
                             pw.Text('Matricule: ', style: const pw.TextStyle(fontSize: 8.5)),
                             pw.Text(matricule, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
                           ],
                         ),
-                        pw.SizedBox(height: 2.5),
+                        pw.SizedBox(height: 3.5),
                         pw.Row(
                           children: [
                             pw.Text('Parcours: ', style: const pw.TextStyle(fontSize: 8.5)),
                             pw.Text(className, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
                           ],
                         ),
-                        pw.SizedBox(height: 3),
+                        pw.SizedBox(height: 4.5),
                         pw.Row(
                           children: [
                             pw.Text('Première session  ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
