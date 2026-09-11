@@ -157,7 +157,12 @@ class EducationalLevelHelper {
       r'\b(ci|cp|cp1|cp2|ce1|ce2|cm1|cm2|sil|cours\s+d.initiation|cours\s+preparatoire|cours\s+elementaire|cours\s+moyen)\b',
       caseSensitive: false,
     );
+    final primaireShortPattern = RegExp(
+      r'\b(ci|cp|ce1|ce2|cm1|cm2)[a-z0-9]?\b',
+      caseSensitive: false,
+    );
     if (primairePattern.hasMatch(normCls) ||
+        primaireShortPattern.hasMatch(normCls) ||
         primairePattern.hasMatch(normSec) ||
         normLvl.contains('prim') ||
         normLvl.contains('elem')) {
@@ -238,6 +243,124 @@ class EducationalLevelHelper {
       final targetInGroup =
           aliases.any((a) => normTarget.contains(a) || a.contains(normTarget));
       if (candidateInGroup && targetInGroup) return true;
+    }
+
+    return false;
+  }
+
+  /// Checks if a given educational level string represents a global / all-levels view.
+  static bool hasAllEducationalLevels(String? level) {
+    if (level == null || level.trim().isEmpty) return true;
+    final norm = normalizeLevel(level);
+    const globalTerms = [
+      'tous',
+      'all',
+      'tous les niveaux',
+      'toutes les etapes',
+      'tous les cycles',
+      'administration generale',
+      'administration',
+      'gestion scolaire',
+      'الكل',
+      'كل',
+      'جميع',
+      'جميع المستويات',
+      'الإدارة العامة',
+      'ادارة عامة',
+      'الإدارة',
+      'ادارة'
+    ];
+    return globalTerms.contains(norm);
+  }
+
+  /// Robust check if a student or class belongs to the given active educational level.
+  /// Checks educationalLevel, className, filiere, and sectionName.
+  static bool isStudentInEducationalLevel({
+    String? educationalLevel,
+    String? className,
+    String? sectionName,
+    String? filiere,
+    String? activeLevel,
+  }) {
+    if (activeLevel == null || activeLevel.isEmpty || hasAllEducationalLevels(activeLevel)) {
+      return true;
+    }
+
+    final targetStage = inferEducationalStage(
+      educationalLevel: activeLevel,
+      className: activeLevel,
+    );
+
+    // 1. Direct match on educationalLevel if set and specific
+    if (educationalLevel != null &&
+        educationalLevel.isNotEmpty &&
+        !hasAllEducationalLevels(educationalLevel)) {
+      final studentStage = inferEducationalStage(educationalLevel: educationalLevel);
+      if (studentStage == targetStage) {
+        return true;
+      }
+    }
+
+    // 2. Class name, section, filiere inspection
+    final classText = '$className $filiere $sectionName'.trim();
+    if (classText.isNotEmpty) {
+      final normText = normalizeLevel(classText);
+
+      final isUnivClass = RegExp(
+        r'\b(l[1-3]|m[1-2]|d[1-3]|licence|master|doctorat|bts|dut|deug|faculte|institut|superieur|universite|lmd)\b',
+        caseSensitive: false,
+      ).hasMatch(normText) ||
+          normText.contains('universit') ||
+          normText.contains('superieur') ||
+          normText.contains('licence') ||
+          normText.contains('master') ||
+          normText.contains('doctorat');
+
+      final isCollegeClass = RegExp(
+        r'\b(6[eè]me?|5[eè]me?|4[eè]me?|3[eè]me?|6e|5e|4e|3e|college|coll[eè]ge|bepc|brevet|cem|moyen)\b',
+        caseSensitive: false,
+      ).hasMatch(normText) ||
+          normText.contains('coll') ||
+          normText.contains('moyen') ||
+          normText.contains('cem');
+
+      final isLyceeClass = RegExp(
+        r'\b(2nde?|seconde|1[eè]re?|premiere|premi[eè]re|tle|terminale|lycee|lyc[eè]e|bac)\b',
+        caseSensitive: false,
+      ).hasMatch(normText) ||
+          normText.contains('lyc') ||
+          normText.contains('secondaire');
+
+      final isPrimaryClass = RegExp(
+        r'\b(ci|cp|cp1|cp2|ce1|ce2|cm1|cm2|sil|cours\s+d.initiation|cours\s+preparatoire|cours\s+elementaire|cours\s+moyen)\b',
+        caseSensitive: false,
+      ).hasMatch(normText) ||
+          RegExp(r'\b(ci|cp|ce1|ce2|cm1|cm2)[a-z0-9]?\b', caseSensitive: false).hasMatch(normText) ||
+          normText.contains('prim') ||
+          normText.contains('elem');
+
+      final isMaternelleClass = RegExp(
+        r'\b(maternelle|creche|prescolaire|garderie|petite\s+section|moyenne\s+section|grande\s+section|ps|ms|gs)\b',
+        caseSensitive: false,
+      ).hasMatch(normText) ||
+          normText.contains('mat') ||
+          normText.contains('creche');
+
+      if (targetStage == EducationalStage.universite) {
+        return isUnivClass && !isPrimaryClass && !isCollegeClass && !isLyceeClass;
+      }
+      if (targetStage == EducationalStage.college) {
+        return isCollegeClass && !isUnivClass && !isPrimaryClass;
+      }
+      if (targetStage == EducationalStage.lycee) {
+        return isLyceeClass && !isUnivClass && !isCollegeClass;
+      }
+      if (targetStage == EducationalStage.primaire) {
+        return (isPrimaryClass || isMaternelleClass) && !isUnivClass && !isCollegeClass && !isLyceeClass;
+      }
+      if (targetStage == EducationalStage.maternelle) {
+        return isMaternelleClass && !isUnivClass && !isCollegeClass && !isLyceeClass;
+      }
     }
 
     return false;

@@ -367,6 +367,7 @@ class AuthRepository {
           studentId: canonicalProfile.studentId,
           studentName: canonicalProfile.studentName,
           studentClass: canonicalProfile.studentClass,
+          educationalLevel: canonicalProfile.educationalLevel,
           permissions: canonicalProfile.permissions,
         );
 

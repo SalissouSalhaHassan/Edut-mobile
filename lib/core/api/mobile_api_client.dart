@@ -30,6 +30,7 @@ class MobileApiProfile {
     this.studentId,
     this.studentName,
     this.studentClass,
+    this.educationalLevel,
   });
 
   final String userId;
@@ -41,6 +42,7 @@ class MobileApiProfile {
   final String? studentId;
   final String? studentName;
   final String? studentClass;
+  final String? educationalLevel;
 
   factory MobileApiProfile.fromJson(Map<String, dynamic> json) {
     final student = json['student'] is Map
@@ -57,6 +59,8 @@ class MobileApiProfile {
       studentId: student?['id']?.toString(),
       studentName: student?['name']?.toString(),
       studentClass: student?['className']?.toString(),
+      educationalLevel: json['educationalLevel']?.toString() ??
+          json['scope']?['educationalLevel']?.toString(),
     );
   }
 }

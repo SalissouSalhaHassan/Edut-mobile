@@ -16,6 +16,7 @@ class SessionManager {
   static const String _keyStudentName = 'auth_student_name';
   static const String _keyStudentClass = 'auth_student_class';
   static const String _keyPermissions = 'auth_permissions';
+  static const String _keyEducationalLevel = 'auth_educational_level';
 
   Future<void> saveSession({
     required String token,
@@ -28,6 +29,7 @@ class SessionManager {
     String? studentId,
     String? studentName,
     String? studentClass,
+    String? educationalLevel,
     List<String>? permissions,
   }) async {
     await _storage.write(key: _keyToken, value: token);
@@ -52,6 +54,9 @@ class SessionManager {
     }
     if (studentClass != null) {
       await _storage.write(key: _keyStudentClass, value: studentClass);
+    }
+    if (educationalLevel != null) {
+      await _storage.write(key: _keyEducationalLevel, value: educationalLevel);
     }
     if (permissions != null) {
       await _storage.write(
@@ -79,6 +84,8 @@ class SessionManager {
   }
   Future<String?> getStudentClass() async =>
       await _storage.read(key: _keyStudentClass);
+  Future<String?> getEducationalLevel() async =>
+      await _storage.read(key: _keyEducationalLevel);
 
   Future<void> savePermissions(List<String> permissions) async {
     await _storage.write(
@@ -164,5 +171,6 @@ class SessionManager {
     await _storage.delete(key: _keyStudentName);
     await _storage.delete(key: _keyStudentClass);
     await _storage.delete(key: _keyPermissions);
+    await _storage.delete(key: _keyEducationalLevel);
   }
 }

@@ -5,6 +5,7 @@ import '../../../core/auth/session_manager.dart';
 import '../../../core/permissions/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/educational_level_helper.dart';
 import '../data/finance_repository.dart';
 
 class FinanceDashboardScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
   bool _isSyncing = false;
   bool _canCollectFinance = false;
   String? _errorMessage;
+  String? _userEducationalLevel;
 
   int _schoolId = 1;
   int? _selectedSessionId;
@@ -64,6 +66,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
       _schoolId = int.tryParse(schoolIdStr ?? '') ?? 1;
       _canCollectFinance =
           profile.permissions.contains(AppPermissions.financeCollect);
+      _userEducationalLevel = await sessionManager.getEducationalLevel();
 
       // Fetch school sessions
       _sessions = await _repository.getSessions(_schoolId);
@@ -117,6 +120,37 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
             _stats = Map<String, dynamic>.from(statsRes['stats']);
           }
           _fees = feesList;
+
+          if (_userEducationalLevel != null &&
+              !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
+            final scopedFees = _fees.where((fee) {
+              final student = fee['students'] as Map<String, dynamic>? ?? {};
+              return EducationalLevelHelper.isStudentInEducationalLevel(
+                educationalLevel: student['educational_level']?.toString() ??
+                    student['educationalLevel']?.toString() ??
+                    fee['educational_level']?.toString(),
+                className: student['classe']?.toString() ?? fee['classe']?.toString(),
+                sectionName: student['section']?.toString() ?? fee['section']?.toString(),
+                filiere: student['filiere']?.toString() ?? fee['filiere']?.toString(),
+                activeLevel: _userEducationalLevel,
+              );
+            }).toList();
+
+            double totalExpected = 0.0;
+            double totalCollected = 0.0;
+            double totalDebts = 0.0;
+            for (final f in scopedFees) {
+              totalExpected += (f['total_expected'] as num?)?.toDouble() ?? 0.0;
+              totalCollected += (f['total_paid'] as num?)?.toDouble() ?? 0.0;
+              totalDebts += (f['balance'] as num?)?.toDouble() ?? 0.0;
+            }
+            _stats = {
+              'totalExpected': totalExpected,
+              'totalCollected': totalCollected,
+              'totalDebts': totalDebts,
+            };
+          }
+
           _applyFilters();
           _isLoading = false;
         });
@@ -148,6 +182,28 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     setState(() {
       _filteredFees = _fees.where((fee) {
         final student = fee['students'] as Map<String, dynamic>? ?? {};
+
+        // Scope check for educational level
+        if (_userEducationalLevel != null &&
+            !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
+          final studentLevel = student['educational_level']?.toString() ??
+              student['educationalLevel']?.toString() ??
+              fee['educational_level']?.toString();
+          final studentClass = student['classe']?.toString() ?? fee['classe']?.toString();
+          final studentSection = student['section']?.toString() ?? fee['section']?.toString();
+          final studentFiliere = student['filiere']?.toString() ?? fee['filiere']?.toString();
+
+          if (!EducationalLevelHelper.isStudentInEducationalLevel(
+            educationalLevel: studentLevel,
+            className: studentClass,
+            sectionName: studentSection,
+            filiere: studentFiliere,
+            activeLevel: _userEducationalLevel,
+          )) {
+            return false;
+          }
+        }
+
         final name = _clean(student['nom_etudiant']);
         final code = _clean(student['num_admission']);
         final classe = _clean(student['classe']);

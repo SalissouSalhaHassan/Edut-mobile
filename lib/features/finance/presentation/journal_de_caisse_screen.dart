@@ -37,6 +37,7 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
   List<Map<String, dynamic>> _rawPayments = [];
   List<Map<String, dynamic>> _filteredPayments = [];
   Map<String, dynamic>? _headerConfig;
+  String? _userEducationalLevel;
 
   // Filter States
   String _classFilter = 'Toutes classes';
@@ -76,6 +77,11 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
       final sessionManager = locator<SessionManager>();
       final schoolIdStr = await sessionManager.getSchoolId();
       _schoolId = int.tryParse(schoolIdStr ?? '') ?? 1;
+      _userEducationalLevel = await sessionManager.getEducationalLevel();
+      if (_userEducationalLevel != null &&
+          !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
+        _levelFilter = _userEducationalLevel!;
+      }
 
       // Parallel fetch: sessions, header config, and payments journal
       final sessionRes = await _repository.getSessions(_schoolId);
@@ -139,6 +145,24 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
 
     setState(() {
       _filteredPayments = _rawPayments.where((p) {
+        // 0. User Educational Level Scoping
+        if (_userEducationalLevel != null &&
+            !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
+          final lvl = (p['educational_level'] ?? '').toString();
+          final cls = (p['classe'] ?? '').toString();
+          final sec = (p['section'] ?? '').toString();
+          final fil = (p['filiere'] ?? '').toString();
+          if (!EducationalLevelHelper.isStudentInEducationalLevel(
+            educationalLevel: lvl,
+            className: cls,
+            sectionName: sec,
+            filiere: fil,
+            activeLevel: _userEducationalLevel,
+          )) {
+            return false;
+          }
+        }
+
         // 1. Classe
         if (_classFilter != 'Toutes classes') {
           final classe = (p['classe'] ?? '').toString();
@@ -217,7 +241,10 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
   void _resetFilters() {
     setState(() {
       _classFilter = 'Toutes classes';
-      _levelFilter = 'Tous niveaux';
+      _levelFilter = (_userEducationalLevel != null &&
+              !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel))
+          ? _userEducationalLevel!
+          : 'Tous niveaux';
       _cashierFilter = 'Tous caissiers';
       _modeFilter = 'Tous modes';
       _statusFilter = 'Tous';
@@ -233,6 +260,22 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
   List<String> get _uniqueClasses {
     final set = <String>{'Toutes classes'};
     for (final p in _rawPayments) {
+      if (_userEducationalLevel != null &&
+          !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
+        final lvl = (p['educational_level'] ?? '').toString();
+        final cls = (p['classe'] ?? '').toString();
+        final sec = (p['section'] ?? '').toString();
+        final fil = (p['filiere'] ?? '').toString();
+        if (!EducationalLevelHelper.isStudentInEducationalLevel(
+          educationalLevel: lvl,
+          className: cls,
+          sectionName: sec,
+          filiere: fil,
+          activeLevel: _userEducationalLevel,
+        )) {
+          continue;
+        }
+      }
       final c = p['classe']?.toString().trim();
       if (c != null && c.isNotEmpty && c != '-') set.add(c);
     }
@@ -240,6 +283,10 @@ class _JournalDeCaisseScreenState extends State<JournalDeCaisseScreen> {
   }
 
   List<String> get _uniqueLevels {
+    if (_userEducationalLevel != null &&
+        !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
+      return [_userEducationalLevel!];
+    }
     final set = <String>{'Tous niveaux', 'Primaire', 'Collège', 'Lycée', 'Université'};
     for (final p in _rawPayments) {
       final l = p['educational_level']?.toString().trim();
