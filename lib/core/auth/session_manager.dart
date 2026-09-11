@@ -2,6 +2,13 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
 
+enum OfflineAuthResult {
+  success,
+  wrongPassword,
+  userMismatch,
+  noCachedUser,
+}
+
 class SessionManager {
   final _storage = const FlutterSecureStorage();
 
@@ -17,6 +24,7 @@ class SessionManager {
   static const String _keyStudentClass = 'auth_student_class';
   static const String _keyPermissions = 'auth_permissions';
   static const String _keyEducationalLevel = 'auth_educational_level';
+  static const String _keyOfflineProfile = 'auth_offline_profile_json';
 
   Future<void> saveSession({
     required String token,
@@ -34,10 +42,15 @@ class SessionManager {
   }) async {
     await _storage.write(key: _keyToken, value: token);
     await _storage.write(key: _keyEmail, value: email.toLowerCase().trim());
+    
+    String? effectivePasswordHash;
     if (password != null && password.isNotEmpty) {
-      final hash = sha256.convert(utf8.encode(password)).toString();
-      await _storage.write(key: _keyPasswordHash, value: hash);
+      effectivePasswordHash = sha256.convert(utf8.encode(password)).toString();
+      await _storage.write(key: _keyPasswordHash, value: effectivePasswordHash);
+    } else {
+      effectivePasswordHash = await _storage.read(key: _keyPasswordHash);
     }
+
     await _storage.write(key: _keyRole, value: role);
     await _storage.write(key: _keyEmployeeId, value: employeeId);
     if (userId != null) {
@@ -64,6 +77,27 @@ class SessionManager {
         value: jsonEncode(permissions),
       );
     }
+
+    // Persist complete offline profile backup to allow login even when network is completely offline
+    try {
+      final offlineProfile = {
+        'email': email.toLowerCase().trim(),
+        'passwordHash': effectivePasswordHash,
+        'role': role,
+        'employeeId': employeeId,
+        'userId': userId,
+        'schoolId': schoolId,
+        'studentId': studentId,
+        'studentName': studentName,
+        'studentClass': studentClass,
+        'educationalLevel': educationalLevel,
+        'permissions': permissions,
+      };
+      await _storage.write(
+        key: _keyOfflineProfile,
+        value: jsonEncode(offlineProfile),
+      );
+    } catch (_) {}
   }
 
   Future<String?> getToken() async => await _storage.read(key: _keyToken);
@@ -108,25 +142,134 @@ class SessionManager {
     return const [];
   }
 
-  Future<bool> validateOfflineCredentials(String email, String password) async {
-    final cachedEmail = await getEmail();
-    if (cachedEmail == null || cachedEmail.isEmpty) return false;
+  Future<String?> getCachedOfflineEmail() async {
+    final email = await getEmail();
+    if (email != null && email.isNotEmpty) return email;
 
+    final offlineRaw = await _storage.read(key: _keyOfflineProfile);
+    if (offlineRaw != null && offlineRaw.isNotEmpty) {
+      try {
+        final data = jsonDecode(offlineRaw) as Map<String, dynamic>?;
+        return data?['email']?.toString();
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<OfflineAuthResult> validateOfflineCredentialsDetailed(
+    String email,
+    String password,
+  ) async {
     final normalizedInput = email.toLowerCase().trim();
     final inputUsername = normalizedInput.split('@').first;
-    final cachedUsername = cachedEmail.toLowerCase().split('@').first;
 
-    final emailMatches = normalizedInput == cachedEmail || inputUsername == cachedUsername;
-    if (!emailMatches) return false;
+    var cachedEmail = await getEmail();
+    var cachedHash = await _storage.read(key: _keyPasswordHash);
 
-    final cachedHash = await _storage.read(key: _keyPasswordHash);
-    if (cachedHash == null || cachedHash.isEmpty) {
-      // If no password hash stored yet but email matches cached user on device, allow offline login
-      return true;
+    Map<String, dynamic>? offlineData;
+    final offlineRaw = await _storage.read(key: _keyOfflineProfile);
+    if (offlineRaw != null && offlineRaw.isNotEmpty) {
+      try {
+        offlineData = jsonDecode(offlineRaw) as Map<String, dynamic>?;
+      } catch (_) {}
     }
 
-    final inputHash = sha256.convert(utf8.encode(password)).toString();
-    return cachedHash == inputHash;
+    if ((cachedEmail == null || cachedEmail.isEmpty) && offlineData != null) {
+      cachedEmail = offlineData['email']?.toString();
+      cachedHash ??= offlineData['passwordHash']?.toString();
+    }
+
+    if (cachedEmail == null || cachedEmail.isEmpty) {
+      return OfflineAuthResult.noCachedUser;
+    }
+
+    final cachedUsername = cachedEmail.toLowerCase().split('@').first;
+    final emailMatches =
+        normalizedInput == cachedEmail || inputUsername == cachedUsername;
+    if (!emailMatches) {
+      return OfflineAuthResult.userMismatch;
+    }
+
+    if (cachedHash != null && cachedHash.isNotEmpty) {
+      final inputHash = sha256.convert(utf8.encode(password)).toString();
+      if (cachedHash != inputHash) {
+        return OfflineAuthResult.wrongPassword;
+      }
+    }
+
+    // Ensure session is properly populated and activated
+    final currentToken = await getToken();
+    if (currentToken == null || currentToken.isEmpty) {
+      await _storage.write(key: _keyToken, value: 'offline_session_token');
+    }
+    await _storage.write(key: _keyEmail, value: cachedEmail);
+    if (cachedHash != null && cachedHash.isNotEmpty) {
+      await _storage.write(key: _keyPasswordHash, value: cachedHash);
+    }
+
+    if (offlineData != null) {
+      if (offlineData['role'] != null) {
+        await _storage.write(
+          key: _keyRole,
+          value: offlineData['role'].toString(),
+        );
+      }
+      if (offlineData['employeeId'] != null) {
+        await _storage.write(
+          key: _keyEmployeeId,
+          value: offlineData['employeeId'].toString(),
+        );
+      }
+      if (offlineData['userId'] != null) {
+        await _storage.write(
+          key: _keyUserId,
+          value: offlineData['userId'].toString(),
+        );
+      }
+      if (offlineData['schoolId'] != null) {
+        await _storage.write(
+          key: _keySchoolId,
+          value: offlineData['schoolId'].toString(),
+        );
+      }
+      if (offlineData['studentId'] != null) {
+        await _storage.write(
+          key: _keyStudentId,
+          value: offlineData['studentId'].toString(),
+        );
+      }
+      if (offlineData['studentName'] != null) {
+        await _storage.write(
+          key: _keyStudentName,
+          value: offlineData['studentName'].toString(),
+        );
+      }
+      if (offlineData['studentClass'] != null) {
+        await _storage.write(
+          key: _keyStudentClass,
+          value: offlineData['studentClass'].toString(),
+        );
+      }
+      if (offlineData['educationalLevel'] != null) {
+        await _storage.write(
+          key: _keyEducationalLevel,
+          value: offlineData['educationalLevel'].toString(),
+        );
+      }
+      if (offlineData['permissions'] != null) {
+        await _storage.write(
+          key: _keyPermissions,
+          value: jsonEncode(offlineData['permissions']),
+        );
+      }
+    }
+
+    return OfflineAuthResult.success;
+  }
+
+  Future<bool> validateOfflineCredentials(String email, String password) async {
+    final res = await validateOfflineCredentialsDetailed(email, password);
+    return res == OfflineAuthResult.success;
   }
 
   Future<bool> validateCurrentPassword(String password) async {

@@ -313,6 +313,9 @@ class AuthRepository {
         ).timeout(const Duration(seconds: 8));
       } catch (firstErr) {
         debugPrint("DEBUG LOGIN: Primary sign-in error with $primaryEmail: $firstErr");
+        if (_isNetworkException(firstErr)) {
+          rethrow;
+        }
         // If primary failed, try to resolve candidate from users/students/employees
         try {
           final candidates = await _resolveCandidateLoginEmails(rawInput).timeout(
@@ -568,6 +571,10 @@ class AuthRepository {
       return const LoginResult.success();
     } on AuthException catch (e) {
       debugPrint("DEBUG LOGIN: AuthException during login: $e");
+      if (_isNetworkException(e) || _isNetworkException(e.message)) {
+        return await _handleOfflineLogin(email, password);
+      }
+
       final message = e.message.toLowerCase();
       if (message.contains('invalid login credentials')) {
         return const LoginResult.failure('Email ou mot de passe incorrect.');
@@ -577,19 +584,81 @@ class AuthRepository {
           'Veuillez confirmer cet email avant de vous connecter.',
         );
       }
-      return LoginResult.failure('Erreur d\'authentification: ${e.message}');
+      if (message.contains('user not found')) {
+        return const LoginResult.failure('Utilisateur introuvable.');
+      }
+      if (message.contains('too many requests')) {
+        return const LoginResult.failure(
+          'Trop de tentatives. Veuillez patienter quelques instants avant de réessayer.',
+        );
+      }
+
+      final cleanMsg = e.message.split('uri=').first.replaceAll('Exception:', '').trim();
+      return LoginResult.failure(
+        cleanMsg.isNotEmpty
+            ? 'Erreur d\'authentification : $cleanMsg'
+            : 'Erreur d\'authentification. Veuillez vérifier vos identifiants.',
+      );
     } catch (e, stack) {
       debugPrint("DEBUG LOGIN: Network or unexpected error during login: $e\n$stack");
-      // Only fallback to offline cache if this is truly a network/connectivity error
-      final isOfflineValid = await _sessionManager.validateOfflineCredentials(email, password);
-      if (isOfflineValid) {
-        debugPrint("DEBUG LOGIN: Offline login validation succeeded after network error!");
-        return const LoginResult.success();
+      if (_isNetworkException(e)) {
+        return await _handleOfflineLogin(email, password);
       }
       return const LoginResult.failure(
         'Impossible de se connecter. Vérifiez votre connexion Internet ou vos identifiants.',
       );
     }
+  }
+
+  bool _isNetworkException(dynamic e) {
+    if (e == null) return false;
+    final str = e.toString().toLowerCase();
+    return str.contains('socketexception') ||
+        str.contains('clientexception') ||
+        str.contains('failed host lookup') ||
+        str.contains('no address associated with hostname') ||
+        str.contains('network is unreachable') ||
+        str.contains('connection refused') ||
+        str.contains('connection timed out') ||
+        str.contains('connection closed') ||
+        str.contains('handshakeexception') ||
+        str.contains('timeoutexception') ||
+        str.contains('délai') ||
+        str.contains('network error') ||
+        str.contains('xmlhttprequest') ||
+        str.contains('http client error') ||
+        str.contains('errno = 7') ||
+        str.contains('errno = 101') ||
+        str.contains('errno = 110') ||
+        str.contains('errno = 111') ||
+        str.contains('offline');
+  }
+
+  Future<LoginResult> _handleOfflineLogin(String email, String password) async {
+    final offlineCheck =
+        await _sessionManager.validateOfflineCredentialsDetailed(
+      email,
+      password,
+    );
+    if (offlineCheck == OfflineAuthResult.success) {
+      debugPrint("DEBUG LOGIN: Offline login validation succeeded!");
+      return const LoginResult.success();
+    } else if (offlineCheck == OfflineAuthResult.wrongPassword) {
+      return const LoginResult.failure(
+        'Mode hors-ligne : Mot de passe incorrect pour le compte enregistré sur cet appareil.',
+      );
+    } else if (offlineCheck == OfflineAuthResult.userMismatch) {
+      return const LoginResult.failure(
+        'Mode hors-ligne : Cet appareil est associé à un autre compte. Veuillez vous connecter avec le compte enregistré ou vous connecter à Internet.',
+      );
+    } else if (offlineCheck == OfflineAuthResult.noCachedUser) {
+      return const LoginResult.failure(
+        'Connexion Internet indisponible. Une première connexion avec accès réseau est requise sur cet appareil.',
+      );
+    }
+    return const LoginResult.failure(
+      'Connexion Internet indisponible. Veuillez vérifier votre réseau.',
+    );
   }
 
   Future<Map<String, dynamic>?> _fetchUserProfile({

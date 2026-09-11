@@ -138,7 +138,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Erreur de connexion : ${e.toString().replaceAll('Exception:', '').trim()}';
+          final errStr = e.toString().toLowerCase();
+          if (errStr.contains('socketexception') ||
+              errStr.contains('clientexception') ||
+              errStr.contains('failed host lookup') ||
+              errStr.contains('no address associated') ||
+              errStr.contains('network') ||
+              errStr.contains('connection')) {
+            _errorMessage =
+                'Connexion Internet indisponible. Veuillez vérifier votre réseau.';
+          } else {
+            _errorMessage =
+                'Erreur de connexion : ${e.toString().replaceAll('Exception:', '').trim()}';
+          }
         });
       }
     } finally {
