@@ -124,7 +124,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
           if (_userEducationalLevel != null &&
               !EducationalLevelHelper.hasAllEducationalLevels(_userEducationalLevel)) {
             final scopedFees = _fees.where((fee) {
-              final student = fee['students'] as Map<String, dynamic>? ?? {};
+              final student = _extractStudentMap(fee['students']);
               return EducationalLevelHelper.isStudentInEducationalLevel(
                 educationalLevel: student['educational_level']?.toString() ??
                     student['educationalLevel']?.toString() ??
@@ -165,6 +165,15 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     }
   }
 
+  Map<String, dynamic> _extractStudentMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is List && raw.isNotEmpty && raw.first is Map) {
+      return Map<String, dynamic>.from(raw.first);
+    }
+    return {};
+  }
+
   String _clean(dynamic val) {
     if (val == null) return '';
     return val
@@ -181,7 +190,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
 
     setState(() {
       _filteredFees = _fees.where((fee) {
-        final student = fee['students'] as Map<String, dynamic>? ?? {};
+        final student = _extractStudentMap(fee['students']);
 
         // Scope check for educational level
         if (_userEducationalLevel != null &&
@@ -204,10 +213,10 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
           }
         }
 
-        final name = _clean(student['nom_etudiant']);
-        final code = _clean(student['num_admission']);
-        final classe = _clean(student['classe']);
-        final level = _clean(student['educational_level']);
+        final name = _clean(student['nom_etudiant'] ?? student['nomEtudiant'] ?? student['name'] ?? fee['nom_etudiant']);
+        final code = _clean(student['num_admission'] ?? student['numAdmission'] ?? student['matricule'] ?? fee['num_admission']);
+        final classe = _clean(student['classe'] ?? student['className'] ?? fee['classe']);
+        final level = _clean(student['educational_level'] ?? student['educationalLevel'] ?? fee['educational_level']);
 
         final matchesSearch = query.isEmpty ||
             name.contains(query) ||
@@ -358,15 +367,10 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
   }
 
   Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Soldé':
-        return AppColors.success;
-      case 'Partiel':
-        return AppColors.warning;
-      case 'Impayé':
-      default:
-        return AppColors.danger;
-    }
+    final s = status.toLowerCase();
+    if (s.contains('sold') || s.contains('pay')) return AppColors.success;
+    if (s.contains('partiel')) return AppColors.warning;
+    return AppColors.danger;
   }
 
   Color _getAvatarColor(String name) {
@@ -378,7 +382,8 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
       const Color(0xFFEA580C),
       const Color(0xFFDB2777),
     ];
-    final int hash = name.codeUnits.fold(0, (prev, element) => prev + element);
+    if (name.isEmpty) return colors[0];
+    final int hash = name.codeUnits.fold(0, (prev, element) => prev + element).abs();
     return colors[hash % colors.length];
   }
 
@@ -462,34 +467,75 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                               itemCount: _filteredFees.length,
                               itemBuilder: (context, index) {
-                                final fee = _filteredFees[index];
-                                final student = fee['students'] as Map<String, dynamic>? ?? {};
-                                final name = student['nom_etudiant'] ?? 'Sans Nom';
-                                final admissionNo = student['num_admission'] ?? 'N/A';
-                                final className = student['classe'] ?? 'Non spécifiée';
-                                final expected = (fee['total_expected'] as num?)?.toDouble() ?? 0.0;
-                                final paid = (fee['total_paid'] as num?)?.toDouble() ?? 0.0;
-                                final balance = (fee['balance'] as num?)?.toDouble() ?? 0.0;
-                                final status = fee['status'] as String? ?? 'Impayé';
+                                try {
+                                  final fee = _filteredFees[index];
+                                  final student = _extractStudentMap(fee['students']);
+                                  final name = (student['nom_etudiant'] ??
+                                          student['nomEtudiant'] ??
+                                          student['name'] ??
+                                          fee['nom_etudiant'] ??
+                                          'Sans Nom')
+                                      .toString()
+                                      .trim();
+                                  final admissionNo = (student['num_admission'] ??
+                                          student['numAdmission'] ??
+                                          student['matricule'] ??
+                                          fee['num_admission'] ??
+                                          'N/A')
+                                      .toString()
+                                      .trim();
+                                  final className = (student['classe'] ??
+                                          student['className'] ??
+                                          fee['classe'] ??
+                                          'Non spécifiée')
+                                      .toString()
+                                      .trim();
 
-                                final initials = name.isNotEmpty
-                                    ? name.trim().split(' ').map((e) => e.substring(0, 1)).take(2).join().toUpperCase()
-                                    : '?';
-                                final avatarColor = _getAvatarColor(name);
+                                  final expected = (fee['total_expected'] as num?)?.toDouble() ??
+                                      double.tryParse(fee['total_expected']?.toString() ?? '') ??
+                                      0.0;
+                                  final paid = (fee['total_paid'] as num?)?.toDouble() ??
+                                      double.tryParse(fee['total_paid']?.toString() ?? '') ??
+                                      0.0;
+                                  final balance = (fee['balance'] as num?)?.toDouble() ??
+                                      double.tryParse(fee['balance']?.toString() ?? '') ??
+                                      (expected - paid);
+                                  final status = fee['status']?.toString() ??
+                                      (balance <= 0 ? 'Soldé' : (paid > 0 ? 'Partiel' : 'Impayé'));
 
-                                return _buildFeeCard(
-                                  feeId: fee['id'] as int,
-                                  name: name,
-                                  admissionNo: admissionNo,
-                                  className: className,
-                                  expected: expected,
-                                  paid: paid,
-                                  balance: balance,
-                                  status: status,
-                                  initials: initials,
-                                  avatarColor: avatarColor,
-                                  feeData: fee,
-                                );
+                                  final words = name
+                                      .split(RegExp(r'\s+'))
+                                      .where((w) => w.isNotEmpty)
+                                      .toList();
+                                  String initials = '?';
+                                  if (words.isNotEmpty) {
+                                    if (words.length == 1) {
+                                      initials = words[0].substring(0, words[0].length >= 2 ? 2 : 1).toUpperCase();
+                                    } else {
+                                      initials = '${words[0][0]}${words[1][0]}'.toUpperCase();
+                                    }
+                                  }
+
+                                  final avatarColor = _getAvatarColor(name);
+                                  final feeId = (fee['id'] as num?)?.toInt() ?? index;
+
+                                  return _buildFeeCard(
+                                    feeId: feeId,
+                                    name: name,
+                                    admissionNo: admissionNo,
+                                    className: className,
+                                    expected: expected,
+                                    paid: paid,
+                                    balance: balance,
+                                    status: status,
+                                    initials: initials,
+                                    avatarColor: avatarColor,
+                                    feeData: fee,
+                                  );
+                                } catch (err, stack) {
+                                  debugPrint("Error rendering fee card at index $index: $err\n$stack");
+                                  return const SizedBox.shrink();
+                                }
                               },
                             ),
                     ),
@@ -682,7 +728,9 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     required Map<String, dynamic> feeData,
   }) {
     final statusColor = _getStatusColor(status);
-    final progress = expected > 0 ? paid / expected : 0.0;
+    final safeProgress = (expected > 0 && paid.isFinite && expected.isFinite)
+        ? (paid / expected).clamp(0.0, 1.0)
+        : 0.0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -696,7 +744,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         onTap: () {
           context.push('/finance/fee-details', extra: feeData).then((_) {
             // Refresh data when returning from details
-            _fetchFinanceData();
+            if (mounted) _fetchFinanceData();
           });
         },
         borderRadius: BorderRadius.circular(20),
@@ -720,11 +768,18 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: AppTextStyles.bodyBold.copyWith(fontSize: 14)),
+                        Text(
+                          name,
+                          style: AppTextStyles.bodyBold.copyWith(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           "Matricule: $admissionNo • $className",
                           style: const TextStyle(color: AppColors.slate500, fontSize: 11, fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -766,7 +821,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: progress,
+                  value: safeProgress,
                   backgroundColor: AppColors.slate100,
                   valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                   minHeight: 6,
