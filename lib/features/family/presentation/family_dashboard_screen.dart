@@ -279,19 +279,40 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     );
   }
 
+  bool _termsMatch(String? termA, String? termB) {
+    if (termA == null || termB == null) return false;
+    final a = termA.trim().toLowerCase();
+    final b = termB.trim().toLowerCase();
+    if (a == b) return true;
+    final numA = RegExp(r'\d+').firstMatch(a)?.group(0);
+    final numB = RegExp(r'\d+').firstMatch(b)?.group(0);
+    if (numA != null && numB != null && numA == numB) {
+      if ((a.contains('s') || a.contains('semestre')) && (b.contains('s') || b.contains('semestre'))) return true;
+      if ((a.contains('t') || a.contains('trimestre')) && (b.contains('t') || b.contains('trimestre'))) return true;
+      if ((a.contains('p') || a.contains('periode') || a.contains('période')) &&
+          (b.contains('p') || b.contains('periode') || b.contains('période'))) return true;
+    }
+    return a.contains(b) || b.contains(a);
+  }
+
   Future<void> _loadGrades() async {
-    if (_studentId == null || _schoolId == null) return;
+    if (_studentId == null) return;
     final res = await _repository.getGrades(
       studentId: _studentId!,
-      schoolId: _schoolId!,
+      schoolId: _schoolId ?? 1,
       sessionId: _selectedSessionId,
     );
+    if (!mounted) return;
     setState(() {
       _grades = res;
-      final periods = _grades.map((g) => g['term']?.toString() ?? '').where((t) => t.isNotEmpty).toSet().toList();
+      final periods = _grades
+          .map((g) => g['term']?.toString().trim() ?? '')
+          .where((t) => t.isNotEmpty)
+          .toSet()
+          .toList();
       periods.sort();
       if (periods.isNotEmpty) {
-        if (_selectedPeriod == null || !periods.contains(_selectedPeriod)) {
+        if (_selectedPeriod == null || !periods.any((p) => _termsMatch(p, _selectedPeriod))) {
           _selectedPeriod = periods.last;
         }
       } else {
@@ -438,17 +459,18 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
   }
 
   Map<String, double> get _gradeSummary {
-    final list = _selectedPeriod == null 
+    final list = (_selectedPeriod == null || _selectedPeriod!.isEmpty)
         ? _grades 
-        : _grades.where((g) => g['term']?.toString() == _selectedPeriod).toList();
-    if (list.isEmpty) {
+        : _grades.where((g) => _termsMatch(g['term']?.toString(), _selectedPeriod)).toList();
+    final effectiveList = list.isNotEmpty ? list : _grades;
+    if (effectiveList.isEmpty) {
       return {'average': 0, 'best': 0, 'risk': 0};
     }
     double totalPoints = 0;
     double totalCoef = 0;
     double best = 0;
     int risk = 0;
-    for (final row in list) {
+    for (final row in effectiveList) {
       final score = _extractNormalizedScoreOn20(row);
       final coef = ((row['coefficient'] as num?)?.toDouble() ?? 1.0).clamp(0.5, 20.0);
       totalPoints += score * coef;
@@ -456,7 +478,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       if (score > best) best = score;
       if (score < 10) risk++;
     }
-    final avg = totalCoef > 0 ? (totalPoints / totalCoef) : (totalPoints / list.length);
+    final avg = totalCoef > 0 ? (totalPoints / totalCoef) : (totalPoints / effectiveList.length);
     return {
       'average': avg.clamp(0.0, 20.0),
       'best': best.clamp(0.0, 20.0),
@@ -1125,7 +1147,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
     
     // Unique periods from grades
     final periods = _grades
-        .map((g) => g['term']?.toString() ?? '')
+        .map((g) => g['term']?.toString().trim() ?? '')
         .where((t) => t.isNotEmpty)
         .toSet()
         .toList();
@@ -1135,17 +1157,19 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
         .where((g) =>
             _selectedPeriod == null ||
             _selectedPeriod!.isEmpty ||
-            g['term']?.toString() == _selectedPeriod)
+            _termsMatch(g['term']?.toString(), _selectedPeriod))
         .toList();
+
+    final displayGrades = filteredGrades.isNotEmpty ? filteredGrades : _grades;
 
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        VoiceNotePlayerCard(studentId: _student['id'] as int? ?? 1),
+        VoiceNotePlayerCard(studentId: _student['id'] as int? ?? _studentId ?? 1),
         _buildSectionTitle('Résultats & bulletins', Icons.bar_chart_rounded),
         const SizedBox(height: 12),
-        if (periods.length > 1) _buildPeriodSelector(periods),
-        _buildLineChartCard(filteredGrades),
+        if (periods.isNotEmpty) _buildPeriodSelector(periods),
+        _buildLineChartCard(displayGrades),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -1178,16 +1202,16 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
             ),
             onPressed: _generateReportCardPdf,
             icon: const Icon(Icons.picture_as_pdf_rounded),
-            label: const Text('Imprimer / Éporter le Bulletin PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            label: const Text('Imprimer / Exporter le Bulletin PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           ),
         ),
         const SizedBox(height: 16),
-        if (filteredGrades.isEmpty)
+        if (displayGrades.isEmpty)
           _buildEmptyCard(
-            'Aucune note disponible pour la période sélectionnée.',
+            'Aucune note disponible pour le moment.',
           )
         else
-          ...filteredGrades.map(_buildGradeCard),
+          ...displayGrades.map(_buildGradeCard),
       ],
     );
   }
@@ -1202,7 +1226,7 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
       ),
       child: Row(
         children: periods.map((period) {
-          final isSelected = _selectedPeriod == period;
+          final isSelected = _termsMatch(_selectedPeriod, period);
           return Expanded(
             child: GestureDetector(
               onTap: () {

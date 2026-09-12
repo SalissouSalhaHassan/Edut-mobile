@@ -96,60 +96,136 @@ class OfficialBulletinPdfGenerator {
       );
     }
 
+    // 0. Compute accurate Totals and Coefficients from grades
+    int sumCoef = 0;
+    double sumPoints = 0.0;
+    for (final g in grades) {
+      final rawDevoir = (g['class_work_score'] as num?)?.toDouble() ??
+          (g['devoir_score'] as num?)?.toDouble();
+      final rawCompo = (g['exam_score'] as num?)?.toDouble();
+      final rawTotal = (g['total_score'] as num?)?.toDouble();
+
+      double s = 0.0;
+      if (rawDevoir != null && rawCompo != null && rawDevoir > 0 && rawCompo > 0) {
+        final d = rawDevoir <= 20.0 ? rawDevoir : (rawDevoir / 2.0);
+        final c = rawCompo <= 20.0 ? rawCompo : (rawCompo / 2.0);
+        s = (d + c) / 2.0;
+      } else if (rawTotal != null && rawTotal > 0) {
+        s = rawTotal <= 20.0 ? rawTotal : (rawTotal <= 40.0 ? rawTotal / 2.0 : (rawTotal / 100.0) * 20.0);
+      } else {
+        s = (rawCompo != null && rawCompo > 0) ? (rawCompo <= 20.0 ? rawCompo : rawCompo / 2.0) : 0.0;
+      }
+      s = s.clamp(0.0, 20.0);
+
+      int c = (g['coefficient'] as num?)?.toInt() ??
+          (g['coef'] as num?)?.toInt() ?? 0;
+      if (c <= 0) {
+        final sub = (g['school_subjects']?['subject_name'] ?? g['subject_name'] ?? g['discipline'] ?? '').toString().toLowerCase();
+        if (sub.contains('arabe') || sub.contains('français') || sub.contains('islam') || sub.contains('physique') || sub.contains('eps') || sub.contains('anglais')) {
+          c = 4;
+        } else if (sub.contains('math') || sub.contains('hist') || sub.contains('géo')) {
+          c = 3;
+        } else if (sub.contains('conduite')) {
+          c = 1;
+        } else {
+          c = 2;
+        }
+      }
+
+      sumPoints += s * c;
+      sumCoef += c;
+    }
+
+    final computedAvg = sumCoef > 0 ? (sumPoints / sumCoef) : 0.0;
+    final Map<String, dynamic> resolvedSummary = Map<String, dynamic>.from(summary);
+    if (resolvedSummary['average'] == null || (resolvedSummary['average'] as num) == 0) {
+      resolvedSummary['average'] = computedAvg;
+    }
+    resolvedSummary['totalPoints'] = sumPoints;
+    resolvedSummary['totalCoef'] = sumCoef;
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          return pw.Stack(
             children: [
-              // 1. Header (School & Republic)
-              _buildHeader(
-                country: country,
-                ministry: ministry,
-                schoolName: schoolName,
-                address: address,
-                phone: phone,
-                sessionName: sessionName,
-                logo: leftLogoImage,
-                amiriBold: amiriBold,
+              // Background Watermark: DUPLICATA NON ORIGINAL
+              pw.Positioned.fill(
+                child: pw.Center(
+                  child: pw.Transform.rotate(
+                    angle: -0.45,
+                    child: pw.Text(
+                      'DUPLICATA NON ORIGINAL\nDOCUMENT INFORMATIF',
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                        color: const PdfColor(0.90, 0.90, 0.90),
+                        fontSize: 34,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
 
-              pw.SizedBox(height: 10),
+              // Main Content Column
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  // 1. Header (School & Republic)
+                  _buildHeader(
+                    country: country,
+                    ministry: ministry,
+                    schoolName: schoolName,
+                    address: address,
+                    phone: phone,
+                    sessionName: sessionName,
+                    logo: leftLogoImage,
+                    amiriBold: amiriBold,
+                  ),
 
-              // 2. Stage Specific Title Banner
-              _buildStageTitleBanner(stage, period),
+                  pw.SizedBox(height: 6),
 
-              pw.SizedBox(height: 10),
+                  // 2. Stage Specific Title Banner
+                  _buildStageTitleBanner(stage, period),
 
-              // 3. Student Identification Card
-              _buildStudentInfoBox(
-                name: studentName,
-                matricule: matricule,
-                className: className,
-                rawLevel: rawLevel,
-                birthDate: birthDate,
-                birthPlace: birthPlace,
-                gender: gender,
-                sessionName: sessionName,
-                stage: stage,
+                  pw.SizedBox(height: 4),
+
+                  // 2b. Warning Banner: Non-Original Duplicata
+                  _buildNonOriginalBanner(),
+
+                  pw.SizedBox(height: 6),
+
+                  // 3. Student Identification Card
+                  _buildStudentInfoBox(
+                    name: studentName,
+                    matricule: matricule,
+                    className: className,
+                    rawLevel: rawLevel,
+                    birthDate: birthDate,
+                    birthPlace: birthPlace,
+                    gender: gender,
+                    sessionName: sessionName,
+                    stage: stage,
+                  ),
+
+                  pw.SizedBox(height: 8),
+
+                  // 4. Stage Specific Grades Table
+                  _buildGradesTable(stage, grades),
+
+                  pw.SizedBox(height: 8),
+
+                  // 5. Summary & Decision Box
+                  _buildSummaryAndDecisionBox(stage, resolvedSummary),
+
+                  pw.Spacer(),
+
+                  // 6. Signatures, Official Seals and Legal Disclaimer
+                  _buildSignaturesBlock(stage),
+                ],
               ),
-
-              pw.SizedBox(height: 12),
-
-              // 4. Stage Specific Grades Table
-              _buildGradesTable(stage, grades),
-
-              pw.SizedBox(height: 12),
-
-              // 5. Summary & Decision Box
-              _buildSummaryAndDecisionBox(stage, summary),
-
-              pw.Spacer(),
-
-              // 6. Signatures and Official Seals
-              _buildSignaturesBlock(stage),
             ],
           );
         },
@@ -864,21 +940,49 @@ class OfficialBulletinPdfGenerator {
     }
   }
 
+  static pw.Widget _buildNonOriginalBanner() {
+    return pw.Container(
+      margin: const pw.EdgeInsets.symmetric(vertical: 2),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: pw.BoxDecoration(
+        color: const PdfColor.fromInt(0xFFFEF2F2), // red 50
+        borderRadius: pw.BorderRadius.circular(4),
+        border: pw.Border.all(color: const PdfColor.fromInt(0xFFDC2626), width: 0.8), // red 600
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.center,
+        children: [
+          pw.Text(
+            '⚠️  DUPLICATA NUMÉRIQUE NON ORIGINAL — DOCUMENT INFORMATIF (ÉDITION MOBILE)',
+            style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 7.5,
+              color: const PdfColor.fromInt(0xFF991B1B), // red 800
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 1. PRIMAIRE TABLE
   static pw.Widget _buildPrimaireTable(List<Map<String, dynamic>> grades) {
     final headers = ['Discipline / Domaine', 'Note / 20', 'Moy. Classe', 'Compétences & Appréciations'];
 
     final rows = grades.map((g) {
-      final subject = g['subject_name']?.toString() ?? 'Discipline';
+      final subject = g['school_subjects']?['subject_name']?.toString() ??
+          g['subject_name']?.toString() ??
+          g['discipline']?.toString() ??
+          'Discipline';
       final score = (g['total_score'] as num?)?.toDouble() ?? 0.0;
       final classAvg = (g['class_avg'] as num?)?.toDouble() ?? 12.5;
-      final appreciation = score >= 16
+      final appreciation = g['appreciation']?.toString() ?? (score >= 16
           ? 'Très bien acquis'
           : score >= 13
               ? 'Bien acquis'
               : score >= 10
                   ? 'Acquis'
-                  : 'En voie d\'acquisition';
+                  : 'En voie d\'acquisition');
 
       return [
         subject,
@@ -908,27 +1012,129 @@ class OfficialBulletinPdfGenerator {
   static pw.Widget _buildCollegeTable(List<Map<String, dynamic>> grades) {
     final headers = ['Discipline', 'Devoir /20', 'Compo /20', 'Moy /20', 'Coef', 'Total', 'Rang', 'Appréciation Professeur'];
 
-    final rows = grades.map((g) {
-      final subject = g['subject_name']?.toString() ?? 'Discipline';
-      final devoir = (g['devoir_score'] as num?)?.toDouble() ?? (g['total_score'] as num?)?.toDouble() ?? 0.0;
-      final compo = (g['exam_score'] as num?)?.toDouble() ?? devoir;
-      final score = (g['total_score'] as num?)?.toDouble() ?? ((devoir + compo) / 2);
-      final coef = (g['coef'] as num?)?.toInt() ?? 2;
-      final total = score * coef;
-      final rank = g['rank']?.toString() ?? '1er';
-      final appreciation = score >= 16 ? 'Excellent' : score >= 14 ? 'Très Bien' : score >= 12 ? 'Assez Bien' : score >= 10 ? 'Passable' : 'Insuffisant';
+    int sumCoef = 0;
+    double sumPoints = 0.0;
+    final rows = <List<String>>[];
 
-      return [
+    for (final g in grades) {
+      final subject = g['school_subjects']?['subject_name']?.toString() ??
+          g['subject_name']?.toString() ??
+          g['discipline']?.toString() ??
+          g['matiere']?.toString() ??
+          'Discipline';
+
+      final rawDevoir = (g['class_work_score'] as num?)?.toDouble() ??
+          (g['devoir_score'] as num?)?.toDouble();
+      final rawCompo = (g['exam_score'] as num?)?.toDouble();
+      final rawTotal = (g['total_score'] as num?)?.toDouble();
+
+      double devoir = 0.0;
+      double compo = 0.0;
+      double score = 0.0;
+
+      if (rawDevoir != null && rawCompo != null && rawDevoir > 0 && rawCompo > 0) {
+        devoir = rawDevoir <= 20.0 ? rawDevoir : (rawDevoir / 2.0);
+        compo = rawCompo <= 20.0 ? rawCompo : (rawCompo / 2.0);
+        score = (devoir + compo) / 2.0;
+      } else if (rawTotal != null && rawTotal > 0) {
+        if (rawTotal <= 20.0) {
+          score = rawTotal;
+        } else if (rawTotal <= 40.0) {
+          score = rawTotal / 2.0;
+        } else {
+          score = (rawTotal / 100.0) * 20.0;
+        }
+        if (rawDevoir != null && rawDevoir > 0) {
+          devoir = rawDevoir <= 20.0 ? rawDevoir : (rawDevoir / 2.0);
+          compo = (score * 2.0) - devoir;
+          if (compo < 0) compo = score;
+        } else if (rawCompo != null && rawCompo > 0) {
+          compo = rawCompo <= 20.0 ? rawCompo : (rawCompo / 2.0);
+          devoir = (score * 2.0) - compo;
+          if (devoir < 0) devoir = score;
+        } else {
+          devoir = score;
+          compo = score;
+        }
+      } else if (rawCompo != null && rawCompo > 0) {
+        compo = rawCompo <= 20.0 ? rawCompo : (rawCompo / 2.0);
+        devoir = compo;
+        score = compo;
+      } else if (rawDevoir != null && rawDevoir > 0) {
+        devoir = rawDevoir <= 20.0 ? rawDevoir : (rawDevoir / 2.0);
+        compo = devoir;
+        score = devoir;
+      }
+
+      score = score.clamp(0.0, 20.0);
+      devoir = devoir.clamp(0.0, 20.0);
+      compo = compo.clamp(0.0, 20.0);
+
+      // Resolve coefficient: read coefficient or coef, else use official national curriculum coefficients
+      int coef = (g['coefficient'] as num?)?.toInt() ??
+          (g['coef'] as num?)?.toInt() ?? 0;
+
+      if (coef <= 0) {
+        final subLower = subject.toLowerCase();
+        if (subLower.contains('arabe') ||
+            subLower.contains('français') ||
+            subLower.contains('islam') ||
+            subLower.contains('physique') ||
+            subLower.contains('eps') ||
+            subLower.contains('anglais')) {
+          coef = 4;
+        } else if (subLower.contains('math') ||
+            subLower.contains('hist') ||
+            subLower.contains('géo')) {
+          coef = 3;
+        } else if (subLower.contains('conduite')) {
+          coef = 1;
+        } else {
+          coef = 2;
+        }
+      }
+
+      final points = score * coef;
+      sumCoef += coef;
+      sumPoints += points;
+
+      final rank = g['rank']?.toString() ?? '-';
+      final appreciation = g['appreciation']?.toString() ??
+          (score >= 16
+              ? 'Excellent'
+              : score >= 14
+                  ? 'Bien'
+                  : score >= 12
+                      ? 'Assez Bien'
+                      : score >= 10
+                          ? 'Passable'
+                          : 'Médiocre');
+
+      rows.add([
         subject,
-        devoir.toStringAsFixed(1),
-        compo.toStringAsFixed(1),
+        devoir.toStringAsFixed(2),
+        compo.toStringAsFixed(2),
         score.toStringAsFixed(2),
         coef.toString(),
-        total.toStringAsFixed(2),
+        points.toStringAsFixed(2),
         rank,
         appreciation,
-      ];
-    }).toList();
+      ]);
+    }
+
+    if (rows.isNotEmpty) {
+      final moyGen = sumCoef > 0 ? (sumPoints / sumCoef) : 0.0;
+      rows.add([
+        'TOTAL GÉNÉRAL',
+        '-',
+        '-',
+        '-',
+        sumCoef.toString(),
+        sumPoints.toStringAsFixed(2),
+        '-',
+        'Moy: ${moyGen.toStringAsFixed(2)} / 20',
+      ]);
+    }
 
     return pw.TableHelper.fromTextArray(
       headers: headers,
@@ -954,27 +1160,80 @@ class OfficialBulletinPdfGenerator {
   static pw.Widget _buildLyceeTable(List<Map<String, dynamic>> grades) {
     final headers = ['Matière', 'Éval. Continue', 'Compo', 'Moyenne /20', 'Coef', 'Points', 'Rang', 'Min-Max Classe', 'Visa & Appréciation'];
 
-    final rows = grades.map((g) {
-      final subject = g['subject_name']?.toString() ?? 'Matière';
-      final score = (g['total_score'] as num?)?.toDouble() ?? 0.0;
-      final coef = (g['coef'] as num?)?.toInt() ?? 3;
+    int sumCoef = 0;
+    double sumPoints = 0.0;
+    final rows = <List<String>>[];
+
+    for (final g in grades) {
+      final subject = g['school_subjects']?['subject_name']?.toString() ??
+          g['subject_name']?.toString() ??
+          g['discipline']?.toString() ??
+          g['matiere']?.toString() ??
+          'Matière';
+
+      final rawDevoir = (g['class_work_score'] as num?)?.toDouble() ??
+          (g['devoir_score'] as num?)?.toDouble();
+      final rawCompo = (g['exam_score'] as num?)?.toDouble();
+      final rawTotal = (g['total_score'] as num?)?.toDouble();
+
+      double devoir = rawDevoir ?? 0.0;
+      double compo = rawCompo ?? devoir;
+      double score = 0.0;
+
+      if (rawDevoir != null && rawCompo != null && rawDevoir > 0 && rawCompo > 0) {
+        devoir = rawDevoir <= 20.0 ? rawDevoir : (rawDevoir / 2.0);
+        compo = rawCompo <= 20.0 ? rawCompo : (rawCompo / 2.0);
+        score = (devoir + compo) / 2.0;
+      } else if (rawTotal != null && rawTotal > 0) {
+        score = rawTotal <= 20.0 ? rawTotal : (rawTotal <= 40.0 ? rawTotal / 2.0 : (rawTotal / 100.0) * 20.0);
+        devoir = score;
+        compo = score;
+      } else {
+        score = compo > 0 ? compo : devoir;
+      }
+
+      int coef = (g['coefficient'] as num?)?.toInt() ??
+          (g['coef'] as num?)?.toInt() ?? 0;
+      if (coef <= 0) {
+        coef = 3;
+      }
+
       final points = score * coef;
+      sumCoef += coef;
+      sumPoints += points;
+
       final rank = g['rank']?.toString() ?? '-';
       final minMax = '${(g['min_score'] ?? 8).toStringAsFixed(0)} - ${(g['max_score'] ?? 18).toStringAsFixed(0)}';
-      final appreciation = score >= 16 ? 'Très satisfaisant' : score >= 12 ? 'Bon travail' : score >= 10 ? 'Travail convenable' : 'Doit redoubler d\'efforts';
+      final appreciation = g['appreciation']?.toString() ??
+          (score >= 16 ? 'Très satisfaisant' : score >= 12 ? 'Bon travail' : score >= 10 ? 'Travail convenable' : 'Insuffisant');
 
-      return [
+      rows.add([
         subject,
-        score.toStringAsFixed(1),
-        score.toStringAsFixed(1),
+        devoir.toStringAsFixed(1),
+        compo.toStringAsFixed(1),
         score.toStringAsFixed(2),
         coef.toString(),
         points.toStringAsFixed(2),
         rank,
         minMax,
         appreciation,
-      ];
-    }).toList();
+      ]);
+    }
+
+    if (rows.isNotEmpty) {
+      final moyGen = sumCoef > 0 ? (sumPoints / sumCoef) : 0.0;
+      rows.add([
+        'TOTAL GÉNÉRAL',
+        '-',
+        '-',
+        '-',
+        sumCoef.toString(),
+        sumPoints.toStringAsFixed(2),
+        '-',
+        '-',
+        'Moy: ${moyGen.toStringAsFixed(2)} / 20',
+      ]);
+    }
 
     return pw.TableHelper.fromTextArray(
       headers: headers,
@@ -1134,31 +1393,51 @@ class OfficialBulletinPdfGenerator {
 
     final dateStr = DateFormat('dd/MM/yyyy').format(DateTime.now());
 
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(top: 8),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
+    return pw.Column(
+      children: [
+        pw.Container(
+          margin: const pw.EdgeInsets.only(top: 6),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text(sig1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-              pw.SizedBox(height: 28),
-              pw.Text('(Signature & Visa)', style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600)),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text(sig1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  pw.SizedBox(height: 20),
+                  pw.Text('(Signature & Visa)', style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600)),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text('Fait le : $dateStr', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                  pw.SizedBox(height: 3),
+                  pw.Text(sig2, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                  pw.SizedBox(height: 16),
+                  pw.Text('(Sceau & Signature Officielle)', style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600)),
+                ],
+              ),
             ],
           ),
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text('Fait le : $dateStr', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
-              pw.SizedBox(height: 4),
-              pw.Text(sig2, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
-              pw.SizedBox(height: 20),
-              pw.Text('(Sceau & Signature Officielle)', style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600)),
-            ],
+        ),
+        pw.SizedBox(height: 6),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.grey100,
+            borderRadius: pw.BorderRadius.circular(3),
+            border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
           ),
-        ],
-      ),
+          child: pw.Text(
+            'AVIS IMPORTANT : Le présent document est un DUPLICATA NUMÉRIQUE NON ORIGINAL généré via l\'application mobile Edut pour information des parents et élèves. '
+            'Il ne constitue en aucun cas le Bulletin de Notes officiel original. Seul le document physique revêtu du cachet humide officiel et de la signature manuscrite du Chef d\'Établissement fait foi.',
+            textAlign: pw.TextAlign.center,
+            style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey700),
+          ),
+        ),
+      ],
     );
   }
 }
