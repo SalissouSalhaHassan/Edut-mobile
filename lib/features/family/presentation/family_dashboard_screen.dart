@@ -1098,10 +1098,22 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
           .where((g) =>
               selectedPeriod == null ||
               selectedPeriod.isEmpty ||
-              g['term']?.toString() == selectedPeriod)
+              _termsMatch(g['term']?.toString(), selectedPeriod))
           .toList();
 
-      final gradesToUse = filteredGrades.isNotEmpty ? filteredGrades : _grades;
+      final isUniv = _studentClass.toLowerCase().contains('licence') ||
+          _studentClass.toLowerCase().contains('master') ||
+          _studentClass.toLowerCase().contains('doctorat') ||
+          _studentClass.toLowerCase().contains('l1') ||
+          _studentClass.toLowerCase().contains('l2') ||
+          _studentClass.toLowerCase().contains('l3') ||
+          _studentClass.toLowerCase().contains('m1') ||
+          _studentClass.toLowerCase().contains('m2') ||
+          (_student['educational_level']?.toString() ?? '').toLowerCase().contains('univ');
+
+      final gradesToUse = isUniv
+          ? _grades
+          : (filteredGrades.isNotEmpty ? filteredGrades : _grades);
 
       Map<String, dynamic>? headerConfig;
       if (_schoolId != null) {
