@@ -58,11 +58,11 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
   }
 
   Future<void> _loadPermission() async {
-    final profile = await locator<PermissionService>().getCurrentProfile();
+    final canCollect = await locator<PermissionService>()
+        .hasPermission(AppPermissions.financeCollect);
     if (!mounted) return;
     setState(() {
-      _canCollectFinance =
-          profile.permissions.contains(AppPermissions.financeCollect);
+      _canCollectFinance = canCollect;
     });
   }
 

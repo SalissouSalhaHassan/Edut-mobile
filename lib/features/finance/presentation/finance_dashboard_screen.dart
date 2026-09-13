@@ -60,12 +60,11 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
     });
 
     try {
-      final profile = await locator<PermissionService>().getCurrentProfile();
       final sessionManager = locator<SessionManager>();
       final schoolIdStr = await sessionManager.getSchoolId();
       _schoolId = int.tryParse(schoolIdStr ?? '') ?? 1;
-      _canCollectFinance =
-          profile.permissions.contains(AppPermissions.financeCollect);
+      _canCollectFinance = await locator<PermissionService>()
+          .hasPermission(AppPermissions.financeCollect);
       _userEducationalLevel = await sessionManager.getEducationalLevel();
 
       // Fetch school sessions

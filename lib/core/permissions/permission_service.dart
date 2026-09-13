@@ -168,6 +168,39 @@ class PermissionService {
       }
     }
 
+    // 4. Finance & Accounting staff have guaranteed access to finance operations, student lookups, and messaging
+    if (role == 'accountant' ||
+        role == 'comptable' ||
+        role == 'finance' ||
+        role == 'financier' ||
+        role == 'caissier' ||
+        role == 'tresorier' ||
+        role == 'trésorier' ||
+        role == 'daf' ||
+        role.contains('account') ||
+        role.contains('comptab') ||
+        role.contains('financ') ||
+        role.contains('caiss') ||
+        role.contains('tresor') ||
+        role.contains('trésor') ||
+        role.contains('daf') ||
+        role.contains('economat') ||
+        role.contains('économe') ||
+        role.contains('econome') ||
+        role.contains('gestionnaire') ||
+        role.contains('محاسب') ||
+        role.contains('مالي') ||
+        role.contains('مالية') ||
+        role.contains('صندوق') ||
+        role.contains('خزينة')) {
+      if (permission == AppPermissions.financeView ||
+          permission == AppPermissions.financeCollect ||
+          permission == AppPermissions.studentsView ||
+          permission == AppPermissions.messagingView) {
+        return true;
+      }
+    }
+
     return profile.permissions.contains(permission);
   }
 
@@ -345,10 +378,29 @@ class PermissionService {
     }
     if (role.contains('censeur')) return 'censeur';
     if (role.contains('surveillant')) return 'surveillant';
-    if (role.contains('comptable') || role.contains('accountant') || role.contains('caissier') || role.contains('caiss')) {
+    if (role.contains('comptab') ||
+        role.contains('account') ||
+        role.contains('caiss') ||
+        role.contains('financ') ||
+        role.contains('tresor') ||
+        role.contains('trésor') ||
+        role.contains('daf') ||
+        role.contains('economat') ||
+        role.contains('économe') ||
+        role.contains('econome') ||
+        role.contains('gestionnaire') ||
+        role.contains('محاسب') ||
+        role.contains('مالي') ||
+        role.contains('مالية') ||
+        role.contains('صندوق') ||
+        role.contains('خزينة')) {
       return 'accountant';
     }
-    if (role.contains('secret')) return 'secretary';
+    if (role.contains('secret') ||
+        role.contains('سكرتير') ||
+        role.contains('أمانة')) {
+      return 'secretary';
+    }
     if (role.contains('personnel') || role == 'hr' || role.contains('rh')) return 'personnel';
     if (role.contains('owner') || role.contains('propriet')) return 'owner';
     if (role.contains('admin') || isAdmin) return 'admin';
@@ -400,11 +452,42 @@ class PermissionService {
       'comptabilité',
       'caisse',
       'paiements',
+      'paiement',
       'frais',
       'scolarite',
       'scolarité',
       'recus',
       'reçus',
+      'versement',
+      'versements',
+      'tresorerie',
+      'trésorerie',
+      'ecolage',
+      'écolage',
+      'tuition',
+      'fee',
+      'fees',
+      'cash',
+      'cashier',
+      'recouvrement',
+      'recouvrements',
+      'dépenses',
+      'depenses',
+      'recettes',
+      'recette',
+      'budget',
+      'facture',
+      'factures',
+      'مالية',
+      'محاسبة',
+      'صندوق',
+      'خزينة',
+      'رسوم',
+      'مصاريف',
+      'أقساط',
+      'دفع',
+      'فواتير',
+      'تحصيل',
     ])) {
       if (canView) permissions.add(AppPermissions.financeView);
       if (canEdit || canDelete) permissions.add(AppPermissions.financeCollect);
@@ -635,11 +718,35 @@ class PermissionService {
       };
     }
 
-    if (role == 'accountant' || role == 'comptable' || role == 'finance') {
+    if (role == 'accountant' ||
+        role == 'comptable' ||
+        role == 'finance' ||
+        role == 'financier' ||
+        role == 'caissier' ||
+        role == 'tresorier' ||
+        role == 'trésorier' ||
+        role == 'daf' ||
+        role.contains('account') ||
+        role.contains('comptab') ||
+        role.contains('financ') ||
+        role.contains('caiss') ||
+        role.contains('tresor') ||
+        role.contains('trésor') ||
+        role.contains('daf') ||
+        role.contains('economat') ||
+        role.contains('économe') ||
+        role.contains('econome') ||
+        role.contains('gestionnaire') ||
+        role.contains('محاسب') ||
+        role.contains('مالي') ||
+        role.contains('مالية') ||
+        role.contains('صندوق') ||
+        role.contains('خزينة')) {
       return {
         AppPermissions.financeView,
         AppPermissions.financeCollect,
         AppPermissions.studentsView,
+        AppPermissions.messagingView,
       };
     }
 
@@ -664,12 +771,18 @@ class PermissionService {
       };
     }
 
-    if (role == 'secretary' || role == 'secretaire') {
+    if (role == 'secretary' ||
+        role == 'secretaire' ||
+        role == 'secrétaire' ||
+        role.contains('secret') ||
+        role.contains('سكرتير') ||
+        role.contains('أمانة')) {
       return {
         AppPermissions.studentsView,
         AppPermissions.studentsCreate,
         AppPermissions.studentsEdit,
         AppPermissions.financeView,
+        AppPermissions.financeCollect,
         AppPermissions.examsView,
         AppPermissions.attendanceView,
         AppPermissions.messagingView,

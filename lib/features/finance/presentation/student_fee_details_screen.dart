@@ -46,7 +46,6 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     });
 
     try {
-      final profile = await locator<PermissionService>().getCurrentProfile();
       final feeId = (_currentFee['id'] as num?)?.toInt() ?? 0;
 
       // 1. Fetch payments
@@ -84,10 +83,12 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
         freshFee['status'] = status;
       }
 
+      final canCollect = await locator<PermissionService>()
+          .hasPermission(AppPermissions.financeCollect);
+
       if (mounted) {
         setState(() {
-          _canCollectFinance =
-              profile.permissions.contains(AppPermissions.financeCollect);
+          _canCollectFinance = canCollect;
           _payments = paymentsList;
           // Merge student data from widget's feeData back into the fresh fee map
           final Map<String, dynamic> merged = Map<String, dynamic>.from(freshFee);

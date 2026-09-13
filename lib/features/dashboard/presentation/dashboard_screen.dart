@@ -150,10 +150,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (r == 'accountant' ||
         r == 'comptable' ||
         r == 'finance' ||
-        r.contains('comptable') ||
-        r.contains('accountant') ||
-        r.contains('finance')) {
-      return 'Comptable';
+        r == 'financier' ||
+        r == 'caissier' ||
+        r == 'tresorier' ||
+        r == 'trésorier' ||
+        r == 'daf' ||
+        r.contains('comptab') ||
+        r.contains('account') ||
+        r.contains('financ') ||
+        r.contains('caiss') ||
+        r.contains('tresor') ||
+        r.contains('trésor') ||
+        r.contains('daf') ||
+        r.contains('محاسب') ||
+        r.contains('مالي') ||
+        r.contains('صندوق') ||
+        r.contains('خزينة')) {
+      return 'Finance / Comptabilité';
     }
     if (r == 'secretary' ||
         r == 'secretaire' ||
@@ -235,24 +248,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
         context.go(getHomeRouteForRole(normalizedRole));
         return;
       }
-      setState(() {
-        _userEmail = email;
-        _userRole = profile.role;
-        final permissions = profile.permissions;
-        _hasFinanceAccess = permissions.contains(AppPermissions.financeView);
-        _hasOwnerAccess = permissions.contains(
-          AppPermissions.ownerPlatformView,
-        );
-        _hasStudentsAccess = permissions.contains(AppPermissions.studentsView);
-        _hasStudentPromotionAccess = permissions.contains(
-          AppPermissions.studentsPromote,
-        );
-        _hasHostelAccess = permissions.contains(AppPermissions.hostelView);
-        _hasHrAccess = permissions.contains(AppPermissions.hrView);
-        _dashboardStats = dashboardStats;
-        _unreadNotificationsCount = unreadNotificationsCount;
-        _isLoading = false;
-      });
+      final hasFinance =
+          await permissionService.hasPermission(AppPermissions.financeView);
+      final hasOwner = await permissionService.hasPermission(
+        AppPermissions.ownerPlatformView,
+      );
+      final hasStudents =
+          await permissionService.hasPermission(AppPermissions.studentsView);
+      final hasStudentPromotion = await permissionService.hasPermission(
+        AppPermissions.studentsPromote,
+      );
+      final hasHostel =
+          await permissionService.hasPermission(AppPermissions.hostelView);
+      final hasHr =
+          await permissionService.hasPermission(AppPermissions.hrView);
+
+      if (mounted) {
+        setState(() {
+          _userEmail = email;
+          _userRole = profile.role;
+          _hasFinanceAccess = hasFinance;
+          _hasOwnerAccess = hasOwner;
+          _hasStudentsAccess = hasStudents;
+          _hasStudentPromotionAccess = hasStudentPromotion;
+          _hasHostelAccess = hasHostel;
+          _hasHrAccess = hasHr;
+          _dashboardStats = dashboardStats;
+          _unreadNotificationsCount = unreadNotificationsCount;
+          _isLoading = false;
+        });
+      }
     }
   }
 
