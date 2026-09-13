@@ -96,6 +96,18 @@ class OfficialBulletinPdfGenerator {
       );
     }
 
+    if (stage == EducationalStage.primaire) {
+      return _generatePrimaireBulletinBytes(
+        student: student,
+        grades: grades,
+        summary: summary,
+        period: period,
+        sessionName: sessionName,
+        headerConfig: resolvedHeader,
+        amiriBold: amiriBold,
+      );
+    }
+
     // 0. Compute accurate Totals and Coefficients from grades
     int sumCoef = 0;
     double sumPoints = 0.0;
@@ -224,6 +236,402 @@ class OfficialBulletinPdfGenerator {
 
                   // 6. Signatures, Official Seals and Legal Disclaimer
                   _buildSignaturesBlock(stage),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  //  OFFICIAL PRIMARY SCHOOL CARNET DE NOTES (BILINGUE FRANÇAIS / ARABE)
+  // ───────────────────────────────────────────────────────────────────────────
+  static Future<Uint8List> _generatePrimaireBulletinBytes({
+    required Map<String, dynamic> student,
+    required List<Map<String, dynamic>> grades,
+    required Map<String, dynamic> summary,
+    required String period,
+    required String sessionName,
+    Map<String, dynamic>? headerConfig,
+    required pw.Font amiriBold,
+  }) async {
+    final pdf = pw.Document();
+
+    final studentName = student['nom_etudiant']?.toString() ??
+        student['nomEtudiant']?.toString() ??
+        student['name']?.toString() ??
+        'Sans Nom';
+    final className = student['classe']?.toString() ??
+        student['className']?.toString() ??
+        'CP';
+    final maitre = student['teacher_name']?.toString() ??
+        headerConfig?['teacherName']?.toString() ??
+        '';
+
+    pw.MemoryImage? centerLogo;
+    final logoSource = headerConfig?['centerLogo'] ??
+        headerConfig?['leftLogo'] ??
+        headerConfig?['customLogo'];
+    if (logoSource != null && logoSource.toString().startsWith('data:image/')) {
+      try {
+        final base64Str = logoSource.toString().split(',').last;
+        centerLogo = pw.MemoryImage(base64.decode(base64Str));
+      } catch (_) {}
+    }
+
+    final pNorm = period.toLowerCase();
+    final currentCompIndex = pNorm.contains('1') ? 1 : (pNorm.contains('2') ? 2 : 3);
+
+    final List<Map<String, String>> defaultSubjects = [
+      {'fr': "AlKour'Ane", 'ar': 'القرآن الكريم', 'cat': 'arabe'},
+      {'fr': 'AL-Hadith', 'ar': 'الحديث', 'cat': 'arabe'},
+      {'fr': 'Attawhide', 'ar': 'التوحيد', 'cat': 'arabe'},
+      {'fr': 'AL-Fikhou', 'ar': 'الفقه', 'cat': 'arabe'},
+      {'fr': 'Assira', 'ar': 'السيرة', 'cat': 'arabe'},
+      {'fr': 'Annahwou', 'ar': 'النحو', 'cat': 'arabe'},
+      {'fr': 'Etude de texte', 'ar': 'دراسة النص', 'cat': 'francais'},
+      {'fr': 'Mathématique', 'ar': 'الحساب/ الرياضيات', 'cat': 'francais'},
+      {'fr': 'Sciences', 'ar': 'العلوم', 'cat': 'francais'},
+      {'fr': 'Lecture', 'ar': 'القراءة', 'cat': 'francais'},
+      {'fr': 'Langage', 'ar': 'المحادثة', 'cat': 'francais'},
+      {'fr': 'Rédaction', 'ar': 'التعبير', 'cat': 'francais'},
+      {'fr': 'Récitation/Chant', 'ar': 'المحفوظات/الأناشيد', 'cat': 'francais'},
+      {'fr': 'Dictée', 'ar': 'الإملاء', 'cat': 'francais'},
+      {'fr': 'Histoire', 'ar': 'التاريخ', 'cat': 'francais'},
+      {'fr': 'Géographie', 'ar': 'الجغرافية', 'cat': 'francais'},
+      {'fr': 'Ecriture', 'ar': 'الخط', 'cat': 'francais'},
+      {'fr': 'Dessin', 'ar': 'الرسم', 'cat': 'francais'},
+      {'fr': 'EPS', 'ar': 'الرياضة البدنية', 'cat': 'francais'},
+    ];
+
+    final scoreLookup = <String, double>{};
+    for (final g in grades) {
+      final sName = (g['school_subjects']?['subject_name'] ?? g['subject_name'] ?? '').toString().toLowerCase().trim();
+      final cw = (g['class_work_score'] as num?)?.toDouble();
+      final ex = (g['exam_score'] as num?)?.toDouble();
+      final tot = (g['total_score'] as num?)?.toDouble();
+
+      double score = 0.0;
+      if (cw != null && ex != null) {
+        score = (cw + ex) / 2.0;
+      } else if (ex != null) {
+        score = ex;
+      } else if (cw != null) {
+        score = cw;
+      } else if (tot != null) {
+        score = tot <= 20 ? tot : tot / 2.0;
+      }
+      scoreLookup[sName] = score;
+    }
+
+    double totalFr1 = 0, totalAr1 = 0;
+    int countFr1 = 0, countAr1 = 0;
+
+    final List<List<String>> tableRows = [];
+    for (final def in defaultSubjects) {
+      final fr = def['fr']!;
+      final ar = def['ar']!;
+      final isAr = def['cat'] == 'arabe';
+      final key = fr.toLowerCase();
+
+      double? sc;
+      for (final entry in scoreLookup.entries) {
+        if (entry.key.contains(key) || key.contains(entry.key) || entry.key.contains(ar)) {
+          sc = entry.value;
+          break;
+        }
+      }
+
+      String c1Fr = '';
+      String c1Ar = '';
+      if (sc != null) {
+        final valStr = sc.toStringAsFixed(sc % 1 == 0 ? 0 : 2);
+        if (isAr) {
+          c1Ar = valStr;
+          totalAr1 += sc;
+          countAr1++;
+        } else {
+          c1Fr = valStr;
+          totalFr1 += sc;
+          countFr1++;
+        }
+      }
+
+      tableRows.add([
+        '$fr / $ar',
+        '20',
+        currentCompIndex == 1 ? c1Fr : '',
+        currentCompIndex == 1 ? c1Ar : '',
+        currentCompIndex == 2 ? c1Fr : '',
+        currentCompIndex == 2 ? c1Ar : '',
+        currentCompIndex == 3 ? c1Fr : '',
+        currentCompIndex == 3 ? c1Ar : '',
+      ]);
+    }
+
+    final rawAvg = (summary['average'] as num?)?.toDouble() ??
+        ((countFr1 + countAr1 > 0) ? ((totalFr1 + totalAr1) / (countFr1 + countAr1)) : 0.0);
+    final comp1GenRank = summary['rank']?.toString() ?? '1er';
+    final totalStudents = summary['total_students']?.toString() ??
+        summary['totalStudents']?.toString() ??
+        '30';
+
+    final isAdmis = rawAvg >= 10.0;
+    final isRedouble = rawAvg >= 8.0 && rawAvg < 10.0;
+    final isExclu = rawAvg > 0 && rawAvg < 8.0;
+
+    String nextClass = 'CP';
+    final uCls = className.toUpperCase().trim();
+    if (uCls.contains('CI')) nextClass = 'CP';
+    else if (uCls.contains('CP1')) nextClass = 'CP2';
+    else if (uCls.contains('CP2') || uCls.contains('CP')) nextClass = 'CE1';
+    else if (uCls.contains('CE1')) nextClass = 'CE2';
+    else if (uCls.contains('CE2')) nextClass = 'CM1';
+    else if (uCls.contains('CM1')) nextClass = 'CM2';
+    else if (uCls.contains('CM2')) nextClass = '6ème (Collège)';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(16),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Row(
+                        children: [
+                          pw.Text('ANNÉE SCOLAIRE : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                          pw.Text(sessionName, style: const pw.TextStyle(fontSize: 10)),
+                        ],
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Row(
+                        children: [
+                          pw.Text("NOM DE L'ÉLÈVE : ", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                          pw.Text(studentName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                          pw.SizedBox(width: 20),
+                          pw.Text('COURS : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                          pw.Text(className, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (centerLogo != null)
+                    pw.Container(
+                      width: 44,
+                      height: 44,
+                      child: pw.Image(centerLogo),
+                    )
+                  else
+                    pw.Container(
+                      width: 44,
+                      height: 44,
+                      decoration: pw.BoxDecoration(
+                        shape: pw.BoxShape.circle,
+                        border: pw.Border.all(color: PdfColors.indigo900, width: 1.5),
+                      ),
+                      child: pw.Center(
+                        child: pw.Text('ÉCOLE\nPRIMAIRE', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7, color: PdfColors.indigo900)),
+                      ),
+                    ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('TENU PAR :', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, decoration: pw.TextDecoration.underline)),
+                      pw.SizedBox(height: 3),
+                      pw.Row(
+                        children: [
+                          pw.Text('Mr : ${maitre.isNotEmpty ? maitre : "..................."}', style: const pw.TextStyle(fontSize: 9)),
+                          pw.SizedBox(width: 10),
+                          pw.Text('ET Mr : ...................', style: const pw.TextStyle(fontSize: 9)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 8),
+
+              // Main Body Row (Left Table + Right Panel)
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // Left Table
+                  pw.Expanded(
+                    flex: 55,
+                    child: pw.TableHelper.fromTextArray(
+                      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+                      cellAlignment: pw.Alignment.center,
+                      headerAlignment: pw.Alignment.center,
+                      cellPadding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                      headerPadding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                      cellStyle: const pw.TextStyle(fontSize: 6.5),
+                      headerStyle: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold),
+                      columnWidths: {
+                        0: const pw.FlexColumnWidth(3.2),
+                        1: const pw.FlexColumnWidth(0.8),
+                        2: const pw.FlexColumnWidth(1.0),
+                        3: const pw.FlexColumnWidth(1.0),
+                        4: const pw.FlexColumnWidth(1.0),
+                        5: const pw.FlexColumnWidth(1.0),
+                        6: const pw.FlexColumnWidth(1.0),
+                        7: const pw.FlexColumnWidth(1.0),
+                      },
+                      headers: [
+                        'Matières / المواد',
+                        'SUR / على',
+                        'Comp 1\nFR',
+                        'Comp 1\nالعربية',
+                        'Comp 2\nFR',
+                        'Comp 2\nالعربية',
+                        'Comp 3\nFR',
+                        'Comp 3\nالعربية',
+                      ],
+                      data: tableRows,
+                    ),
+                  ),
+
+                  pw.SizedBox(width: 10),
+
+                  // Right Panel (Top Visa Table + Bottom Result Box)
+                  pw.Expanded(
+                    flex: 45,
+                    child: pw.Column(
+                      children: [
+                        // Top Table (Evaluation & Visas)
+                        pw.Table(
+                          border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+                          columnWidths: {
+                            0: const pw.FlexColumnWidth(1.2),
+                            1: const pw.FlexColumnWidth(1.8),
+                            2: const pw.FlexColumnWidth(1.1),
+                            3: const pw.FlexColumnWidth(1.1),
+                          },
+                          children: [
+                            pw.TableRow(
+                              decoration: const pw.BoxDecoration(color: PdfColors.white),
+                              children: [
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(3),
+                                  child: pw.Text('Composition\nالتقويم', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center),
+                                ),
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(3),
+                                  child: pw.Text('Observation\nDes enseignants', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center),
+                                ),
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(3),
+                                  child: pw.Text('Visa du\nDirecteur', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center),
+                                ),
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(3),
+                                  child: pw.Text('Visa du\nParents', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7), textAlign: pw.TextAlign.center),
+                                ),
+                              ],
+                            ),
+                            for (int i = 1; i <= 3; i++)
+                              pw.TableRow(
+                                children: [
+                                  pw.Container(
+                                    height: 38,
+                                    alignment: pw.Alignment.center,
+                                    child: pw.Text('Composition N° $i\nالشهر $i', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5), textAlign: pw.TextAlign.center),
+                                  ),
+                                  pw.Container(
+                                    height: 38,
+                                    padding: const pw.EdgeInsets.all(3),
+                                    alignment: pw.Alignment.topLeft,
+                                    child: pw.Text(i == currentCompIndex ? (summary['observation']?.toString() ?? summary['appreciation']?.toString() ?? 'Bon travail.') : '', style: const pw.TextStyle(fontSize: 6.5)),
+                                  ),
+                                  pw.Container(height: 38),
+                                  pw.Container(height: 38),
+                                ],
+                              ),
+                          ],
+                        ),
+
+                        pw.SizedBox(height: 10),
+
+                        // Bottom Result Box (RESULTAT DE FIN D'ANNÉE)
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(8),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.black, width: 1),
+                          ),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('RESULTAT DE FIN D\'ANNÉE', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5, decoration: pw.TextDecoration.underline)),
+                                  pw.Text('نتيجة نهاية السنة', style: pw.TextStyle(font: amiriBold, fontSize: 10.5), textDirection: pw.TextDirection.rtl),
+                                ],
+                              ),
+                              pw.Divider(thickness: 0.5, color: PdfColors.black),
+                              pw.SizedBox(height: 4),
+
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('Moyenne Annuelle : ${rawAvg > 0 ? rawAvg.toStringAsFixed(2) : "...."}   Rang : $comp1GenRank   Sur : $totalStudents', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                                  pw.Text('معدل سنوي : ${rawAvg > 0 ? rawAvg.toStringAsFixed(2) : "...."}   الترتيب : $comp1GenRank   على : $totalStudents', style: pw.TextStyle(font: amiriBold, fontSize: 7.5), textDirection: pw.TextDirection.rtl),
+                                ],
+                              ),
+                              pw.SizedBox(height: 6),
+
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('[${isAdmis ? "X" : " "}] Admis au $nextClass à la rentrée', style: pw.TextStyle(fontWeight: isAdmis ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 7.5)),
+                                  pw.Text('نجح إلى : $nextClass', style: pw.TextStyle(font: amiriBold, fontSize: 8), textDirection: pw.TextDirection.rtl),
+                                ],
+                              ),
+                              pw.SizedBox(height: 4),
+
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('[${isRedouble ? "X" : " "}] Redouble La classe de : $className', style: pw.TextStyle(fontWeight: isRedouble ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 7.5)),
+                                  pw.Text('راسب في فصل : $className', style: pw.TextStyle(font: amiriBold, fontSize: 8), textDirection: pw.TextDirection.rtl),
+                                ],
+                              ),
+                              pw.SizedBox(height: 4),
+
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('[${isExclu ? "X" : " "}] Exclu de l\'école pour : ....................', style: const pw.TextStyle(fontSize: 7.5)),
+                                  pw.Text('طُرد من المدرسة من أجل : ....................', style: pw.TextStyle(font: amiriBold, fontSize: 8), textDirection: pw.TextDirection.rtl),
+                                ],
+                              ),
+                              pw.SizedBox(height: 6),
+
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('Fait le ...................., à ....................', style: const pw.TextStyle(fontSize: 7, fontStyle: pw.FontStyle.italic)),
+                                  pw.Text('Visa & Cachet du Directeur', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -879,6 +1287,671 @@ class OfficialBulletinPdfGenerator {
                       style: pw.TextStyle(fontSize: 6.0, fontStyle: pw.FontStyle.italic, color: PdfColors.grey600),
                     ),
                   ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  //  OFFICIAL PRIMARY SCHOOL BULLETIN (CARNET DE NOTES PRIMAIRE - BILINGUE)
+  // ───────────────────────────────────────────────────────────────────────────
+  static String _computePrimaryNextClass(String currentClass) {
+    final upper = currentClass.toUpperCase().trim();
+    if (upper.contains('CI')) return 'CP';
+    if (upper.contains('CP')) return 'CE1';
+    if (upper.contains('CE1')) return 'CE2';
+    if (upper.contains('CE2')) return 'CM1';
+    if (upper.contains('CM1')) return 'CM2';
+    if (upper.contains('CM2')) return '6ème';
+    if (upper.contains('SIL')) return 'CP';
+    return 'Classe Supérieure';
+  }
+
+  static Future<Uint8List> _generatePrimaireBulletinBytes({
+    required Map<String, dynamic> student,
+    required List<Map<String, dynamic>> grades,
+    required Map<String, dynamic> summary,
+    required String period,
+    required String sessionName,
+    Map<String, dynamic>? headerConfig,
+    required pw.Font amiriBold,
+  }) async {
+    final pdf = pw.Document();
+
+    final studentName = student['nom_etudiant']?.toString() ??
+        student['nomEtudiant']?.toString() ??
+        student['name']?.toString() ??
+        'Sans Nom';
+    final className = student['classe']?.toString() ??
+        student['className']?.toString() ??
+        'CP';
+
+    // School Header Logos
+    pw.MemoryImage? centerLogoImage;
+    final logoSource = headerConfig?['centerLogo'] ??
+        headerConfig?['customLogo'] ??
+        headerConfig?['leftLogo'];
+    if (logoSource != null && logoSource.toString().startsWith('data:image/')) {
+      try {
+        final base64Str = logoSource.toString().split(',').last;
+        centerLogoImage = pw.MemoryImage(base64.decode(base64Str));
+      } catch (_) {}
+    }
+
+    // Determine current active composition index
+    int currentCompIndex = 1;
+    final lowerPeriod = period.toLowerCase();
+    if (lowerPeriod.contains('2') || lowerPeriod.contains('deux')) {
+      currentCompIndex = 2;
+    } else if (lowerPeriod.contains('3') || lowerPeriod.contains('trois')) {
+      currentCompIndex = 3;
+    }
+
+    // Standard subjects definition matching reference model
+    final List<Map<String, dynamic>> primarySubjects = [
+      {'nameFr': "Al-Kour'Ane", 'nameAr': 'القرآن الكريم', 'sur': 20, 'isAr': true, 'keys': ['coran', 'quran', 'kourane', 'kouran']},
+      {'nameFr': 'Al-Hadith', 'nameAr': 'الحديث', 'sur': 10, 'isAr': true, 'keys': ['hadith', 'hadit']},
+      {'nameFr': 'Attawhide', 'nameAr': 'التوحيد', 'sur': 10, 'isAr': true, 'keys': ['tawhid', 'tawhide', 'attawhid']},
+      {'nameFr': 'Al-Fikhou', 'nameAr': 'الفقه', 'sur': 10, 'isAr': true, 'keys': ['fikh', 'fikhou', 'fiqh']},
+      {'nameFr': 'Assira', 'nameAr': 'السيرة', 'sur': 10, 'isAr': true, 'keys': ['sira', 'assira']},
+      {'nameFr': 'Annahwou', 'nameAr': 'النحو', 'sur': 10, 'isAr': true, 'keys': ['nahw', 'nahwou', 'annahwou']},
+      {'nameFr': 'Etude de texte', 'nameAr': 'دراسة النص', 'sur': 20, 'isAr': false, 'keys': ['texte', 'etude de texte']},
+      {'nameFr': 'Mathématique', 'nameAr': 'الحساب/الرياضيات', 'sur': 50, 'isAr': false, 'keys': ['math', 'calcul', 'arithmetique', 'arithmétique']},
+      {'nameFr': 'Sciences', 'nameAr': 'العلوم', 'sur': 20, 'isAr': false, 'keys': ['science', 'eveil', 'éveil', 'observation']},
+      {'nameFr': 'Lecture', 'nameAr': 'القراءة', 'sur': 20, 'isAr': false, 'keys': ['lecture']},
+      {'nameFr': 'Langage', 'nameAr': 'المحادثة', 'sur': 10, 'isAr': false, 'keys': ['langage', 'expression orale', 'communication']},
+      {'nameFr': 'Rédaction', 'nameAr': 'التعبير', 'sur': 20, 'isAr': false, 'keys': ['redaction', 'rédaction', 'expression ecrite']},
+      {'nameFr': 'Récitation/Chant', 'nameAr': 'المحفوظات/الأناشيد', 'sur': 10, 'isAr': false, 'keys': ['recitation', 'récitation', 'chant', 'poesie', 'poésie']},
+      {'nameFr': 'Dictée', 'nameAr': 'الإملاء', 'sur': 20, 'isAr': false, 'keys': ['dictee', 'dictée', 'orthographe']},
+      {'nameFr': 'Histoire', 'nameAr': 'التاريخ', 'sur': 10, 'isAr': false, 'keys': ['histoire']},
+      {'nameFr': 'Géographie', 'nameAr': 'الجغرافية', 'sur': 10, 'isAr': false, 'keys': ['geographie', 'géographie']},
+      {'nameFr': 'Ecriture', 'nameAr': 'الخط', 'sur': 10, 'isAr': true, 'keys': ['ecriture', 'écriture', 'khatt', 'khat']},
+      {'nameFr': 'Dessin', 'nameAr': 'الرسم', 'sur': 10, 'isAr': false, 'keys': ['dessin', 'arts']},
+      {'nameFr': 'EPS', 'nameAr': 'الرياضة البدنية', 'sur': 10, 'isAr': false, 'keys': ['eps', 'sport', 'physique']},
+    ];
+
+    // Find grades mapped to standard subjects
+    double totalFr1 = 0, totalAr1 = 0;
+    int countFr1 = 0, countAr1 = 0;
+
+    final List<List<dynamic>> rowsData = [];
+
+    for (final s in primarySubjects) {
+      final nameFr = s['nameFr'] as String;
+      final nameAr = s['nameAr'] as String;
+      final sur = s['sur'] as int;
+      final isAr = s['isAr'] as bool;
+      final keys = s['keys'] as List<String>;
+
+      // Match grade from actual grades list
+      Map<String, dynamic>? matchedGrade;
+      for (final g in grades) {
+        final gName = (g['subject_name'] ?? g['name'] ?? g['matiere'] ?? '').toString().toLowerCase();
+        if (keys.any((k) => gName.contains(k))) {
+          matchedGrade = g;
+          break;
+        }
+      }
+
+      double? score;
+      if (matchedGrade != null) {
+        final rawVal = matchedGrade['exam_score'] ?? matchedGrade['total_score'] ?? matchedGrade['note'];
+        if (rawVal != null) {
+          score = (rawVal as num).toDouble();
+        }
+      }
+
+      String comp1Fr = '', comp1Ar = '';
+      if (score != null) {
+        final formattedScore = score.toStringAsFixed(1);
+        if (isAr) {
+          comp1Ar = formattedScore;
+          totalAr1 += score;
+          countAr1++;
+        } else {
+          comp1Fr = formattedScore;
+          totalFr1 += score;
+          countFr1++;
+        }
+      }
+
+      rowsData.add([
+        nameFr,
+        nameAr,
+        sur.toString(),
+        currentCompIndex == 1 ? comp1Fr : '',
+        currentCompIndex == 1 ? comp1Ar : '',
+        currentCompIndex == 2 ? comp1Fr : '',
+        currentCompIndex == 2 ? comp1Ar : '',
+        currentCompIndex == 3 ? comp1Fr : '',
+        currentCompIndex == 3 ? comp1Ar : '',
+      ]);
+    }
+
+    // Totals and averages
+    final moyFr1 = countFr1 > 0 ? (totalFr1 / countFr1).toStringAsFixed(2) : '-';
+    final moyAr1 = countAr1 > 0 ? (totalAr1 / countAr1).toStringAsFixed(2) : '-';
+
+    final annAvg = (summary['annual_average'] as num?)?.toDouble() ??
+        (summary['average'] as num?)?.toDouble() ??
+        (summary['moyenne_annuelle'] as num?)?.toDouble() ??
+        (summary['moyenne'] as num?)?.toDouble() ??
+        0.0;
+    final annRank = summary['annual_rank']?.toString() ??
+        summary['rank']?.toString() ??
+        summary['rang']?.toString() ??
+        '-';
+    final isAdmis = annAvg >= 10.0;
+    final isRedouble = annAvg >= 8.0 && annAvg < 10.0;
+    final isExclu = annAvg > 0.0 && annAvg < 8.0;
+
+    final nextClass = _computePrimaryNextClass(className);
+    String nextYear = '2025';
+    if (sessionName.contains('-')) {
+      final p = sessionName.split('-').last.trim();
+      if (int.tryParse(p) != null) nextYear = p;
+    }
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(18),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // 1. Top Header Row
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left info
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Row(
+                        children: [
+                          pw.Text('ANNÉE SCOLAIRE : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                          pw.Text(sessionName.isNotEmpty ? sessionName : '2024-2025', style: const pw.TextStyle(fontSize: 9)),
+                        ],
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Row(
+                        children: [
+                          pw.Text("NOM DE L'ÉLÈVE : ", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                          pw.Text(studentName.toUpperCase(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Center Logo / Badge
+                  pw.Column(
+                    children: [
+                      if (centerLogoImage != null)
+                        pw.Image(centerLogoImage, width: 44, height: 44)
+                      else
+                        pw.Container(
+                          width: 44,
+                          height: 44,
+                          decoration: pw.BoxDecoration(
+                            shape: pw.BoxShape.circle,
+                            border: pw.Border.all(color: PdfColors.black, width: 1.2),
+                          ),
+                          child: pw.Center(
+                            child: pw.Text('ONG', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  // Right info
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Row(
+                        children: [
+                          pw.Text('COURS : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                          pw.Text(className.toUpperCase(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                        ],
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Row(
+                        children: [
+                          pw.Text('TENU PAR : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+                          pw.Text('Mr : ................... ET Mr : ...................', style: const pw.TextStyle(fontSize: 8.5)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              pw.SizedBox(height: 7),
+
+              // 2. Main Content Split: Left Table (Notes) + Right Panel (Evaluation + Résultat)
+              pw.Expanded(
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    // LEFT PANEL: BILINGUAL GRADES TABLE
+                    pw.Expanded(
+                      flex: 54,
+                      child: pw.Table(
+                        border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+                        columnWidths: const {
+                          0: pw.FlexColumnWidth(3.4), // Matière
+                          1: pw.FlexColumnWidth(0.9), // SUR
+                          2: pw.FlexColumnWidth(1.1), // C1 FR
+                          3: pw.FlexColumnWidth(1.1), // C1 AR
+                          4: pw.FlexColumnWidth(1.1), // C2 FR
+                          5: pw.FlexColumnWidth(1.1), // C2 AR
+                          6: pw.FlexColumnWidth(1.1), // C3 FR
+                          7: pw.FlexColumnWidth(1.1), // C3 AR
+                        },
+                        children: [
+                          // Header 1
+                          pw.TableRow(
+                            decoration: const pw.BoxDecoration(color: PdfColors.white),
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                                child: pw.Column(
+                                  children: [
+                                    pw.Text('Compositions', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                                    pw.Text('الامتحانات', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7.5)),
+                                  ],
+                                ),
+                              ),
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                child: pw.Center(child: pw.Text('SUR\nعلى', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
+                              ),
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                child: pw.Center(child: pw.Text('Composition N° 1', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              ),
+                              pw.Container(), // Placeholder for visual span
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                child: pw.Center(child: pw.Text('Composition N° 2', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              ),
+                              pw.Container(),
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                child: pw.Center(child: pw.Text('Composition N° 3', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              ),
+                              pw.Container(),
+                            ],
+                          ),
+                          // Header 2
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Text('Matières', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text('المواد', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                  ],
+                                ),
+                              ),
+                              pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6))),
+                              pw.Center(child: pw.Text('FR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                              pw.Center(child: pw.Text('العربية', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('FR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                              pw.Center(child: pw.Text('العربية', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('FR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
+                              pw.Center(child: pw.Text('العربية', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
+                            ],
+                          ),
+                          // Subject rows
+                          ...rowsData.map((row) {
+                            return pw.TableRow(
+                              children: [
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.symmetric(vertical: 1, horizontal: 3),
+                                  child: pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Text(row[0] as String, style: const pw.TextStyle(fontSize: 6.5)),
+                                      pw.Text(row[1] as String, textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                    ],
+                                  ),
+                                ),
+                                pw.Center(child: pw.Text(row[2] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                                pw.Center(child: pw.Text(row[3] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                                pw.Center(child: pw.Text(row[4] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                                pw.Center(child: pw.Text(row[5] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                                pw.Center(child: pw.Text(row[6] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                                pw.Center(child: pw.Text(row[7] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                                pw.Center(child: pw.Text(row[8] as String, style: const pw.TextStyle(fontSize: 6.5))),
+                              ],
+                            );
+                          }),
+                          // Foot 1: Total / المجموع
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text('المجموع', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                  ],
+                                ),
+                              ),
+                              pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text(totalFr1 > 0 ? totalFr1.toStringAsFixed(1) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text(totalAr1 > 0 ? totalAr1.toStringAsFixed(1) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                            ],
+                          ),
+                          // Foot 2: Moyenne / المعدل
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Text('Moyenne', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text('المعدل', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                  ],
+                                ),
+                              ),
+                              pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text(moyFr1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text(moyAr1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                            ],
+                          ),
+                          // Foot 3: Rang / الترتيب
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Text('Rang', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text('الترتيب', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                  ],
+                                ),
+                              ),
+                              pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text(summary['rank']?.toString() ?? '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text(summary['rank']?.toString() ?? '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                            ],
+                          ),
+                          // Foot 4: Moyenne Générale / معدل عام
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Text('Moyenne Générale', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text('معدل عام', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                  ],
+                                ),
+                              ),
+                              pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text(annAvg > 0 ? annAvg.toStringAsFixed(2) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text(annAvg > 0 ? annAvg.toStringAsFixed(2) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                            ],
+                          ),
+                          // Foot 5: Rang Général / ترتيب عام
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 1.5, horizontal: 3),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Text('Rang Général', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text('ترتيب عام', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                  ],
+                                ),
+                              ),
+                              pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text(annRank, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text(annRank, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                              pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    pw.SizedBox(width: 14),
+
+                    // RIGHT PANEL: EVALUATION TABLE & RESULTAT DE FIN D'ANNÉE
+                    pw.Expanded(
+                      flex: 46,
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                        children: [
+                          // 1. Evaluations Table
+                          pw.Table(
+                            border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+                            columnWidths: const {
+                              0: pw.FlexColumnWidth(2.0),
+                              1: pw.FlexColumnWidth(2.6),
+                              2: pw.FlexColumnWidth(1.8),
+                              3: pw.FlexColumnWidth(1.8),
+                            },
+                            children: [
+                              pw.TableRow(
+                                children: [
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(3),
+                                    child: pw.Column(
+                                      children: [
+                                        pw.Text('التقويم والتوقيع', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7.5)),
+                                        pw.Text('Composition', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                      ],
+                                    ),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(3),
+                                    child: pw.Text('Observation\nDes enseignants', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(3),
+                                    child: pw.Text('Visa du\nDirecteur', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                  ),
+                                  pw.Padding(
+                                    padding: const pw.EdgeInsets.all(3),
+                                    child: pw.Text('Visa du\nParents', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                  ),
+                                ],
+                              ),
+                              ...List.generate(3, (i) {
+                                final compNum = i + 1;
+                                final obs = compNum == currentCompIndex ? (summary['appreciation'] ?? summary['observation'] ?? '') : '';
+                                return pw.TableRow(
+                                  children: [
+                                    pw.Container(
+                                      height: 38,
+                                      padding: const pw.EdgeInsets.all(2),
+                                      child: pw.Column(
+                                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                                        children: [
+                                          pw.Text('Composition N° $compNum', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                          pw.Text('الشهر $compNum', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                        ],
+                                      ),
+                                    ),
+                                    pw.Container(
+                                      height: 38,
+                                      padding: const pw.EdgeInsets.all(3),
+                                      child: pw.Text(obs.isNotEmpty ? obs.toString() : '............................', style: const pw.TextStyle(fontSize: 6.5)),
+                                    ),
+                                    pw.Container(height: 38),
+                                    pw.Container(height: 38),
+                                  ],
+                                );
+                              }),
+                            ],
+                          ),
+
+                          pw.SizedBox(height: 10),
+
+                          // 2. RESULTAT DE FIN D'ANNÉE / نتيجة نهاية السنة
+                          pw.Expanded(
+                            child: pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              decoration: pw.BoxDecoration(
+                                border: pw.Border.all(color: PdfColors.black, width: 1.2),
+                              ),
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Title
+                                  pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Text('RESULTAT DE FIN D\'ANNÉE', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                                      pw.Text('نتيجة نهاية السنة', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 11)),
+                                    ],
+                                  ),
+                                  pw.Divider(color: PdfColors.black, thickness: 0.8),
+
+                                  // Line 1: Stats
+                                  pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Row(
+                                        children: [
+                                          pw.Text('Moyenne Annuelle : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                                          pw.Text(annAvg > 0 ? annAvg.toStringAsFixed(2) : '.......', style: const pw.TextStyle(fontSize: 8)),
+                                          pw.SizedBox(width: 8),
+                                          pw.Text('Rang : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                                          pw.Text(annRank, style: const pw.TextStyle(fontSize: 8)),
+                                          pw.SizedBox(width: 8),
+                                          pw.Text('Sur : ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                                          pw.Text('30', style: const pw.TextStyle(fontSize: 8)),
+                                        ],
+                                      ),
+                                      pw.Row(
+                                        children: [
+                                          pw.Text('على : 30', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 8.5)),
+                                          pw.SizedBox(width: 6),
+                                          pw.Text('الترتيب : $annRank', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 8.5)),
+                                          pw.SizedBox(width: 6),
+                                          pw.Text('معدل سنوي : ${annAvg > 0 ? annAvg.toStringAsFixed(2) : "......."}', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 8.5)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  pw.Divider(color: PdfColors.grey300, thickness: 0.5),
+
+                                  // Line 2: Admis
+                                  pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Text(
+                                        '${isAdmis ? "[X]" : "[  ]"} Admis au ${isAdmis ? nextClass : "......."} à la rentrée de l\'année $nextYear',
+                                        style: pw.TextStyle(fontWeight: isAdmis ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 8),
+                                      ),
+                                      pw.Text(
+                                        'نجح إلى : ${isAdmis ? nextClass : "......."}',
+                                        textDirection: pw.TextDirection.rtl,
+                                        style: pw.TextStyle(font: amiriBold, fontSize: 8.5),
+                                      ),
+                                    ],
+                                  ),
+                                  pw.Divider(color: PdfColors.grey300, thickness: 0.5),
+
+                                  // Line 3: Redouble
+                                  pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Text(
+                                        '${isRedouble ? "[X]" : "[  ]"} Redouble La classe de : ${isRedouble ? className : "......."}',
+                                        style: pw.TextStyle(fontWeight: isRedouble ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 8),
+                                      ),
+                                      pw.Text(
+                                        'راسب في فصل : ${isRedouble ? className : "......."}',
+                                        textDirection: pw.TextDirection.rtl,
+                                        style: pw.TextStyle(font: amiriBold, fontSize: 8.5),
+                                      ),
+                                    ],
+                                  ),
+                                  pw.Divider(color: PdfColors.grey300, thickness: 0.5),
+
+                                  // Line 4: Exclu
+                                  pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Text(
+                                        '${isExclu ? "[X]" : "[  ]"} Exclu de l\'école pour : ${isExclu ? "Insuffisance" : "......................."}',
+                                        style: pw.TextStyle(fontWeight: isExclu ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 8),
+                                      ),
+                                      pw.Text(
+                                        'طُرد من المدرسة من أجل : .......................',
+                                        textDirection: pw.TextDirection.rtl,
+                                        style: pw.TextStyle(font: amiriBold, fontSize: 8.5),
+                                      ),
+                                    ],
+                                  ),
+                                  pw.Divider(color: PdfColors.grey400, thickness: 0.6),
+
+                                  // Signatures
+                                  pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Text('Fait à ........................, le ................', style: const pw.TextStyle(fontSize: 7.5)),
+                                      pw.Text('Visa & Cachet du Directeur', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 3),
+
+              // Bottom Duplicata Notice
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                child: pw.Text(
+                  'DUPLICATA NUMÉRIQUE NON ORIGINAL GÉNÉRÉ VIA L\'APPLICATION EDUT — SEUL LE BULLETIN PHYSIQUE REVÊTU DU CACHET ET DE LA SIGNATURE FAIT FOI',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 5.5, color: PdfColors.grey600),
                 ),
               ),
             ],
