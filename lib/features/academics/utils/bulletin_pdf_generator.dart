@@ -908,7 +908,8 @@ class OfficialBulletinPdfGenerator {
   static String _computePrimaryNextClass(String currentClass) {
     final upper = currentClass.toUpperCase().trim();
     if (upper.contains('CI')) return 'CP';
-    if (upper.contains('CP')) return 'CE1';
+    if (upper.contains('CP1')) return 'CP2';
+    if (upper.contains('CP2') || upper.contains('CP')) return 'CE1';
     if (upper.contains('CE1')) return 'CE2';
     if (upper.contains('CE2')) return 'CM1';
     if (upper.contains('CM1')) return 'CM2';
@@ -916,6 +917,93 @@ class OfficialBulletinPdfGenerator {
     if (upper.contains('SIL')) return 'CP';
     return 'Classe Supérieure';
   }
+
+  static String _getQualitativeMention(double sc) {
+    if (sc >= 16) return 'Très Bien';
+    if (sc >= 14) return 'Bien';
+    if (sc >= 12) return 'A.Bien';
+    if (sc >= 10) return 'Passable';
+    return 'Insuffisant';
+  }
+
+  static String _inferPrimaryTrack(
+    Map<String, dynamic> student,
+    List<Map<String, dynamic>> grades,
+    Map<String, dynamic>? headerConfig,
+  ) {
+    final explicit = student['primary_track'] ??
+        student['primaryTrack'] ??
+        student['track'] ??
+        headerConfig?['primaryTrack'];
+    if (explicit != null) {
+      final expLower = explicit.toString().toLowerCase();
+      if (expLower.contains('fa') || expLower.contains('arabe')) return 'franco_arabe';
+      if (expLower.contains('gen') || expLower.contains('fran')) return 'general';
+    }
+
+    final text = '${student['section'] ?? ''} ${student['sectionName'] ?? ''} ${student['filiere'] ?? ''} ${student['classe'] ?? ''} ${student['className'] ?? ''} ${student['educationalLevel'] ?? ''}'
+        .toLowerCase();
+
+    if (RegExp(r'\bfa\b|franco[-_ ]?arabe|medersa|islamique').hasMatch(text)) {
+      return 'franco_arabe';
+    }
+    if (RegExp(r'\bgen\b|g[eé]n[eé]ral|classique|fran[cç]ais[e]?\s*g[eé]n[eé]ral').hasMatch(text)) {
+      return 'general';
+    }
+
+    final hasIslamic = grades.any((g) {
+      final name = (g['subject_name'] ?? g['name'] ?? g['matiere'] ?? '').toString().toLowerCase();
+      return RegExp(r'coran|quran|kouran|hadith|hadit|tawhid|fikh|fiqh|sira|nahw').hasMatch(name);
+    });
+    if (hasIslamic) return 'franco_arabe';
+
+    if (text.contains('arabe')) return 'franco_arabe';
+
+    return 'general';
+  }
+
+  static final List<Map<String, dynamic>> _primaryFrancoArabeSubjects = [
+    {'nameFr': "Al-Kour'Ane", 'nameAr': 'القرآن الكريم', 'sur': 20, 'isAr': true, 'keys': ['coran', 'quran', 'kourane', 'kouran']},
+    {'nameFr': 'Al-Hadith', 'nameAr': 'الحديث', 'sur': 10, 'isAr': true, 'keys': ['hadith', 'hadit']},
+    {'nameFr': 'Attawhide', 'nameAr': 'التوحيد', 'sur': 10, 'isAr': true, 'keys': ['tawhid', 'tawhide', 'attawhid']},
+    {'nameFr': 'Al-Fikhou', 'nameAr': 'الفقه', 'sur': 10, 'isAr': true, 'keys': ['fikh', 'fikhou', 'fiqh']},
+    {'nameFr': 'Assira', 'nameAr': 'السيرة', 'sur': 10, 'isAr': true, 'keys': ['sira', 'assira']},
+    {'nameFr': 'Annahwou', 'nameAr': 'النحو', 'sur': 10, 'isAr': true, 'keys': ['nahw', 'nahwou', 'annahwou']},
+    {'nameFr': 'Etude de texte', 'nameAr': 'دراسة النص', 'sur': 20, 'isAr': false, 'keys': ['texte', 'etude de texte']},
+    {'nameFr': 'Mathématique', 'nameAr': 'الحساب/الرياضيات', 'sur': 50, 'isAr': false, 'keys': ['math', 'calcul', 'arithmetique', 'arithmétique']},
+    {'nameFr': 'Sciences', 'nameAr': 'العلوم', 'sur': 20, 'isAr': false, 'keys': ['science', 'eveil', 'éveil', 'observation']},
+    {'nameFr': 'Lecture', 'nameAr': 'القراءة', 'sur': 20, 'isAr': false, 'keys': ['lecture']},
+    {'nameFr': 'Langage', 'nameAr': 'المحادثة', 'sur': 10, 'isAr': false, 'keys': ['langage', 'expression orale', 'communication']},
+    {'nameFr': 'Rédaction', 'nameAr': 'التعبير', 'sur': 20, 'isAr': false, 'keys': ['redaction', 'rédaction', 'expression ecrite']},
+    {'nameFr': 'Récitation/Chant', 'nameAr': 'المحفوظات/الأناشيد', 'sur': 10, 'isAr': false, 'keys': ['recitation', 'récitation', 'chant', 'poesie', 'poésie']},
+    {'nameFr': 'Dictée', 'nameAr': 'الإملاء', 'sur': 20, 'isAr': false, 'keys': ['dictee', 'dictée', 'orthographe']},
+    {'nameFr': 'Histoire', 'nameAr': 'التاريخ', 'sur': 10, 'isAr': false, 'keys': ['histoire']},
+    {'nameFr': 'Géographie', 'nameAr': 'الجغرافية', 'sur': 10, 'isAr': false, 'keys': ['geographie', 'géographie']},
+    {'nameFr': 'Ecriture', 'nameAr': 'الخط', 'sur': 10, 'isAr': true, 'keys': ['ecriture', 'écriture', 'khatt', 'khat']},
+    {'nameFr': 'Dessin', 'nameAr': 'الرسم', 'sur': 10, 'isAr': false, 'keys': ['dessin', 'arts']},
+    {'nameFr': 'EPS', 'nameAr': 'الرياضة البدنية', 'sur': 10, 'isAr': false, 'keys': ['eps', 'sport', 'physique']},
+  ];
+
+  static final List<Map<String, dynamic>> _primaryGeneralSubjects = [
+    {'nameFr': 'Étude de texte', 'nameAr': 'دراسة النص', 'sur': 20, 'keys': ['etude de texte', 'texte', 'comprehension']},
+    {'nameFr': 'Lecture', 'nameAr': 'القراءة', 'sur': 20, 'keys': ['lecture']},
+    {'nameFr': 'Expression écrite / Rédaction', 'nameAr': 'التعبير والإنشاء', 'sur': 20, 'keys': ['redaction', 'rédaction', 'expression', 'production']},
+    {'nameFr': 'Vocabulaire', 'nameAr': 'المفردات', 'sur': 10, 'keys': ['vocabulaire', 'lexique']},
+    {'nameFr': 'Grammaire / Conjugaison', 'nameAr': 'القواعد والصرف', 'sur': 20, 'keys': ['grammaire', 'conjugaison']},
+    {'nameFr': 'Dictée & Orthographe', 'nameAr': 'الإملاء', 'sur': 20, 'keys': ['dictee', 'dictée', 'orthographe']},
+    {'nameFr': 'Écriture', 'nameAr': 'الخط', 'sur': 10, 'keys': ['ecriture', 'écriture', 'graphisme']},
+    {'nameFr': 'Poésie & Récitation', 'nameAr': 'المحفوظات', 'sur': 10, 'keys': ['poesie', 'poésie', 'recitation', 'récitation']},
+    {'nameFr': 'Calcul & Opérations', 'nameAr': 'الحساب والعمليات', 'sur': 30, 'keys': ['calcul', 'arithmetique', 'arithmétique', 'math']},
+    {'nameFr': 'Problèmes', 'nameAr': 'المسائل', 'sur': 20, 'keys': ['probleme', 'problème', 'resolution']},
+    {'nameFr': 'Géométrie & Mesures', 'nameAr': 'الهندسة والقياس', 'sur': 10, 'keys': ['geometrie', 'géométrie', 'mesure']},
+    {'nameFr': "Sciences d'observation", 'nameAr': 'العلوم والملاحظة', 'sur': 20, 'keys': ['science', 'eveil', 'éveil', 'observation']},
+    {'nameFr': 'Hygiène & Environnement', 'nameAr': 'الصحة والبيئة', 'sur': 10, 'keys': ['hygiene', 'hygiène', 'environnement', 'sante', 'santé']},
+    {'nameFr': 'Histoire', 'nameAr': 'التاريخ', 'sur': 10, 'keys': ['histoire']},
+    {'nameFr': 'Géographie', 'nameAr': 'الجغرافية', 'sur': 10, 'keys': ['geographie', 'géographie']},
+    {'nameFr': 'Éducation civique / Morale', 'nameAr': 'التربية المدنية', 'sur': 10, 'keys': ['civique', 'morale', 'ecm', 'civisme']},
+    {'nameFr': 'Dessin & Travaux manuels', 'nameAr': 'الرسم والأشغال', 'sur': 10, 'keys': ['dessin', 'arts', 'manuelle', 'bricolage']},
+    {'nameFr': 'EPS / Sport', 'nameAr': 'الرياضة البدنية', 'sur': 10, 'keys': ['eps', 'sport', 'physique']},
+  ];
 
   static Future<Uint8List> _generatePrimaireBulletinBytes({
     required Map<String, dynamic> student,
@@ -935,6 +1023,9 @@ class OfficialBulletinPdfGenerator {
     final className = student['classe']?.toString() ??
         student['className']?.toString() ??
         'CP';
+
+    final track = _inferPrimaryTrack(student, grades, headerConfig);
+    final isFrancoArabe = track == 'franco_arabe';
 
     // School Header Logos
     pw.MemoryImage? centerLogoImage;
@@ -957,85 +1048,120 @@ class OfficialBulletinPdfGenerator {
       currentCompIndex = 3;
     }
 
-    // Standard subjects definition matching reference model
-    final List<Map<String, dynamic>> primarySubjects = [
-      {'nameFr': "Al-Kour'Ane", 'nameAr': 'القرآن الكريم', 'sur': 20, 'isAr': true, 'keys': ['coran', 'quran', 'kourane', 'kouran']},
-      {'nameFr': 'Al-Hadith', 'nameAr': 'الحديث', 'sur': 10, 'isAr': true, 'keys': ['hadith', 'hadit']},
-      {'nameFr': 'Attawhide', 'nameAr': 'التوحيد', 'sur': 10, 'isAr': true, 'keys': ['tawhid', 'tawhide', 'attawhid']},
-      {'nameFr': 'Al-Fikhou', 'nameAr': 'الفقه', 'sur': 10, 'isAr': true, 'keys': ['fikh', 'fikhou', 'fiqh']},
-      {'nameFr': 'Assira', 'nameAr': 'السيرة', 'sur': 10, 'isAr': true, 'keys': ['sira', 'assira']},
-      {'nameFr': 'Annahwou', 'nameAr': 'النحو', 'sur': 10, 'isAr': true, 'keys': ['nahw', 'nahwou', 'annahwou']},
-      {'nameFr': 'Etude de texte', 'nameAr': 'دراسة النص', 'sur': 20, 'isAr': false, 'keys': ['texte', 'etude de texte']},
-      {'nameFr': 'Mathématique', 'nameAr': 'الحساب/الرياضيات', 'sur': 50, 'isAr': false, 'keys': ['math', 'calcul', 'arithmetique', 'arithmétique']},
-      {'nameFr': 'Sciences', 'nameAr': 'العلوم', 'sur': 20, 'isAr': false, 'keys': ['science', 'eveil', 'éveil', 'observation']},
-      {'nameFr': 'Lecture', 'nameAr': 'القراءة', 'sur': 20, 'isAr': false, 'keys': ['lecture']},
-      {'nameFr': 'Langage', 'nameAr': 'المحادثة', 'sur': 10, 'isAr': false, 'keys': ['langage', 'expression orale', 'communication']},
-      {'nameFr': 'Rédaction', 'nameAr': 'التعبير', 'sur': 20, 'isAr': false, 'keys': ['redaction', 'rédaction', 'expression ecrite']},
-      {'nameFr': 'Récitation/Chant', 'nameAr': 'المحفوظات/الأناشيد', 'sur': 10, 'isAr': false, 'keys': ['recitation', 'récitation', 'chant', 'poesie', 'poésie']},
-      {'nameFr': 'Dictée', 'nameAr': 'الإملاء', 'sur': 20, 'isAr': false, 'keys': ['dictee', 'dictée', 'orthographe']},
-      {'nameFr': 'Histoire', 'nameAr': 'التاريخ', 'sur': 10, 'isAr': false, 'keys': ['histoire']},
-      {'nameFr': 'Géographie', 'nameAr': 'الجغرافية', 'sur': 10, 'isAr': false, 'keys': ['geographie', 'géographie']},
-      {'nameFr': 'Ecriture', 'nameAr': 'الخط', 'sur': 10, 'isAr': true, 'keys': ['ecriture', 'écriture', 'khatt', 'khat']},
-      {'nameFr': 'Dessin', 'nameAr': 'الرسم', 'sur': 10, 'isAr': false, 'keys': ['dessin', 'arts']},
-      {'nameFr': 'EPS', 'nameAr': 'الرياضة البدنية', 'sur': 10, 'isAr': false, 'keys': ['eps', 'sport', 'physique']},
-    ];
-
-    // Find grades mapped to standard subjects
+    // Find grades mapped to standard subjects based on track
     double totalFr1 = 0, totalAr1 = 0;
     int countFr1 = 0, countAr1 = 0;
 
     final List<List<dynamic>> rowsData = [];
 
-    for (final s in primarySubjects) {
-      final nameFr = s['nameFr'] as String;
-      final nameAr = s['nameAr'] as String;
-      final sur = s['sur'] as int;
-      final isAr = s['isAr'] as bool;
-      final keys = s['keys'] as List<String>;
+    if (isFrancoArabe) {
+      for (final s in _primaryFrancoArabeSubjects) {
+        final nameFr = s['nameFr'] as String;
+        final nameAr = s['nameAr'] as String;
+        final sur = s['sur'] as int;
+        final isAr = s['isAr'] as bool;
+        final keys = s['keys'] as List<String>;
 
-      // Match grade from actual grades list
-      Map<String, dynamic>? matchedGrade;
-      for (final g in grades) {
-        final gName = (g['subject_name'] ?? g['name'] ?? g['matiere'] ?? '').toString().toLowerCase();
-        if (keys.any((k) => gName.contains(k))) {
-          matchedGrade = g;
-          break;
+        Map<String, dynamic>? matchedGrade;
+        for (final g in grades) {
+          final gName = (g['subject_name'] ?? g['name'] ?? g['matiere'] ?? '').toString().toLowerCase();
+          if (keys.any((k) => gName.contains(k))) {
+            matchedGrade = g;
+            break;
+          }
         }
-      }
 
-      double? score;
-      if (matchedGrade != null) {
-        final rawVal = matchedGrade['exam_score'] ?? matchedGrade['total_score'] ?? matchedGrade['note'];
-        if (rawVal != null) {
-          score = (rawVal as num).toDouble();
+        double? score;
+        if (matchedGrade != null) {
+          final rawVal = matchedGrade['exam_score'] ?? matchedGrade['total_score'] ?? matchedGrade['note'];
+          if (rawVal != null) {
+            score = (rawVal as num).toDouble();
+          }
         }
-      }
 
-      String comp1Fr = '', comp1Ar = '';
-      if (score != null) {
-        final formattedScore = score.toStringAsFixed(1);
-        if (isAr) {
-          comp1Ar = formattedScore;
-          totalAr1 += score;
-          countAr1++;
-        } else {
-          comp1Fr = formattedScore;
-          totalFr1 += score;
-          countFr1++;
+        String comp1Fr = '', comp1Ar = '';
+        if (score != null) {
+          final formattedScore = score.toStringAsFixed(1);
+          if (isAr) {
+            comp1Ar = formattedScore;
+            totalAr1 += score;
+            countAr1++;
+          } else {
+            comp1Fr = formattedScore;
+            totalFr1 += score;
+            countFr1++;
+          }
         }
-      }
 
-      rowsData.add([
-        nameFr,
-        nameAr,
-        sur.toString(),
-        currentCompIndex == 1 ? comp1Fr : '',
-        currentCompIndex == 1 ? comp1Ar : '',
-        currentCompIndex == 2 ? comp1Fr : '',
-        currentCompIndex == 2 ? comp1Ar : '',
-        currentCompIndex == 3 ? comp1Fr : '',
-        currentCompIndex == 3 ? comp1Ar : '',
-      ]);
+        rowsData.add([
+          nameFr,
+          nameAr,
+          sur.toString(),
+          currentCompIndex == 1 ? comp1Fr : '',
+          currentCompIndex == 1 ? comp1Ar : '',
+          currentCompIndex == 2 ? comp1Fr : '',
+          currentCompIndex == 2 ? comp1Ar : '',
+          currentCompIndex == 3 ? comp1Fr : '',
+          currentCompIndex == 3 ? comp1Ar : '',
+        ]);
+      }
+    } else {
+      // General Primary (Français Général)
+      for (final s in _primaryGeneralSubjects) {
+        final nameFr = s['nameFr'] as String;
+        final nameAr = s['nameAr'] as String;
+        final sur = s['sur'] as int;
+        final keys = s['keys'] as List<String>;
+
+        Map<String, dynamic>? matchedGrade;
+        for (final g in grades) {
+          final gName = (g['subject_name'] ?? g['name'] ?? g['matiere'] ?? '').toString().toLowerCase();
+          if (keys.any((k) => gName.contains(k))) {
+            matchedGrade = g;
+            break;
+          }
+        }
+
+        String col1 = '', col2 = '';
+        if (matchedGrade != null) {
+          final cw = matchedGrade['classwork_score'] ?? matchedGrade['devoir'] ?? matchedGrade['cw'];
+          final ex = matchedGrade['exam_score'] ?? matchedGrade['examen'] ?? matchedGrade['ex'];
+          final tot = matchedGrade['total_score'] ?? matchedGrade['note'] ?? matchedGrade['score'];
+
+          if (cw != null && ex != null) {
+            final cwNum = (cw as num).toDouble();
+            final exNum = (ex as num).toDouble();
+            col1 = cwNum.toStringAsFixed(1);
+            col2 = exNum.toStringAsFixed(1);
+            totalFr1 += (cwNum + exNum) / 2;
+            countFr1++;
+          } else if (tot != null) {
+            final totNum = (tot as num).toDouble();
+            col1 = totNum.toStringAsFixed(1);
+            col2 = _getQualitativeMention(totNum);
+            totalFr1 += totNum;
+            countFr1++;
+          } else if (ex != null) {
+            final exNum = (ex as num).toDouble();
+            col1 = exNum.toStringAsFixed(1);
+            col2 = _getQualitativeMention(exNum);
+            totalFr1 += exNum;
+            countFr1++;
+          }
+        }
+
+        rowsData.add([
+          nameFr,
+          nameAr,
+          sur.toString(),
+          currentCompIndex == 1 ? col1 : '',
+          currentCompIndex == 1 ? col2 : '',
+          currentCompIndex == 2 ? col1 : '',
+          currentCompIndex == 2 ? col2 : '',
+          currentCompIndex == 3 ? col1 : '',
+          currentCompIndex == 3 ? col2 : '',
+        ]);
+      }
     }
 
     // Totals and averages
@@ -1085,7 +1211,22 @@ class OfficialBulletinPdfGenerator {
                           pw.Text(sessionName.isNotEmpty ? sessionName : '2024-2025', style: const pw.TextStyle(fontSize: 9)),
                         ],
                       ),
-                      pw.SizedBox(height: 3),
+                      pw.SizedBox(height: 2),
+                      pw.Row(
+                        children: [
+                          pw.Text(
+                            isFrancoArabe
+                                ? 'ENSEIGNEMENT PRIMAIRE FRANCO-ARABE (F.A)'
+                                : 'ENSEIGNEMENT PRIMAIRE GÉNÉRAL (FRANÇAIS)',
+                            style: pw.TextStyle(
+                              fontSize: 7.5,
+                              fontStyle: pw.FontStyle.italic,
+                              color: PdfColors.grey700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 2),
                       pw.Row(
                         children: [
                           pw.Text("NOM DE L'ÉLÈVE : ", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
@@ -1108,7 +1249,7 @@ class OfficialBulletinPdfGenerator {
                             border: pw.Border.all(color: PdfColors.black, width: 1.2),
                           ),
                           child: pw.Center(
-                            child: pw.Text('ONG', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                            child: pw.Text('ÉCOLE', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
                           ),
                         ),
                     ],
@@ -1142,7 +1283,7 @@ class OfficialBulletinPdfGenerator {
                 child: pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
-                    // LEFT PANEL: BILINGUAL GRADES TABLE
+                    // LEFT PANEL: GRADES TABLE
                     pw.Expanded(
                       flex: 54,
                       child: pw.Table(
@@ -1150,12 +1291,12 @@ class OfficialBulletinPdfGenerator {
                         columnWidths: const {
                           0: pw.FlexColumnWidth(3.4), // Matière
                           1: pw.FlexColumnWidth(0.9), // SUR
-                          2: pw.FlexColumnWidth(1.1), // C1 FR
-                          3: pw.FlexColumnWidth(1.1), // C1 AR
-                          4: pw.FlexColumnWidth(1.1), // C2 FR
-                          5: pw.FlexColumnWidth(1.1), // C2 AR
-                          6: pw.FlexColumnWidth(1.1), // C3 FR
-                          7: pw.FlexColumnWidth(1.1), // C3 AR
+                          2: pw.FlexColumnWidth(1.1), // C1 Col1
+                          3: pw.FlexColumnWidth(1.1), // C1 Col2
+                          4: pw.FlexColumnWidth(1.1), // C2 Col1
+                          5: pw.FlexColumnWidth(1.1), // C2 Col2
+                          6: pw.FlexColumnWidth(1.1), // C3 Col1
+                          7: pw.FlexColumnWidth(1.1), // C3 Col2
                         },
                         children: [
                           // Header 1
@@ -1206,12 +1347,51 @@ class OfficialBulletinPdfGenerator {
                                 ),
                               ),
                               pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6))),
-                              pw.Center(child: pw.Text('FR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
-                              pw.Center(child: pw.Text('العربية', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text('FR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
-                              pw.Center(child: pw.Text('العربية', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text('FR', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6))),
-                              pw.Center(child: pw.Text('العربية', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 6.5))),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? 'FR' : 'Devoir',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+                                ),
+                              ),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? 'العربية' : 'Compo',
+                                  textDirection: isFrancoArabe ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+                                  style: isFrancoArabe
+                                      ? pw.TextStyle(font: amiriBold, fontSize: 6.5)
+                                      : pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+                                ),
+                              ),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? 'FR' : 'Devoir',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+                                ),
+                              ),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? 'العربية' : 'Compo',
+                                  textDirection: isFrancoArabe ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+                                  style: isFrancoArabe
+                                      ? pw.TextStyle(font: amiriBold, fontSize: 6.5)
+                                      : pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+                                ),
+                              ),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? 'FR' : 'Devoir',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+                                ),
+                              ),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? 'العربية' : 'Compo',
+                                  textDirection: isFrancoArabe ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+                                  style: isFrancoArabe
+                                      ? pw.TextStyle(font: amiriBold, fontSize: 6.5)
+                                      : pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6),
+                                ),
+                              ),
                             ],
                           ),
                           // Subject rows
@@ -1246,14 +1426,33 @@ class OfficialBulletinPdfGenerator {
                                 child: pw.Row(
                                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                                   children: [
-                                    pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
-                                    pw.Text('المجموع', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
+                                    pw.Text(
+                                      isFrancoArabe ? 'Total' : 'Total Points',
+                                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                    ),
+                                    pw.Text(
+                                      isFrancoArabe ? 'المجموع' : 'مجموع النقاط',
+                                      textDirection: pw.TextDirection.rtl,
+                                      style: pw.TextStyle(font: amiriBold, fontSize: 7),
+                                    ),
                                   ],
                                 ),
                               ),
                               pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
-                              pw.Center(child: pw.Text(totalFr1 > 0 ? totalFr1.toStringAsFixed(1) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text(totalAr1 > 0 ? totalAr1.toStringAsFixed(1) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(
+                                child: pw.Text(
+                                  totalFr1 > 0 ? totalFr1.toStringAsFixed(1) : '-',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                ),
+                              ),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe
+                                      ? (totalAr1 > 0 ? totalAr1.toStringAsFixed(1) : '-')
+                                      : '-',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                ),
+                              ),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
@@ -1268,14 +1467,22 @@ class OfficialBulletinPdfGenerator {
                                 child: pw.Row(
                                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                                   children: [
-                                    pw.Text('Moyenne', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5)),
+                                    pw.Text(
+                                      isFrancoArabe ? 'Moyenne' : 'Moyenne / 20',
+                                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                    ),
                                     pw.Text('المعدل', textDirection: pw.TextDirection.rtl, style: pw.TextStyle(font: amiriBold, fontSize: 7)),
                                   ],
                                 ),
                               ),
                               pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text(moyFr1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text(moyAr1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? moyAr1 : '-',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                ),
+                              ),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
@@ -1297,7 +1504,12 @@ class OfficialBulletinPdfGenerator {
                               ),
                               pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text(summary['rank']?.toString() ?? '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text(summary['rank']?.toString() ?? '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? (summary['rank']?.toString() ?? '-') : '-',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                ),
+                              ),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
@@ -1319,7 +1531,12 @@ class OfficialBulletinPdfGenerator {
                               ),
                               pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text(annAvg > 0 ? annAvg.toStringAsFixed(2) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text(annAvg > 0 ? annAvg.toStringAsFixed(2) : '-', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? (annAvg > 0 ? annAvg.toStringAsFixed(2) : '-') : '-',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                ),
+                              ),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
@@ -1341,7 +1558,12 @@ class OfficialBulletinPdfGenerator {
                               ),
                               pw.Center(child: pw.Text('', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text(annRank, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
-                              pw.Center(child: pw.Text(annRank, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5))),
+                              pw.Center(
+                                child: pw.Text(
+                                  isFrancoArabe ? annRank : '-',
+                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 6.5),
+                                ),
+                              ),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
                               pw.Center(child: pw.Text('-', style: const pw.TextStyle(fontSize: 6.5))),
