@@ -321,6 +321,7 @@ class _LmsCoursesScreenState extends State<LmsCoursesScreen> {
                           builder: (_) => LmsLessonPlayerScreen(
                             lesson: Map<String, dynamic>.from(l),
                             studentId: widget.studentId,
+                            courseId: _selectedCourseId,
                           ),
                         ),
                       );
@@ -389,6 +390,7 @@ class _LmsCoursesScreenState extends State<LmsCoursesScreen> {
                           builder: (_) => LmsQuizScreen(
                             quiz: Map<String, dynamic>.from(q),
                             studentId: widget.studentId,
+                            studentName: widget.studentName,
                           ),
                         ),
                       );

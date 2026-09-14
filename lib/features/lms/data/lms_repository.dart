@@ -157,4 +157,80 @@ class LmsRepository {
       return [];
     }
   }
+
+  /// Fetches discussions / Q&A forum messages for a course or lesson
+  Future<List<dynamic>> getDiscussions({int? courseId, int? lessonId}) async {
+    try {
+      final queryParams = <String>[
+        if (courseId != null) 'courseId=$courseId',
+        if (lessonId != null) 'lessonId=$lessonId',
+      ].join('&');
+
+      final url = '/api/mobile/lms/discussions${queryParams.isNotEmpty ? '?$queryParams' : ''}';
+      final res = await _apiClient.getJson(url);
+      if (res['success'] == true && res['data'] is List) {
+        return res['data'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('LmsRepository.getDiscussions error: $e');
+      return [];
+    }
+  }
+
+  /// Posts a new message or reply in discussions
+  Future<bool> postDiscussion({
+    required String message,
+    int? courseId,
+    int? lessonId,
+    int? parentId,
+    int? studentId,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/lms/discussions', {
+        'message': message,
+        if (courseId != null) 'courseId': courseId,
+        if (lessonId != null) 'lessonId': lessonId,
+        if (parentId != null) 'parentId': parentId,
+        if (studentId != null) 'studentIdParam': studentId,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('LmsRepository.postDiscussion error: $e');
+      return false;
+    }
+  }
+
+  /// Fetches student submissions for an assignment (Teacher / Grading mode)
+  Future<List<dynamic>> getAssignmentSubmissions({required int assignmentId}) async {
+    try {
+      final res = await _apiClient.getJson('/api/mobile/lms/assignments/submissions?assignmentId=$assignmentId');
+      if (res['success'] == true && res['data'] is List) {
+        return res['data'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('LmsRepository.getAssignmentSubmissions error: $e');
+      return [];
+    }
+  }
+
+  /// Grades a student assignment submission (Teacher / Grading mode)
+  Future<bool> gradeAssignmentSubmission({
+    required int submissionId,
+    required double score,
+    String? comment,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/lms/assignments/submissions', {
+        'submissionId': submissionId,
+        'score': score,
+        if (comment != null) 'comment': comment,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('LmsRepository.gradeAssignmentSubmission error: $e');
+      return false;
+    }
+  }
 }
