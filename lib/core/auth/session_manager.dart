@@ -267,6 +267,34 @@ class SessionManager {
     return OfflineAuthResult.success;
   }
 
+  Future<bool> restoreSessionFromOfflineProfile() async {
+    final offlineRaw = await _storage.read(key: _keyOfflineProfile);
+    if (offlineRaw != null && offlineRaw.isNotEmpty) {
+      try {
+        final data = jsonDecode(offlineRaw) as Map<String, dynamic>?;
+        if (data != null && data['email'] != null && data['role'] != null) {
+          await _storage.write(key: _keyEmail, value: data['email'].toString());
+          await _storage.write(key: _keyRole, value: data['role'].toString());
+          final currentToken = await getToken();
+          if (currentToken == null || currentToken.isEmpty) {
+            await _storage.write(key: _keyToken, value: 'biometric_session_token');
+          }
+          if (data['employeeId'] != null) await _storage.write(key: _keyEmployeeId, value: data['employeeId'].toString());
+          if (data['userId'] != null) await _storage.write(key: _keyUserId, value: data['userId'].toString());
+          if (data['schoolId'] != null) await _storage.write(key: _keySchoolId, value: data['schoolId'].toString());
+          if (data['studentId'] != null) await _storage.write(key: _keyStudentId, value: data['studentId'].toString());
+          if (data['studentName'] != null) await _storage.write(key: _keyStudentName, value: data['studentName'].toString());
+          if (data['studentClass'] != null) await _storage.write(key: _keyStudentClass, value: data['studentClass'].toString());
+          if (data['educationalLevel'] != null) await _storage.write(key: _keyEducationalLevel, value: data['educationalLevel'].toString());
+          if (data['permissions'] != null) await _storage.write(key: _keyPermissions, value: jsonEncode(data['permissions']));
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
+
   Future<bool> validateOfflineCredentials(String email, String password) async {
     final res = await validateOfflineCredentialsDetailed(email, password);
     return res == OfflineAuthResult.success;

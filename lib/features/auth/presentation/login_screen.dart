@@ -74,8 +74,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     if (didAuth) {
       final session = locator<SessionManager>();
-      final email = await session.getEmail();
-      final role = await session.getRole();
+      var email = await session.getEmail();
+      var role = await session.getRole();
+
+      // If active session is empty, try restoring from saved offline profile
+      if (email == null || role == null || email.isEmpty) {
+        final restored = await session.restoreSessionFromOfflineProfile();
+        if (restored) {
+          email = await session.getEmail();
+          role = await session.getRole();
+        }
+      }
+
       if (email != null && role != null && email.isNotEmpty) {
         if (mounted) {
           locator<InactivityLockService>().unlock();
@@ -83,16 +93,55 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           context.go(getHomeRouteForRole(role));
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Veuillez vous connecter manuellement avec mot de passe pour enregistrer votre profil.'),
-              backgroundColor: Color(0xFFD97706),
-            ),
-          );
+        final typedEmail = _emailController.text.trim();
+        final typedPassword = _passwordController.text;
+        if (typedEmail.isNotEmpty && typedPassword.isNotEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🔐 Empreinte validée ! Connexion et activation sur votre compte...'),
+                backgroundColor: Color(0xFF4F46E5),
+              ),
+            );
+            await _handleLogin();
+          }
+        } else {
+          if (mounted) {
+            _showBiometricHelpDialog();
+          }
         }
       }
     }
+  }
+
+  void _showBiometricHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.fingerprint_rounded, color: Color(0xFF4F46E5), size: 28),
+            SizedBox(width: 10),
+            Text('Empreinte / Face ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'Pour activer la connexion par Empreinte ou Face ID sur cet appareil, veuillez vous connecter une première fois avec votre identifiant et mot de passe.\n\nVotre compte sera ensuite automatiquement lié à votre empreinte pour vous connecter en 1 seul clic !',
+          style: TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Compris', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
