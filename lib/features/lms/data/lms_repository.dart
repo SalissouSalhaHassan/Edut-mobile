@@ -72,4 +72,89 @@ class LmsRepository {
       return null;
     }
   }
+
+  /// Fetches virtual live classes
+  Future<List<dynamic>> getVirtualClasses({int? studentId}) async {
+    try {
+      final queryParam = studentId != null ? '?studentId=$studentId' : '';
+      final res = await _apiClient.getJson('/api/mobile/lms/virtual-classes$queryParam');
+      if (res['success'] == true && res['data'] is List) {
+        return res['data'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('LmsRepository.getVirtualClasses error: $e');
+      return [];
+    }
+  }
+
+  /// Validates attendance for a virtual live session
+  Future<bool> markVirtualClassAttendance({
+    required int virtualClassId,
+    int? studentId,
+    int? durationMinutes,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/lms/virtual-classes', {
+        'virtualClassId': virtualClassId,
+        if (studentId != null) 'studentIdParam': studentId,
+        if (durationMinutes != null) 'durationMinutes': durationMinutes,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('LmsRepository.markVirtualClassAttendance error: $e');
+      return false;
+    }
+  }
+
+  /// Fetches homework assignments
+  Future<List<dynamic>> getAssignments({int? studentId}) async {
+    try {
+      final queryParam = studentId != null ? '?studentId=$studentId' : '';
+      final res = await _apiClient.getJson('/api/mobile/lms/assignments$queryParam');
+      if (res['success'] == true && res['data'] is List) {
+        return res['data'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('LmsRepository.getAssignments error: $e');
+      return [];
+    }
+  }
+
+  /// Submits student work for an assignment
+  Future<bool> submitAssignment({
+    required int assignmentId,
+    int? studentId,
+    String? textResponse,
+    String? fileReponsePath,
+  }) async {
+    try {
+      final res = await _apiClient.postJson('/api/mobile/lms/assignments', {
+        'assignmentId': assignmentId,
+        if (studentId != null) 'studentIdParam': studentId,
+        if (textResponse != null) 'textResponse': textResponse,
+        if (fileReponsePath != null) 'fileReponsePath': fileReponsePath,
+      });
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('LmsRepository.submitAssignment error: $e');
+      return false;
+    }
+  }
+
+  /// Fetches earned certificates
+  Future<List<dynamic>> getCertificates({int? studentId}) async {
+    try {
+      final queryParam = studentId != null ? '?studentId=$studentId' : '';
+      final res = await _apiClient.getJson('/api/mobile/lms/certificates$queryParam');
+      if (res['success'] == true && res['data'] is List) {
+        return res['data'];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('LmsRepository.getCertificates error: $e');
+      return [];
+    }
+  }
 }

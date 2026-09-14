@@ -70,6 +70,7 @@ import '../../features/security/presentation/connected_devices_screen.dart';
 import '../../features/security/presentation/gate_scanner_screen.dart';
 import '../permissions/permission_service.dart';
 import 'guarded_screen.dart';
+import '../../features/lms/presentation/lms_home_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -356,6 +357,20 @@ class AppRouter {
       GoRoute(
         path: '/library/past-exams',
         builder: (context, state) => const PastExamsScreen(),
+      ),
+      GoRoute(
+        path: '/lms',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final studentId = extra['studentId'] as int? ??
+              int.tryParse(state.uri.queryParameters['studentId'] ?? '');
+          final studentName = extra['studentName'] as String? ??
+              state.uri.queryParameters['studentName'];
+          return LmsHomeScreen(
+            studentId: studentId,
+            studentName: studentName,
+          );
+        },
       ),
       GoRoute(
         path: '/finance/dashboard',

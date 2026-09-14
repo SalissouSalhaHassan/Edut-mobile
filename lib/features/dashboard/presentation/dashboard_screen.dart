@@ -944,6 +944,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ListTile(
                   leading: const Icon(
+                    Icons.school_rounded,
+                    color: Color(0xFF6366F1),
+                  ),
+                  title: const Text('E-Learning & LMS'),
+                  subtitle: const Text('Cours, Lives, Quiz, Certificats'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/lms');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
                     Icons.assignment,
                     color: Color(0xFF2563EB),
                   ),
@@ -1550,6 +1562,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildQuickActionsGrid(bool isTeacher) {
     final List<Widget> quickActions = [
+      _buildQuickActionCard(
+        title: "E-Learning & LMS",
+        description: "Cours, Lives, Quiz, Devoirs",
+        icon: Icons.school_rounded,
+        color: const Color(0xFF4F46E5),
+        onTap: () => context.push('/lms'),
+      ),
       if (!isTeacher)
         _buildQuickActionCard(
           title: 'QG Direction',
