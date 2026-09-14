@@ -9,7 +9,6 @@ import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/family/presentation/family_dashboard_screen.dart';
 import '../../features/family/presentation/family_finance_screen.dart';
-import '../../features/family/presentation/family_library_screen.dart';
 import '../../features/family/presentation/family_transport_screen.dart';
 import '../../features/family/presentation/family_hostel_screen.dart';
 import '../../features/family/presentation/digital_student_id_screen.dart';
@@ -26,6 +25,7 @@ import '../../features/academics/presentation/gestion_devoirs_screen.dart';
 import '../../features/academics/presentation/student_homework_screen.dart';
 import '../../features/academics/presentation/ai_timetable_generator_sheet.dart';
 import '../../features/library/presentation/past_exams_screen.dart';
+import '../../features/library/presentation/e_library_screen.dart';
 import '../../features/academics/presentation/qcm_scanner_screen.dart';
 import '../../features/finance/presentation/finance_dashboard_screen.dart';
 import '../../features/finance/presentation/journal_de_caisse_screen.dart';
@@ -160,7 +160,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/family/library',
-        builder: (context, state) => const FamilyLibraryScreen(),
+        builder: (context, state) => const ELibraryScreen(),
       ),
       GoRoute(
         path: '/family/homework',
@@ -602,11 +602,15 @@ class AppRouter {
       ),
       GoRoute(
         path: '/library',
-        builder: (context, state) => const FamilyLibraryScreen(),
+        builder: (context, state) => const ELibraryScreen(),
+      ),
+      GoRoute(
+        path: '/e-library',
+        builder: (context, state) => const ELibraryScreen(),
       ),
       GoRoute(
         path: '/e-learning',
-        builder: (context, state) => const FamilyLibraryScreen(),
+        builder: (context, state) => const ELibraryScreen(),
       ),
     ],
   );

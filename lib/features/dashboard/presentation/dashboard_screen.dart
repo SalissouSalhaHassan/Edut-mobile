@@ -1099,6 +1099,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 ListTile(
                   leading: const Icon(
+                    Icons.local_library_rounded,
+                    color: Color(0xFF0284C7),
+                  ),
+                  title: const Text('Bibliothèque & Centre Doc.', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Fonds physiques & E-books numériques', style: TextStyle(fontSize: 11)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/library');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
                     Icons.sync_lock_rounded,
                     color: Color(0xFF0284C7),
                   ),
@@ -1649,6 +1661,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.assignment_outlined,
         color: const Color(0xFF2563EB),
         onTap: () => _handleAcademicsAction(isDevoirs: true),
+      ),
+      _buildQuickActionCard(
+        title: "Bibliothèque",
+        description: "Fonds doc. & E-books",
+        icon: Icons.local_library_outlined,
+        color: const Color(0xFF0284C7),
+        onTap: () => context.push('/library'),
       ),
       if (_isTeacher || _isSuperAdmin)
         _buildQuickActionCard(
