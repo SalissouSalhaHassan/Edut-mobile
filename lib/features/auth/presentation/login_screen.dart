@@ -409,39 +409,56 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 ),
                               ),
                               Container(
-                                width: 78,
-                                height: 78,
+                                width: 84,
+                                height: 84,
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF4F46E5), Color(0xFF2563EB)],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ),
+                                  borderRadius: BorderRadius.circular(22),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF4F46E5).withValues(alpha: 0.35),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
                                 ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.school_rounded,
-                                    size: 42,
-                                    color: Colors.white,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: Image.asset(
+                                    'assets/images/app_icon.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFF4F46E5), Color(0xFF2563EB)],
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                        ),
+                                      ),
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.school_rounded,
+                                          size: 44,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         // Title & Subtitle
                         const Center(
                           child: Text(
-                            'Edut Mobile',
+                            'EDUT PRO SCOLAIRE',
                             style: TextStyle(
-                              fontSize: 28,
+                              fontSize: 25,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
-                              letterSpacing: -0.8,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ),

@@ -1160,7 +1160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Edut Mobile v1.0.0',
+              'EDUT PRO SCOLAIRE v1.0.0',
               style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
             ),
           ),
@@ -2201,7 +2201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 30),
           Center(
             child: Text(
-              "Edut Mobile - Version 1.0.0",
+              "EDUT PRO SCOLAIRE - Version 1.0.0",
               style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
             ),
           ),
@@ -2222,11 +2222,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'EDUT MOBILE',
+          'EDUT PRO SCOLAIRE',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 20,
-            letterSpacing: 1.5,
+            fontSize: 18,
+            letterSpacing: 1.0,
           ),
         ),
         leading: Builder(

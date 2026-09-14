@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Edut Mobile',
+      title: 'EDUT PRO SCOLAIRE',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: AppRouter.router,
