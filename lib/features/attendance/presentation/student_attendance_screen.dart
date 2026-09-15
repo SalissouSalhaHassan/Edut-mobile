@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/injection.dart';
@@ -92,10 +93,12 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
       final Map<int, String> existingRemarks = {};
 
       for (var record in recordsList) {
-        final sId = (record['student_id'] as num).toInt();
-        existingStatuses[sId] = record['status'] as String? ?? 'Présent';
-        if (record['remark'] != null && (record['remark'] as String).isNotEmpty) {
-          existingRemarks[sId] = record['remark'] as String;
+        final sId = (record['student_id'] as num?)?.toInt() ?? int.tryParse(record['student_id']?.toString() ?? '') ?? 0;
+        if (sId != 0) {
+          existingStatuses[sId] = record['status']?.toString() ?? 'Présent';
+          if (record['remark'] != null && record['remark'].toString().trim().isNotEmpty) {
+            existingRemarks[sId] = record['remark'].toString().trim();
+          }
         }
       }
 
@@ -110,10 +113,12 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
           _statuses.clear();
           _remarks.clear();
           for (var s in _students) {
-            final sId = s['id'] as int;
-            _statuses[sId] = existingStatuses[sId] ?? 'Présent';
-            if (existingRemarks.containsKey(sId)) {
-              _remarks[sId] = existingRemarks[sId]!;
+            final sId = (s['id'] as num?)?.toInt() ?? int.tryParse(s['id']?.toString() ?? '') ?? 0;
+            if (sId != 0) {
+              _statuses[sId] = existingStatuses[sId] ?? 'Présent';
+              if (existingRemarks.containsKey(sId)) {
+                _remarks[sId] = existingRemarks[sId]!;
+              }
             }
           }
           
@@ -141,8 +146,8 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     final lowerQuery = query.toLowerCase();
     setState(() {
       _filteredStudents = _students.where((s) {
-        final name = (s['nom_etudiant'] as String? ?? '').toLowerCase();
-        final code = (s['num_admission'] as String? ?? '').toLowerCase();
+        final name = (s['nom_etudiant'] ?? s['nomEtudiant'] ?? '').toString().toLowerCase();
+        final code = (s['num_admission'] ?? s['numAdmission'] ?? '').toString().toLowerCase();
         return name.contains(lowerQuery) || code.contains(lowerQuery);
       }).toList();
     });
@@ -152,8 +157,10 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
   void _setAllStatus(String status) {
     setState(() {
       for (var s in _students) {
-        final sId = s['id'] as int;
-        _statuses[sId] = status;
+        final sId = (s['id'] as num?)?.toInt() ?? int.tryParse(s['id']?.toString() ?? '') ?? 0;
+        if (sId != 0) {
+          _statuses[sId] = status;
+        }
       }
     });
     
@@ -227,12 +234,14 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     // Format records for repository API
     final List<Map<String, dynamic>> recordsToSave = [];
     for (var s in _students) {
-      final sId = s['id'] as int;
-      recordsToSave.add({
-        'student_id': sId,
-        'status': _statuses[sId] ?? 'Présent',
-        'remark': _remarks[sId],
-      });
+      final sId = (s['id'] as num?)?.toInt() ?? int.tryParse(s['id']?.toString() ?? '') ?? 0;
+      if (sId != 0) {
+        recordsToSave.add({
+          'student_id': sId,
+          'status': _statuses[sId] ?? 'Présent',
+          'remark': _remarks[sId],
+        });
+      }
     }
 
     final result = await _repository.saveStudentBatchAttendance(
@@ -438,11 +447,11 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                               itemCount: _filteredStudents.length,
                               itemBuilder: (context, index) {
                                 final student = _filteredStudents[index];
-                                final studentId = student['id'] as int;
-                                final studentName = student['nom_etudiant'] as String? ?? '';
-                                final admissionNo = student['num_admission'] as String? ?? '';
+                                final studentId = (student['id'] as num?)?.toInt() ?? int.tryParse(student['id']?.toString() ?? '') ?? 0;
+                                final studentName = student['nom_etudiant']?.toString() ?? '';
+                                final admissionNo = student['num_admission']?.toString() ?? '';
                                 final currentStatus = _statuses[studentId] ?? 'Présent';
-                                final hasRemark = _remarks.containsKey(studentId);
+                                final hasRemark = _remarks.containsKey(studentId) && (_remarks[studentId]?.toString().trim().isNotEmpty ?? false);
 
                                 return _buildStudentCard(
                                   studentId: studentId,
@@ -623,7 +632,10 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
   }
 
   Future<void> _notifyAbsentParentsViaWhatsApp() async {
-    final absentStudents = _students.where((s) => _statuses[s['id']] == 'Absent').toList();
+    final absentStudents = _students.where((s) {
+      final sId = (s['id'] as num?)?.toInt() ?? int.tryParse(s['id']?.toString() ?? '') ?? 0;
+      return _statuses[sId] == 'Absent';
+    }).toList();
     if (absentStudents.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Aucun élève marqué absent.')),
@@ -719,9 +731,16 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     required String currentStatus,
     required bool hasRemark,
   }) {
-    final initials = studentName.isNotEmpty
-        ? studentName.trim().split(' ').map((e) => e.substring(0, 1)).take(2).join().toUpperCase()
-        : '?';
+    String initials = '?';
+    final nameTrimmed = studentName.trim();
+    if (nameTrimmed.isNotEmpty) {
+      final parts = nameTrimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 2) {
+        initials = (parts[0][0] + parts[1][0]).toUpperCase();
+      } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        initials = parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+      }
+    }
 
     final avatarColor = _getAvatarColor(studentName);
 
@@ -815,7 +834,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _remarks[studentId]!,
+                        _remarks[studentId] ?? '',
                         style: const TextStyle(color: AppColors.slate700, fontSize: 12, fontStyle: FontStyle.italic),
                       ),
                     ),
