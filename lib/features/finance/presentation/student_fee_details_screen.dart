@@ -157,6 +157,7 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     final student = _currentFee['students'] as Map<String, dynamic>? ?? {};
     final name = student['nom_etudiant'] ?? 'Élève';
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
+    final balance = (_currentFee['balance'] as num?)?.toDouble() ?? 0.0;
     final pRefRaw = payment['reference']?.toString().trim();
     final pId = payment['id'];
     final ref = (pRefRaw != null && pRefRaw.isNotEmpty)
