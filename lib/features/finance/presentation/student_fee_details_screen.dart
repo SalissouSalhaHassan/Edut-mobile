@@ -157,14 +157,17 @@ class _StudentFeeDetailsScreenState extends State<StudentFeeDetailsScreen> {
     final student = _currentFee['students'] as Map<String, dynamic>? ?? {};
     final name = student['nom_etudiant'] ?? 'Élève';
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
-    final balance = (_currentFee['balance'] as num?)?.toDouble() ?? 0.0;
-    final ref = payment['reference'] ?? '';
+    final pRefRaw = payment['reference']?.toString().trim();
+    final pId = payment['id'];
+    final ref = (pRefRaw != null && pRefRaw.isNotEmpty)
+        ? pRefRaw
+        : (pId != null ? 'REC-$pId' : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
     final rawPhone = student['whatsapp'] ?? student['telephone_parent'] ?? student['telephone'] ?? '';
     final phone = rawPhone.toString().replaceAll(RegExp(r'[^0-9+]'), '');
 
     final amountFmt = amount.toStringAsFixed(0);
     final balFmt = balance.toStringAsFixed(0);
-    final refStr = ref.toString().isNotEmpty ? " (Réf: $ref)" : "";
+    final refStr = " (Réf: $ref)";
 
     final stage = EducationalLevelHelper.inferEducationalStage(
       educationalLevel: student['educational_level']?.toString() ?? student['educationalLevel']?.toString(),

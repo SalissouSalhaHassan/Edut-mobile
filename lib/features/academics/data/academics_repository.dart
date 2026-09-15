@@ -629,6 +629,25 @@ class AcademicsRepository {
     }
   }
 
+  String _mapWorkflowActionToStatus(String action) {
+    switch (action) {
+      case 'submit':
+        return 'SAISIE_TERMINEE';
+      case 'request_correction':
+        return 'CORRECTION_DEMANDEE';
+      case 'validate_pedagogique':
+        return 'CONTROLE_PEDAGOGIQUE';
+      case 'lock':
+        return 'VERROUILLE';
+      case 'publish':
+        return 'PUBLIE';
+      case 'reopen':
+        return 'BROUILLON';
+      default:
+        return 'SAISIE_TERMINEE';
+    }
+  }
+
   /// Fetches Grade Approval Workflow Status for class & subject
   Future<Map<String, dynamic>> getGradeWorkflowStatus({
     required int classId,
@@ -636,13 +655,46 @@ class AcademicsRepository {
     required int sessionId,
     required String period,
   }) async {
+    final syncEngine = locator<SyncEngine>();
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = "grade_workflow_${classId}_${subjectId}_${sessionId}_$period";
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      final cached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
+      if (cached.isNotEmpty) {
+        return _cleanMap(cached.first);
+      }
+      return {
+        'success': true,
+        'workflowStatus': 'BROUILLON',
+        'observation': null,
+      };
+    }
+
     try {
       final response = await _apiClient.getJson(
         '/api/mobile/academics?action=getWorkflowStatus&classId=$classId&subjectId=$subjectId&sessionId=$sessionId&period=$period',
       );
+      if (response['success'] == true) {
+        await cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudentResults,
+          key: cacheKey,
+          data: [_cleanMap(response)],
+        );
+      }
       return response;
     } catch (e) {
-      debugPrint("Error fetching grade workflow status: $e");
+      debugPrint("Error fetching grade workflow status online: $e");
+      final cached = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+      );
+      if (cached.isNotEmpty) {
+        return _cleanMap(cached.first);
+      }
       return {
         'success': true,
         'workflowStatus': 'BROUILLON',
@@ -660,6 +712,42 @@ class AcademicsRepository {
     required String targetAction,
     String? observation,
   }) async {
+    final syncEngine = locator<SyncEngine>();
+    final queueManager = locator<OfflineQueueManager>();
+    final cacheManager = locator<OfflineStoreManager>();
+    final cacheKey = "grade_workflow_${classId}_${subjectId}_${sessionId}_$period";
+
+    final newStatus = _mapWorkflowActionToStatus(targetAction);
+    final localResult = {
+      'success': true,
+      'isOffline': true,
+      'workflowStatus': newStatus,
+      'observation': observation,
+      'message': 'Action enregistrée localement (Mode Hors-ligne). Synchronisation automatique dès la reconnexion.',
+    };
+
+    if (!syncEngine.isOnlineNotifier.value) {
+      debugPrint("📶 Offline Mode: Queueing grade workflow update ($targetAction -> $newStatus).");
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+        data: [_cleanMap(localResult)],
+      );
+      await queueManager.enqueue(
+        table: 'grade_workflow',
+        action: 'update_workflow_status',
+        data: {
+          'classId': classId,
+          'subjectId': subjectId,
+          'sessionId': sessionId,
+          'period': period,
+          'targetAction': targetAction,
+          'observation': observation,
+        },
+      );
+      return localResult;
+    }
+
     try {
       final response = await _apiClient.postJson(
         '/api/mobile/academics',
@@ -675,13 +763,40 @@ class AcademicsRepository {
           },
         },
       );
+
+      if (response['success'] == true) {
+        final merged = {
+          ...response,
+          'workflowStatus': response['workflowStatus'] ?? newStatus,
+          'observation': observation,
+        };
+        await cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudentResults,
+          key: cacheKey,
+          data: [_cleanMap(merged)],
+        );
+      }
       return response;
     } catch (e) {
-      debugPrint("Error updating grade workflow status: $e");
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      debugPrint("Error updating grade workflow status online: $e. Queueing for offline sync.");
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+        data: [_cleanMap(localResult)],
+      );
+      await queueManager.enqueue(
+        table: 'grade_workflow',
+        action: 'update_workflow_status',
+        data: {
+          'classId': classId,
+          'subjectId': subjectId,
+          'sessionId': sessionId,
+          'period': period,
+          'targetAction': targetAction,
+          'observation': observation,
+        },
+      );
+      return localResult;
     }
   }
 }

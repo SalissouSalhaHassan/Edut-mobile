@@ -35,12 +35,18 @@ class ReceiptQrDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
-    final reference = payment['reference']?.toString() ?? 'REC-${payment['id'] ?? '001'}';
-    final paymentMode = payment['paymentMode']?.toString() ?? 'Espèces / Mobile Money';
-    final month = payment['monthConcerned']?.toString() ?? 'Frais de scolarité';
-    final date = payment['datePaid']?.toString() ?? DateTime.now().toIso8601String();
+    final refRaw = payment['reference']?.toString().trim();
+    final pId = payment['id'];
+    final reference = (refRaw != null && refRaw.isNotEmpty)
+        ? refRaw
+        : (pId != null
+            ? 'REC-$pId'
+            : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
+    final paymentMode = payment['payment_mode']?.toString() ?? payment['paymentMode']?.toString() ?? 'Espèces / Mobile Money';
+    final month = payment['month_concerned']?.toString() ?? payment['monthConcerned']?.toString() ?? 'Frais de scolarité';
+    final date = payment['date_paid']?.toString() ?? payment['datePaid']?.toString() ?? DateTime.now().toIso8601String();
 
-    final verifyUrl = 'https://edut.app/verify/receipt/$reference';
+    final verifyUrl = 'https://edut-web.vercel.app/verify?type=recu&ref=$reference';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),

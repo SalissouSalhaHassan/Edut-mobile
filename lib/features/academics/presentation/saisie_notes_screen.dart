@@ -245,15 +245,28 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
       } else {
         setState(() {
           _isLoading = false;
-          _errorMessage = result['error'] ?? "Une erreur est survenue.";
+          _errorMessage = _formatFriendlyError(result['error'] ?? "Une erreur est survenue.");
         });
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = "Erreur lors du chargement de la grille: $e";
+        _errorMessage = _formatFriendlyError("Erreur lors du chargement de la grille: $e");
       });
     }
+  }
+
+  String _formatFriendlyError(dynamic error) {
+    if (error == null) return "Une erreur est survenue.";
+    final str = error.toString();
+    if (str.contains('SocketException') ||
+        str.contains('Failed host lookup') ||
+        str.contains('DioException') ||
+        str.contains('connection error') ||
+        str.contains('errno = 7')) {
+      return "Mode Hors-ligne : Connexion réseau indisponible. Les données locales sont conservées en sécurité.";
+    }
+    return str;
   }
 
   void _filterStudents(String query) {
@@ -429,7 +442,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(res['error'] ?? 'Erreur lors de la sauvegarde.'),
+              content: Text(_formatFriendlyError(res['error'] ?? 'Erreur lors de la sauvegarde.')),
               backgroundColor: AppColors.danger,
             ),
           );
@@ -442,7 +455,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur critique: $e'),
+            content: Text(_formatFriendlyError(e)),
             backgroundColor: AppColors.danger,
           ),
         );
@@ -464,19 +477,33 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
 
       if (res['success'] == true) {
         if (mounted) {
+          final isOffline = res['isOffline'] == true || !locator<SyncEngine>().isOnlineNotifier.value;
+          final msg = isOffline
+              ? (res['message'] ?? '📋 Soumission enregistrée localement (Mode Hors-ligne). Synchronisation automatique dès le retour du réseau 📶')
+              : (res['message'] ?? 'Statut mis à jour avec succès.');
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(res['message'] ?? 'Statut mis à jour avec succès.'),
-              backgroundColor: AppColors.success,
+              content: Text(msg),
+              backgroundColor: isOffline ? const Color(0xFFD97706) : AppColors.success,
             ),
           );
+
+          if (res['workflowStatus'] != null) {
+            setState(() {
+              _workflowStatus = res['workflowStatus'] as String;
+              if (observation != null) _workflowObservation = observation;
+              _isEditable = _workflowStatus == 'BROUILLON' || _workflowStatus == 'CORRECTION_DEMANDEE';
+            });
+          }
+
           _fetchGridData(_schoolId);
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(res['error'] ?? 'Erreur lors de la mise à jour.'),
+              content: Text(_formatFriendlyError(res['error'] ?? 'Erreur lors de la mise à jour.')),
               backgroundColor: AppColors.danger,
             ),
           );
@@ -485,7 +512,10 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text(_formatFriendlyError(e)),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     } finally {

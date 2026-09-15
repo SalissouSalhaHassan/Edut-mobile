@@ -305,6 +305,10 @@ class _OfflineSyncScreenState extends State<OfflineSyncScreen> {
                 label = 'Saisie de Notes / Devoirs';
                 icon = Icons.grade_rounded;
                 color = const Color(0xFFF59E0B);
+              } else if (op.table == 'grade_workflow') {
+                label = 'Circuit d\'Approbation des Notes';
+                icon = Icons.assignment_turned_in_rounded;
+                color = const Color(0xFF2563EB);
               } else if (op.table == 'fee_payments') {
                 label = 'Paiement Encaissé';
                 icon = Icons.payments_rounded;

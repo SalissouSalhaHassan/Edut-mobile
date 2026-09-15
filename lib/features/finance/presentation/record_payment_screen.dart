@@ -103,13 +103,21 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
       final email = await session.getEmail() ?? 'Admin';
       final recordedBy = email.split('@').first.toUpperCase();
 
+      final student = widget.feeData['students'] as Map<String, dynamic>? ?? {};
+      final admissionNum = student['num_admission'] ?? student['matricule'] ?? student['id'] ?? '';
+      final admissionClean = admissionNum.toString().replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+      final defaultRef = 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}${admissionClean.isNotEmpty ? "-$admissionClean" : ""}';
+      final referenceToSend = _referenceController.text.trim().isNotEmpty
+          ? _referenceController.text.trim()
+          : defaultRef;
+
       final res = await _repository.recordPayment(
         feeId: _feeId,
         schoolId: _schoolId,
         amount: amount,
         reduction: reduction,
         paymentMode: _paymentMode,
-        reference: _referenceController.text.trim(),
+        reference: referenceToSend,
         monthConcerned: _monthConcerned,
         recordedBy: recordedBy,
         currentPaid: _paid,
@@ -123,14 +131,17 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
         });
 
         if (res['success'] == true) {
+          final isOffline = res['isOffline'] == true || res['queued'] == true;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Versement enregistré avec succès ! Préparation du reçu..."),
+            SnackBar(
+              content: Text(
+                isOffline
+                    ? "Versement enregistré hors-ligne avec succès ! Réf: ${res['reference'] ?? referenceToSend}"
+                    : "Versement enregistré avec succès ! Préparation du reçu...",
+              ),
               backgroundColor: AppColors.success,
             ),
           );
-
-          final student = widget.feeData['students'] as Map<String, dynamic>? ?? {};
 
           Map<String, dynamic>? headerConfig;
           try {
@@ -142,16 +153,22 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
             debugPrint("Error fetching document header: $e");
           }
 
+          final paymentData = res['payment'] as Map<String, dynamic>? ?? {};
+          final resolvedRef = res['reference']?.toString().isNotEmpty == true
+              ? res['reference'].toString()
+              : (paymentData['reference']?.toString().isNotEmpty == true
+                  ? paymentData['reference'].toString()
+                  : referenceToSend);
+          final resolvedId = res['paymentId'] ?? paymentData['id'] ?? DateTime.now().millisecondsSinceEpoch;
+
           final paymentRecord = {
-            'id': res['paymentId'] ?? DateTime.now().millisecondsSinceEpoch,
+            'id': resolvedId,
             'amount': amount,
             'reduction': reduction,
             'payment_mode': _paymentMode,
-            'reference': _referenceController.text.trim().isNotEmpty
-                ? _referenceController.text.trim()
-                : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+            'reference': resolvedRef,
             'month_concerned': _monthConcerned,
-            'date_paid': DateTime.now().toIso8601String(),
+            'date_paid': paymentData['date_paid'] ?? DateTime.now().toIso8601String(),
             'recorded_by': recordedBy,
           };
 

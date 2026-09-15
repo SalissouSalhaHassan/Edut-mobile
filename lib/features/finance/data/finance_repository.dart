@@ -334,8 +334,13 @@ class FinanceRepository {
       newStatus = "Partiel";
     }
 
+    final String receiptRef = reference.trim().isNotEmpty
+        ? reference.trim()
+        : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final int offlinePaymentId = DateTime.now().millisecondsSinceEpoch;
+
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("Offline Mode: Queueing fee payment locally.");
+      debugPrint("Offline Mode: Queueing fee payment locally with ref: $receiptRef");
       await queueManager.enqueue(
         table: 'fee_payments',
         action: 'record_payment',
@@ -345,7 +350,7 @@ class FinanceRepository {
           'amount': amount,
           'reduction': reduction,
           'paymentMode': paymentMode,
-          'reference': reference,
+          'reference': receiptRef,
           'monthConcerned': monthConcerned,
           'recordedBy': recordedBy,
           'currentPaid': currentPaid,
@@ -360,13 +365,13 @@ class FinanceRepository {
         key: paymentCacheKey,
       );
       final localPayment = {
-        'id': null,
+        'id': offlinePaymentId,
         'fee_id': feeId,
         'school_id': schoolId,
         'amount': amount,
         'reduction': reduction,
         'payment_mode': paymentMode,
-        'reference': reference.isNotEmpty ? reference : null,
+        'reference': receiptRef,
         'month_concerned': monthConcerned.isNotEmpty ? monthConcerned : null,
         'date_paid': DateTime.now().toIso8601String(),
         'recorded_by': recordedBy,
@@ -389,7 +394,10 @@ class FinanceRepository {
       return {
         'success': true,
         'payment': localPayment,
+        'paymentId': offlinePaymentId,
+        'reference': receiptRef,
         'queued': true,
+        'isOffline': true,
         'newPaid': newPaid,
         'newReduction': newReduction,
         'newBalance': newBalance,
@@ -408,7 +416,7 @@ class FinanceRepository {
             'amount': amount,
             'reduction': reduction,
             'paymentMode': paymentMode,
-            'reference': reference,
+            'reference': receiptRef,
             'monthConcerned': monthConcerned,
             'recordedBy': recordedBy,
             'currentPaid': currentPaid,
@@ -419,7 +427,15 @@ class FinanceRepository {
       );
 
       if (response['success'] == true) {
-        final paymentResponse = response['payment'];
+        final paymentResponse = response['payment'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(response['payment'] as Map)
+            : <String, dynamic>{};
+        final resolvedRef = (paymentResponse['reference'] != null && paymentResponse['reference'].toString().trim().isNotEmpty)
+            ? paymentResponse['reference'].toString().trim()
+            : receiptRef;
+        paymentResponse['reference'] = resolvedRef;
+        final resolvedId = paymentResponse['id'] ?? offlinePaymentId;
+
         await _updateCachedFeeAfterPayment(
           feeId: feeId,
           newPaid: newPaid,
@@ -431,6 +447,8 @@ class FinanceRepository {
         return {
           'success': true,
           'payment': paymentResponse,
+          'paymentId': resolvedId,
+          'reference': resolvedRef,
         };
       } else {
         return {
@@ -439,10 +457,68 @@ class FinanceRepository {
         };
       }
     } catch (e) {
-      debugPrint("Error recording payment: $e");
+      debugPrint("Error recording payment online: $e. Falling back to offline local queue.");
+      await queueManager.enqueue(
+        table: 'fee_payments',
+        action: 'record_payment',
+        data: {
+          'feeId': feeId,
+          'schoolId': schoolId,
+          'amount': amount,
+          'reduction': reduction,
+          'paymentMode': paymentMode,
+          'reference': receiptRef,
+          'monthConcerned': monthConcerned,
+          'recordedBy': recordedBy,
+          'currentPaid': currentPaid,
+          'currentReduction': currentReduction,
+          'totalExpected': totalExpected,
+        },
+      );
+
+      final paymentCacheKey = _paymentsCacheKey(feeId);
+      final cachedPayments = cacheManager.getDataList(
+        boxName: OfflineStoreManager.boxFeePayments,
+        key: paymentCacheKey,
+      );
+      final localPayment = {
+        'id': offlinePaymentId,
+        'fee_id': feeId,
+        'school_id': schoolId,
+        'amount': amount,
+        'reduction': reduction,
+        'payment_mode': paymentMode,
+        'reference': receiptRef,
+        'month_concerned': monthConcerned.isNotEmpty ? monthConcerned : null,
+        'date_paid': DateTime.now().toIso8601String(),
+        'recorded_by': recordedBy,
+        'is_pending_sync': true,
+      };
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxFeePayments,
+        key: paymentCacheKey,
+        data: [localPayment, ...cachedPayments],
+      );
+
+      await _updateCachedFeeAfterPayment(
+        feeId: feeId,
+        newPaid: newPaid,
+        newReduction: newReduction,
+        newBalance: newBalance,
+        newStatus: newStatus,
+      );
+
       return {
-        'success': false,
-        'error': 'Erreur lors de l\'enregistrement du paiement: $e',
+        'success': true,
+        'payment': localPayment,
+        'paymentId': offlinePaymentId,
+        'reference': receiptRef,
+        'queued': true,
+        'isOffline': true,
+        'newPaid': newPaid,
+        'newReduction': newReduction,
+        'newBalance': newBalance,
+        'newStatus': newStatus,
       };
     }
   }

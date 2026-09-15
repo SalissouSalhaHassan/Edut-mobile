@@ -332,6 +332,22 @@ class SyncEngine {
         return res['success'] == true;
       } 
       
+      else if (op.table == 'grade_workflow' && op.action == 'update_workflow_status') {
+        final repo = locator<AcademicsRepository>();
+        final data = op.data;
+        
+        final res = await repo.updateGradeWorkflowStatus(
+          classId: data['classId'] as int,
+          subjectId: data['subjectId'] as int,
+          sessionId: data['sessionId'] as int,
+          period: data['period'] as String,
+          targetAction: data['targetAction'] as String,
+          observation: data['observation'] as String?,
+        );
+        
+        return res['success'] == true;
+      } 
+      
       else if (op.table == 'fee_payments' && op.action == 'record_payment') {
         final repo = locator<FinanceRepository>();
         final data = op.data;

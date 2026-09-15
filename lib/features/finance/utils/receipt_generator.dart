@@ -48,7 +48,14 @@ class ReceiptGenerator {
       targetLevel: rawLevel.isNotEmpty ? rawLevel : className,
     );
 
-    final paymentId = payment['id'] ?? 1;
+    final pRefRaw = payment['reference']?.toString().trim();
+    final paymentId = payment['id'];
+    final receiptRef = (pRefRaw != null && pRefRaw.isNotEmpty)
+        ? pRefRaw
+        : (paymentId != null
+            ? 'REC-$paymentId'
+            : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
+
     final totalPaid = totalExpected - remainingBalance > 0
         ? totalExpected - remainingBalance
         : (payment['amount'] as num?)?.toDouble() ?? 0.0;
@@ -246,7 +253,7 @@ class ReceiptGenerator {
                     borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
                   ),
                   child: pw.Text(
-                    'RÉFÉRENCE : REC-$paymentId',
+                    'RÉFÉRENCE : $receiptRef',
                     style: pw.TextStyle(
                       font: amiriBold,
                       fontSize: isA5 ? 7 : 8.5,
@@ -362,7 +369,9 @@ class ReceiptGenerator {
                   final pDate = p['date_paid'] != null
                       ? DateFormat('dd/MM/yyyy').format(DateTime.parse(p['date_paid'].toString()))
                       : datePaidStr;
-                  final pRef = 'PAY-${pId.toString().padLeft(6, '0')}';
+                  final pRef = (p['reference'] != null && p['reference'].toString().trim().isNotEmpty)
+                      ? p['reference'].toString().trim()
+                      : 'PAY-${pId.toString().padLeft(6, '0')}';
                   final pMode = p['payment_mode'] ?? 'Espèces';
                   final pAmount = (p['amount'] as num?)?.toDouble() ?? 0.0;
                   final pRec = p['recorded_by'] ?? 'Admin Scolarité';
@@ -439,14 +448,9 @@ class ReceiptGenerator {
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('CERTIFICATION', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: royalBlue)),
-                          pw.Text(
-                            EducationalLevelHelper.getReceiptCertificationText(stage),
-                            style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor),
-                          ),
-                          pw.Center(
-                            child: pw.Text('Signature & Cachet', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
-                          ),
+                          pw.Text('CERTIFICATION OFFICIELLE', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: emeraldGreen)),
+                          pw.Text('Quittance conforme émise par le système automatisé de l\'établissement.', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: darkNavy)),
+                          pw.Text('Opérateur : ${payment['recorded_by'] ?? 'Agent Caisse'}', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
                         ],
                       ),
                     ),
@@ -454,29 +458,24 @@ class ReceiptGenerator {
 
                   pw.SizedBox(width: 8),
 
-                  // Center: Circular Official Stamp
-                  pw.Container(
-                    width: isA5 ? 56 : 70,
-                    height: isA5 ? 56 : 70,
-                    decoration: pw.BoxDecoration(
-                      shape: pw.BoxShape.circle,
-                      border: pw.Border.all(color: const PdfColor(0.06, 0.09, 0.16, 0.35), width: 1.2),
-                    ),
-                    child: pw.Center(
-                      child: pw.Container(
-                        width: isA5 ? 46 : 58,
-                        height: isA5 ? 46 : 58,
-                        decoration: pw.BoxDecoration(
-                          shape: pw.BoxShape.circle,
-                          border: pw.Border.all(color: const PdfColor(0.06, 0.09, 0.16, 0.35), width: 0.8),
-                        ),
-                        child: pw.Center(
-                          child: pw.Text(
-                            EducationalLevelHelper.getReceiptStampText(stage, school),
-                            textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 4 : 5, color: const PdfColor(0.06, 0.09, 0.16, 0.45)),
-                          ),
-                        ),
+                  // Middle Card: Stamp Box
+                  pw.Expanded(
+                    flex: 4,
+                    child: pw.Container(
+                      height: isA5 ? 64 : 76,
+                      padding: const pw.EdgeInsets.all(6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: lightBorder),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      ),
+                      child: pw.Column(
+                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Text('CACHE DU SERVICE FINANCIER', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 5.5 : 6.5, color: darkNavy)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('[ Cachet et Signature Électronique ]', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 4.5 : 5.5, color: greyColor)),
+                        ],
                       ),
                     ),
                   ),
@@ -498,7 +497,7 @@ class ReceiptGenerator {
                         children: [
                           pw.BarcodeWidget(
                             barcode: pw.Barcode.qrCode(),
-                            data: 'REC-$paymentId|$studentName|$className|${_formatCfa(totalPaid)}|${_formatCfa(remainingBalance)}',
+                            data: '$receiptRef|$studentName|$className|${_formatCfa(totalPaid)}|${_formatCfa(remainingBalance)}',
                             width: isA5 ? 38 : 46,
                             height: isA5 ? 38 : 46,
                           ),
@@ -510,7 +509,7 @@ class ReceiptGenerator {
                               children: [
                                 pw.Text('Scannez pour vérifier l\'authenticité', style: pw.TextStyle(font: amiriFont, fontSize: isA5 ? 5 : 6, color: greyColor)),
                                 pw.SizedBox(height: 2),
-                                pw.Text('REC-$paymentId', style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: royalBlue)),
+                                pw.Text(receiptRef, style: pw.TextStyle(font: amiriBold, fontSize: isA5 ? 6 : 7, color: royalBlue)),
                               ],
                             ),
                           ),
@@ -550,6 +549,14 @@ class ReceiptGenerator {
     List<Map<String, dynamic>>? allPayments,
     Map<String, dynamic>? headerConfig,
   }) async {
+    final resolvedPayment = Map<String, dynamic>.from(payment);
+    final pRefRaw = resolvedPayment['reference']?.toString().trim();
+    final pId = resolvedPayment['id'];
+    final displayRef = (pRefRaw != null && pRefRaw.isNotEmpty)
+        ? pRefRaw
+        : (pId != null ? 'REC-$pId' : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
+    resolvedPayment['reference'] = displayRef;
+
     PdfPageFormat selectedFormat = PdfPageFormat.a5;
 
     await showModalBottomSheet(
@@ -570,13 +577,27 @@ class ReceiptGenerator {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Exporter / Imprimer le Reçu',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Exporter / Imprimer le Reçu',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'N° Quittance : $displayRef',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4F46E5),
+                            ),
+                          ),
+                        ],
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, size: 20),
@@ -646,7 +667,7 @@ class ReceiptGenerator {
                             Navigator.pop(ctx);
                             await generateAndPrint(
                               student: student,
-                              payment: payment,
+                              payment: resolvedPayment,
                               totalExpected: totalExpected,
                               remainingBalance: remainingBalance,
                               allPayments: allPayments,
@@ -671,7 +692,7 @@ class ReceiptGenerator {
                             Navigator.pop(ctx);
                             await generateAndShare(
                               student: student,
-                              payment: payment,
+                              payment: resolvedPayment,
                               totalExpected: totalExpected,
                               remainingBalance: remainingBalance,
                               allPayments: allPayments,
@@ -701,7 +722,12 @@ class ReceiptGenerator {
     Map<String, dynamic>? headerConfig,
     PdfPageFormat pageFormat = PdfPageFormat.a5,
   }) async {
-    final paymentId = payment['id'] ?? 0;
+    final pRefRaw = payment['reference']?.toString().trim();
+    final paymentId = payment['id'];
+    final receiptRef = (pRefRaw != null && pRefRaw.isNotEmpty)
+        ? pRefRaw
+        : (paymentId != null ? 'REC-$paymentId' : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
+
     final bytes = await generatePdfBytes(
       student: student,
       payment: payment,
@@ -725,7 +751,7 @@ class ReceiptGenerator {
 
     await Printing.layoutPdf(
       onLayout: (format) async => bytes,
-      name: '${prefix}_REC-$paymentId.pdf',
+      name: '${prefix}_$receiptRef.pdf',
     );
   }
 
@@ -738,7 +764,12 @@ class ReceiptGenerator {
     Map<String, dynamic>? headerConfig,
     PdfPageFormat pageFormat = PdfPageFormat.a5,
   }) async {
-    final paymentId = payment['id'] ?? 0;
+    final pRefRaw = payment['reference']?.toString().trim();
+    final paymentId = payment['id'];
+    final receiptRef = (pRefRaw != null && pRefRaw.isNotEmpty)
+        ? pRefRaw
+        : (paymentId != null ? 'REC-$paymentId' : 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
+
     final bytes = await generatePdfBytes(
       student: student,
       payment: payment,
@@ -771,7 +802,7 @@ class ReceiptGenerator {
           XFile.fromData(
             bytes,
             mimeType: 'application/pdf',
-            name: '${prefix}_REC-$paymentId.pdf',
+            name: '${prefix}_$receiptRef.pdf',
           ),
         ],
       ),
