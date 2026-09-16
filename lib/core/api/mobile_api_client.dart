@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_client.dart';
+import '../auth/session_manager.dart';
+import '../di/injection.dart';
 
 class MobileApiConfig {
   static const String baseUrl = String.fromEnvironment(
@@ -66,20 +68,27 @@ class MobileApiProfile {
 }
 
 class MobileApiClient {
-  MobileApiClient({Dio? dio, SupabaseClient? supabaseClient})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: _normalizeBaseUrl(MobileApiConfig.baseUrl),
-              connectTimeout: const Duration(seconds: 12),
-              receiveTimeout: const Duration(seconds: 20),
+  MobileApiClient({
+    Dio? dio,
+    SupabaseClient? supabaseClient,
+    SessionManager? sessionManager,
+  })  : _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: _normalizeBaseUrl(MobileApiConfig.baseUrl),
+                connectTimeout: const Duration(seconds: 12),
+                receiveTimeout: const Duration(seconds: 20),
+              ),
             ),
-          ),
-      _supabaseClient = supabaseClient ?? SupabaseClientManager().client;
+        _supabaseClient = supabaseClient ?? SupabaseClientManager().client,
+        _sessionManager = sessionManager ??
+            (locator.isRegistered<SessionManager>()
+                ? locator<SessionManager>()
+                : SessionManager());
 
   final Dio _dio;
   final SupabaseClient _supabaseClient;
+  final SessionManager _sessionManager;
 
   static String _normalizeBaseUrl(String rawValue) {
     final value = rawValue.trim();
@@ -90,8 +99,14 @@ class MobileApiClient {
   }
 
   Future<MobileApiProfile> getCurrentProfile({String? accessToken}) async {
-    final token =
+    var token =
         accessToken ?? _supabaseClient.auth.currentSession?.accessToken;
+
+    if (token == null || token.isEmpty) {
+      try {
+        token = await _sessionManager.getToken();
+      } catch (_) {}
+    }
 
     if (token == null || token.isEmpty) {
       throw const MobileApiException('Session mobile absente.');
@@ -240,11 +255,8 @@ class MobileApiClient {
 
   Future<Options> _authOptions() async {
     var session = _supabaseClient.auth.currentSession;
-    if (session == null) {
-      throw const MobileApiException('Session mobile absente.');
-    }
 
-    if (session.isExpired) {
+    if (session != null && session.isExpired) {
       try {
         final refreshRes = await _supabaseClient.auth.refreshSession();
         session = refreshRes.session ?? session;
@@ -253,9 +265,15 @@ class MobileApiClient {
       }
     }
 
-    final token = session?.accessToken ?? _supabaseClient.auth.currentSession?.accessToken;
+    var token = session?.accessToken ?? _supabaseClient.auth.currentSession?.accessToken;
     if (token == null || token.isEmpty) {
-      throw const MobileApiException('Session mobile absente ou expirée.');
+      try {
+        token = await _sessionManager.getToken();
+      } catch (_) {}
+    }
+
+    if (token == null || token.isEmpty) {
+      throw const MobileApiException('Session mobile absente.');
     }
     return Options(headers: {'Authorization': 'Bearer $token'});
   }

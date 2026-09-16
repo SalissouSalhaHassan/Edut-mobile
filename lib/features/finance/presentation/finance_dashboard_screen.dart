@@ -262,10 +262,12 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
       });
 
       if (res['success'] == true) {
+        final message = res['message']?.toString() ??
+            "Dossiers synchronisés: ${res['inserted'] ?? 0} créés, ${res['updated'] ?? 0} mis à jour.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Dossiers synchronisés: ${res['inserted']} créés, ${res['updated']} mis à jour."),
-            backgroundColor: AppColors.success,
+            content: Text(message),
+            backgroundColor: res['offline'] == true ? const Color(0xFF1E88E5) : AppColors.success,
           ),
         );
         _fetchFinanceData();
