@@ -377,6 +377,19 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
 
     try {
       final ranksMap = _getLiveRanks();
+      if (_students.isEmpty) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aucun élève à enregistrer dans cette classe.'),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+        return;
+      }
+
+      final sessionId = _selectedSessionId ?? 1;
+      final periodName = _selectedPeriodName.isNotEmpty ? _selectedPeriodName : '1er Trimestre';
       final List<Map<String, dynamic>> gradesToSave = [];
 
       for (var s in _students) {
@@ -402,12 +415,12 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
           'student_id': sId,
           'class_id': widget.classId,
           'subject_id': widget.subjectId,
-          'session_id': _selectedSessionId!,
-          'term': _selectedPeriodName,
+          'session_id': sessionId,
+          'term': periodName,
           'class_work_score': cw,
           'exam_score': ex,
           'total_score': metrics.total,
-          'coefficient': _coefficient.toInt(),
+          'coefficient': _coefficient.round(),
           'weighted_score': metrics.weighted,
           'absences': s['absences'] ?? 0,
           'observation': _observations[sId] ?? '',
@@ -425,14 +438,15 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
 
         if (res['success'] == true) {
           final isOnline = locator<SyncEngine>().isOnlineNotifier.value;
+          final isActuallySavedOnline = isOnline && res['isOffline'] != true;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                isOnline
+                isActuallySavedOnline
                     ? 'Notes enregistrées avec succès !'
                     : '💾 Notes enregistrées localement (Mode Hors-ligne). Synchronisation automatique dès le retour du réseau 📶',
               ),
-              backgroundColor: isOnline ? AppColors.success : const Color(0xFFD97706),
+              backgroundColor: isActuallySavedOnline ? AppColors.success : const Color(0xFFD97706),
             ),
           );
           // Reload data to ensure sync under current selected session & period

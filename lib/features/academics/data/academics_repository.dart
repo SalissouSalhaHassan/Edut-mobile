@@ -323,6 +323,7 @@ class AcademicsRepository {
 
   Future<Map<String, dynamic>> saveStudentGrades({
     required List<Map<String, dynamic>> grades,
+    bool isFromSync = false,
   }) async {
     final syncEngine = locator<SyncEngine>();
     final queueManager = locator<OfflineQueueManager>();
@@ -331,10 +332,10 @@ class AcademicsRepository {
     if (grades.isEmpty) return {'success': true};
 
     final first = grades.first;
-    final classId = first['class_id'] as int;
-    final subjectId = first['subject_id'] as int;
-    final sessionId = first['session_id'] as int;
-    final term = first['term'] as String;
+    final classId = (first['class_id'] as num?)?.toInt() ?? int.tryParse(first['class_id']?.toString() ?? '') ?? 0;
+    final subjectId = (first['subject_id'] as num?)?.toInt() ?? int.tryParse(first['subject_id']?.toString() ?? '') ?? 0;
+    final sessionId = (first['session_id'] as num?)?.toInt() ?? int.tryParse(first['session_id']?.toString() ?? '') ?? 0;
+    final term = first['term']?.toString() ?? '';
     final cacheKey = "grading_grid_${classId}_${subjectId}_${sessionId}_$term";
 
     // Build or update grid cache locally
@@ -396,12 +397,14 @@ class AcademicsRepository {
     );
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("📶 Offline Mode: Queueing student grades save locally.");
-      await queueManager.enqueue(
-        table: 'student_results',
-        action: 'save_grades',
-        data: {'grades': grades},
-      );
+      if (!isFromSync) {
+        debugPrint("📶 Offline Mode: Queueing student grades save locally.");
+        await queueManager.enqueue(
+          table: 'student_results',
+          action: 'save_grades',
+          data: {'grades': grades},
+        );
+      }
       return {'success': true, 'isOffline': true};
     }
 
@@ -417,13 +420,18 @@ class AcademicsRepository {
       );
       return response;
     } catch (e) {
-      debugPrint("Error saving student grades online: $e. Queueing for offline sync.");
-      await queueManager.enqueue(
-        table: 'student_results',
-        action: 'save_grades',
-        data: {'grades': grades},
-      );
-      return {'success': true, 'isOffline': true};
+      debugPrint("Error saving student grades online: $e.");
+      if (!isFromSync) {
+        debugPrint("Queueing for offline sync.");
+        await queueManager.enqueue(
+          table: 'student_results',
+          action: 'save_grades',
+          data: {'grades': grades},
+        );
+        return {'success': true, 'isOffline': true};
+      } else {
+        return {'success': false, 'error': e.toString(), 'isOffline': true};
+      }
     }
   }
 
@@ -523,6 +531,7 @@ class AcademicsRepository {
 
   Future<Map<String, dynamic>> saveDevoirGrades({
     required List<Map<String, dynamic>> devoirsList,
+    bool isFromSync = false,
   }) async {
     final syncEngine = locator<SyncEngine>();
     final queueManager = locator<OfflineQueueManager>();
@@ -531,10 +540,10 @@ class AcademicsRepository {
     if (devoirsList.isEmpty) return {'success': true};
 
     final first = devoirsList.first;
-    final classId = first['class_id'] as int;
-    final subjectId = first['subject_id'] as int;
-    final sessionId = first['session_id'] as int;
-    final term = first['term'] as String;
+    final classId = (first['class_id'] as num?)?.toInt() ?? int.tryParse(first['class_id']?.toString() ?? '') ?? 0;
+    final subjectId = (first['subject_id'] as num?)?.toInt() ?? int.tryParse(first['subject_id']?.toString() ?? '') ?? 0;
+    final sessionId = (first['session_id'] as num?)?.toInt() ?? int.tryParse(first['session_id']?.toString() ?? '') ?? 0;
+    final term = first['term']?.toString() ?? '';
     final cacheKey = "devoir_grid_${classId}_${subjectId}_${sessionId}_$term";
 
     // Build or update grid cache locally
@@ -582,12 +591,14 @@ class AcademicsRepository {
     );
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("📶 Offline Mode: Queueing devoir grades save locally.");
-      await queueManager.enqueue(
-        table: 'student_results',
-        action: 'save_devoirs',
-        data: {'devoirsList': devoirsList},
-      );
+      if (!isFromSync) {
+        debugPrint("📶 Offline Mode: Queueing devoir grades save locally.");
+        await queueManager.enqueue(
+          table: 'student_results',
+          action: 'save_devoirs',
+          data: {'devoirsList': devoirsList},
+        );
+      }
       return {'success': true, 'isOffline': true};
     }
 
@@ -603,13 +614,18 @@ class AcademicsRepository {
       );
       return response;
     } catch (e) {
-      debugPrint("Error saving devoir grades online: $e. Queueing for offline sync.");
-      await queueManager.enqueue(
-        table: 'student_results',
-        action: 'save_devoirs',
-        data: {'devoirsList': devoirsList},
-      );
-      return {'success': true, 'isOffline': true};
+      debugPrint("Error saving devoir grades online: $e.");
+      if (!isFromSync) {
+        debugPrint("Queueing for offline sync.");
+        await queueManager.enqueue(
+          table: 'student_results',
+          action: 'save_devoirs',
+          data: {'devoirsList': devoirsList},
+        );
+        return {'success': true, 'isOffline': true};
+      } else {
+        return {'success': false, 'error': e.toString(), 'isOffline': true};
+      }
     }
   }
 
@@ -721,6 +737,7 @@ class AcademicsRepository {
     required String period,
     required String targetAction,
     String? observation,
+    bool isFromSync = false,
   }) async {
     final syncEngine = locator<SyncEngine>();
     final queueManager = locator<OfflineQueueManager>();
@@ -737,24 +754,26 @@ class AcademicsRepository {
     };
 
     if (!syncEngine.isOnlineNotifier.value) {
-      debugPrint("📶 Offline Mode: Queueing grade workflow update ($targetAction -> $newStatus).");
-      await cacheManager.saveDataList(
-        boxName: OfflineStoreManager.boxStudentResults,
-        key: cacheKey,
-        data: [_cleanMap(localResult)],
-      );
-      await queueManager.enqueue(
-        table: 'grade_workflow',
-        action: 'update_workflow_status',
-        data: {
-          'classId': classId,
-          'subjectId': subjectId,
-          'sessionId': sessionId,
-          'period': period,
-          'targetAction': targetAction,
-          'observation': observation,
-        },
-      );
+      if (!isFromSync) {
+        debugPrint("📶 Offline Mode: Queueing grade workflow update ($targetAction -> $newStatus).");
+        await cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudentResults,
+          key: cacheKey,
+          data: [_cleanMap(localResult)],
+        );
+        await queueManager.enqueue(
+          table: 'grade_workflow',
+          action: 'update_workflow_status',
+          data: {
+            'classId': classId,
+            'subjectId': subjectId,
+            'sessionId': sessionId,
+            'period': period,
+            'targetAction': targetAction,
+            'observation': observation,
+          },
+        );
+      }
       return localResult;
     }
 
@@ -788,25 +807,30 @@ class AcademicsRepository {
       }
       return response;
     } catch (e) {
-      debugPrint("Error updating grade workflow status online: $e. Queueing for offline sync.");
-      await cacheManager.saveDataList(
-        boxName: OfflineStoreManager.boxStudentResults,
-        key: cacheKey,
-        data: [_cleanMap(localResult)],
-      );
-      await queueManager.enqueue(
-        table: 'grade_workflow',
-        action: 'update_workflow_status',
-        data: {
-          'classId': classId,
-          'subjectId': subjectId,
-          'sessionId': sessionId,
-          'period': period,
-          'targetAction': targetAction,
-          'observation': observation,
-        },
-      );
-      return localResult;
+      debugPrint("Error updating grade workflow status online: $e.");
+      if (!isFromSync) {
+        debugPrint("Queueing for offline sync.");
+        await cacheManager.saveDataList(
+          boxName: OfflineStoreManager.boxStudentResults,
+          key: cacheKey,
+          data: [_cleanMap(localResult)],
+        );
+        await queueManager.enqueue(
+          table: 'grade_workflow',
+          action: 'update_workflow_status',
+          data: {
+            'classId': classId,
+            'subjectId': subjectId,
+            'sessionId': sessionId,
+            'period': period,
+            'targetAction': targetAction,
+            'observation': observation,
+          },
+        );
+        return localResult;
+      } else {
+        return {'success': false, 'error': e.toString(), 'isOffline': true};
+      }
     }
   }
 }

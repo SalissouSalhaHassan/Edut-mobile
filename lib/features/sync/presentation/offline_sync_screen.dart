@@ -54,14 +54,29 @@ class _OfflineSyncScreenState extends State<OfflineSyncScreen> {
 
     setState(() => _isManualSyncing = true);
     try {
-      await _syncEngine.triggerSync();
+      final res = await _syncEngine.triggerSync();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Synchronisation terminée avec succès !'),
-            backgroundColor: Color(0xFF059669),
-          ),
-        );
+        if (res.failedCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                res.successCount > 0
+                    ? '✅ Synchronisation terminée avec succès (${res.successCount} opération(s) envoyée(s)) !'
+                    : '✅ Toutes vos modifications locales sont déjà à jour !',
+              ),
+              backgroundColor: const Color(0xFF059669),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '⚠️ ${res.successCount} synchronisée(s), ${res.failedCount} opération(s) toujours en attente.',
+              ),
+              backgroundColor: const Color(0xFFD97706),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isManualSyncing = false);
@@ -337,6 +352,16 @@ class _OfflineSyncScreenState extends State<OfflineSyncScreen> {
                         children: [
                           Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                           Text('Action: ${op.action} • Répétitions: ${op.retryCount}', style: const TextStyle(fontSize: 11, color: AppColors.slate500)),
+                          if (op.lastError != null && op.lastError!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                op.lastError!,
+                                style: const TextStyle(fontSize: 10, color: Color(0xFFDC2626), fontWeight: FontWeight.w500),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                         ],
                       ),
                     ),

@@ -189,14 +189,16 @@ class SyncEngine {
   }
 
   /// Manually trigger queue processing
-  Future<void> triggerSync() async {
-    if (isSyncingNotifier.value || !isOnlineNotifier.value) return;
+  Future<({int successCount, int failedCount})> triggerSync() async {
+    if (isSyncingNotifier.value || !isOnlineNotifier.value) {
+      return (successCount: 0, failedCount: 0);
+    }
 
     final pending = _queueManager.getPendingOperations();
     if (pending.isEmpty) {
       // Even if no pending ops, update sync time on request
       await updateLastSyncTime();
-      return;
+      return (successCount: 0, failedCount: 0);
     }
 
     // Refresh token before draining queue to ensure valid authorization
@@ -230,7 +232,7 @@ class SyncEngine {
               );
               failedCount++;
             } else {
-              await _queueManager.incrementRetry(op.id, error: "Replay returned false");
+              await _queueManager.incrementRetry(op.id, error: "Replay returned false (hors-ligne ou rejet serveur)");
               failedCount++;
               debugPrint("⚠️ SyncEngine: Operation ${op.id} failed (retry ${op.retryCount + 1}/${OfflineOperation.maxRetries}). Continuing with next.");
             }
@@ -251,8 +253,10 @@ class SyncEngine {
       }
 
       debugPrint("🔄 SyncEngine: Sync complete — ✅ $successCount succeeded, ❌ $failedCount failed/deferred.");
+      return (successCount: successCount, failedCount: failedCount);
     } catch (e) {
       debugPrint("❌ SyncEngine: Unexpected error during sync: $e");
+      return (successCount: successCount, failedCount: failedCount);
     } finally {
       isSyncingNotifier.value = false;
       debugPrint("🔄 SyncEngine: Sync process finished.");
@@ -331,26 +335,40 @@ class SyncEngine {
         final repo = locator<AcademicsRepository>();
         final data = op.data;
         
+        final rawGrades = data['grades'];
+        if (rawGrades == null || rawGrades is! List || rawGrades.isEmpty) {
+          debugPrint("⚠️ SyncEngine: Invalid or empty grades in save_grades queue. Dequeueing.");
+          return true;
+        }
+
         final res = await repo.saveStudentGrades(
           grades: List<Map<String, dynamic>>.from(
-            (data['grades'] as List).map((e) => Map<String, dynamic>.from(e as Map))
+            rawGrades.map((e) => Map<String, dynamic>.from(e as Map))
           ),
+          isFromSync: true,
         );
         
-        return res['success'] == true;
+        return res['success'] == true && res['isOffline'] != true;
       } 
       
       else if (op.table == 'student_results' && op.action == 'save_devoirs') {
         final repo = locator<AcademicsRepository>();
         final data = op.data;
         
+        final rawDevoirs = data['devoirsList'];
+        if (rawDevoirs == null || rawDevoirs is! List || rawDevoirs.isEmpty) {
+          debugPrint("⚠️ SyncEngine: Invalid or empty devoirsList in save_devoirs queue. Dequeueing.");
+          return true;
+        }
+
         final res = await repo.saveDevoirGrades(
           devoirsList: List<Map<String, dynamic>>.from(
-            (data['devoirsList'] as List).map((e) => Map<String, dynamic>.from(e as Map))
+            rawDevoirs.map((e) => Map<String, dynamic>.from(e as Map))
           ),
+          isFromSync: true,
         );
         
-        return res['success'] == true;
+        return res['success'] == true && res['isOffline'] != true;
       } 
       
       else if (op.table == 'grade_workflow' && op.action == 'update_workflow_status') {
@@ -358,15 +376,16 @@ class SyncEngine {
         final data = op.data;
         
         final res = await repo.updateGradeWorkflowStatus(
-          classId: data['classId'] as int,
-          subjectId: data['subjectId'] as int,
-          sessionId: data['sessionId'] as int,
-          period: data['period'] as String,
-          targetAction: data['targetAction'] as String,
+          classId: (data['classId'] as num?)?.toInt() ?? int.tryParse(data['classId']?.toString() ?? '') ?? 0,
+          subjectId: (data['subjectId'] as num?)?.toInt() ?? int.tryParse(data['subjectId']?.toString() ?? '') ?? 0,
+          sessionId: (data['sessionId'] as num?)?.toInt() ?? int.tryParse(data['sessionId']?.toString() ?? '') ?? 0,
+          period: data['period']?.toString() ?? '',
+          targetAction: data['targetAction']?.toString() ?? '',
           observation: data['observation'] as String?,
+          isFromSync: true,
         );
         
-        return res['success'] == true;
+        return res['success'] == true && res['isOffline'] != true;
       } 
       
       else if (op.table == 'fee_payments' && op.action == 'record_payment') {
