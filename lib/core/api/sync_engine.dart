@@ -131,20 +131,41 @@ class SyncEngine {
     if (!isOnlineNotifier.value) return;
     try {
       debugPrint("📦 SyncEngine: Hydrating local Hive cache for offline mode...");
+
+      int schoolId = 1;
+      int sessionId = 1;
+      if (locator.isRegistered<SessionManager>()) {
+        final sessionManager = locator<SessionManager>();
+        final sIdStr = await sessionManager.getSchoolId();
+        schoolId = int.tryParse(sIdStr ?? '') ?? 1;
+      }
+
+      try {
+        final sessions = await locator<FinanceRepository>().getSessions(schoolId);
+        if (sessions.isNotEmpty) {
+          final active = sessions.firstWhere(
+            (s) => s['is_active'] == true || (s['status']?.toString().toLowerCase() == 'actif'),
+            orElse: () => sessions.first,
+          );
+          sessionId = (active['id'] as num?)?.toInt() ?? 1;
+        }
+      } catch (_) {}
+
       await Future.wait<dynamic>([
         locator<StudentsRepository>().getStudentsList().catchError((_) => <Map<String, dynamic>>[]),
         locator<DashboardStatsRepository>().getSummary().catchError((_) => <String, dynamic>{}),
-        locator<AcademicsRepository>().getSessions(1).catchError((_) => <Map<String, dynamic>>[]),
-        locator<AcademicsRepository>().getPeriods(1, 1).catchError((_) => <Map<String, dynamic>>[]),
-        locator<AcademicsRepository>().getAllClassesAndSubjects(1).catchError((_) => <Map<String, dynamic>>[]),
-        locator<FinanceRepository>().getStudentFeesList(schoolId: 1, sessionId: 1).catchError((_) => <Map<String, dynamic>>[]),
+        locator<AcademicsRepository>().getSessions(schoolId).catchError((_) => <Map<String, dynamic>>[]),
+        locator<AcademicsRepository>().getPeriods(schoolId, sessionId).catchError((_) => <Map<String, dynamic>>[]),
+        locator<AcademicsRepository>().getAllClassesAndSubjects(schoolId).catchError((_) => <Map<String, dynamic>>[]),
+        locator<FinanceRepository>().getStudentFeesList(schoolId: schoolId, sessionId: sessionId).catchError((_) => <Map<String, dynamic>>[]),
+        locator<FinanceRepository>().getFinanceStats(schoolId: schoolId, sessionId: sessionId).catchError((_) => <String, dynamic>{}),
         locator<PedagogieRepository>().getTeacherClassesAndSubjects().catchError((_) => <Map<String, dynamic>>[]),
         locator<PedagogieRepository>().getSeances().catchError((_) => <Map<String, dynamic>>[]),
         locator<CanteenRepository>().getWeeklyMenu().catchError((_) => null),
         locator<TransportRepository>().getDriverRoutes().catchError((_) => <Map<String, dynamic>>[]),
       ]);
       await updateLastSyncTime();
-      debugPrint("✅ SyncEngine: Offline cache hydrated successfully.");
+      debugPrint("✅ SyncEngine: Offline cache hydrated successfully for school $schoolId, session $sessionId.");
     } catch (e) {
       debugPrint("⚠️ SyncEngine: Preload warning: $e");
     }

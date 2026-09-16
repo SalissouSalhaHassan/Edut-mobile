@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -621,6 +622,12 @@ class FinanceRepository {
     }
 
     try {
+      // 1. Drain pending operations in queue before requesting server sync
+      if (syncEngine != null) {
+        await syncEngine.triggerSync();
+      }
+
+      // 2. Request server-side sync and re-aggregation
       final response = await _apiClient.postJson(
         '/api/mobile/finance/invoices',
         {
@@ -631,7 +638,24 @@ class FinanceRepository {
           },
         },
       );
-      return response;
+
+      // 3. Immediately refresh local cache with fresh fees and stats from server
+      final freshFees = await getStudentFeesList(
+        schoolId: schoolId,
+        sessionId: sessionId,
+      );
+      final freshStats = await getFinanceStats(
+        schoolId: schoolId,
+        sessionId: sessionId,
+      );
+
+      return {
+        'success': true,
+        'message': response['message'] ?? 'Dossiers synchronisés avec succès.',
+        'updated': response['updated'] ?? 0,
+        'stats': freshStats['stats'],
+        'data': freshFees,
+      };
     } catch (e) {
       debugPrint("Error syncing student fees online: $e. Falling back to local offline reconciliation.");
       return await _reconcileOfflineStudentFees(
@@ -702,18 +726,45 @@ class FinanceRepository {
       // Reconcile existing fees balances and status
       for (final f in existingFees) {
         final fee = Map<String, dynamic>.from(f);
+        final feeId = (fee['id'] as num?)?.toInt();
         final expected = (fee['total_expected'] as num?)?.toDouble() ?? 0.0;
-        final paid = (fee['total_paid'] as num?)?.toDouble() ?? 0.0;
-        final reduction = (fee['total_reduction'] as num?)?.toDouble() ?? 0.0;
-        final balance = expected - paid - reduction;
+        double paid = (fee['total_paid'] as num?)?.toDouble() ?? 0.0;
+        double reduction = (fee['total_reduction'] as num?)?.toDouble() ?? 0.0;
+
+        // Reconcile with any offline payments stored in boxFeePayments
+        if (feeId != null) {
+          final paymentCacheKey = _paymentsCacheKey(feeId);
+          final cachedPayments = cacheManager.getDataList(
+            boxName: OfflineStoreManager.boxFeePayments,
+            key: paymentCacheKey,
+          );
+          if (cachedPayments.isNotEmpty) {
+            double cachedSum = 0.0;
+            double cachedReduc = 0.0;
+            for (final p in cachedPayments) {
+              cachedSum += (p['amount'] as num?)?.toDouble() ?? 0.0;
+              cachedReduc += (p['reduction'] as num?)?.toDouble() ?? 0.0;
+            }
+            if (cachedSum > paid) {
+              paid = cachedSum;
+            }
+            if (cachedReduc > reduction) {
+              reduction = cachedReduc;
+            }
+          }
+        }
+
+        final balance = math.max(0.0, expected - paid - reduction);
 
         String status = "Impayé";
-        if (balance <= 0) {
+        if (balance <= 0 && expected > 0) {
           status = "Soldé";
         } else if (paid > 0) {
           status = "Partiel";
         }
 
+        fee['total_paid'] = paid;
+        fee['total_reduction'] = reduction;
         fee['balance'] = balance;
         fee['status'] = status;
         updatedFeesList.add(fee);

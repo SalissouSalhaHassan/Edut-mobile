@@ -270,6 +270,13 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
             backgroundColor: res['offline'] == true ? const Color(0xFF1E88E5) : AppColors.success,
           ),
         );
+        if (res['stats'] != null && res['stats'] is Map) {
+          _stats = Map<String, dynamic>.from(res['stats']);
+        }
+        if (res['data'] != null && res['data'] is List) {
+          _fees = List<Map<String, dynamic>>.from(res['data']);
+          _applyFilters();
+        }
         _fetchFinanceData();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
