@@ -86,7 +86,8 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final profile = await locator<PermissionService>().getCurrentProfile(forceRefresh: true);
+    final isOnline = locator<SyncEngine>().isOnlineNotifier.value;
+    final profile = await locator<PermissionService>().getCurrentProfile(forceRefresh: isOnline);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -102,8 +103,8 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
       _schoolId = schoolId;
       debugPrint("✅ schoolId from session: $schoolId");
 
-      // Fallback: If not found or defaults to 1, try querying database
-      if (schoolId == 1) {
+      // Fallback: If not found or defaults to 1, try querying database only if online
+      if (schoolId == 1 && isOnline) {
         final employeeIdStr = await sessionManager.getEmployeeId();
         final employeeId = int.tryParse(employeeIdStr ?? '');
         if (employeeId != null) {
@@ -225,13 +226,13 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         _observations.clear();
 
         for (var student in _students) {
-          final sId = student['student_id'] as int;
+          final sId = (student['student_id'] as num?)?.toInt() ?? int.tryParse(student['student_id']?.toString() ?? '') ?? 0;
           
           final classWorkVal = student['class_work_score'] != null
-              ? (student['class_work_score'] as num).toStringAsFixed(2).replaceAll('.00', '')
+              ? (num.tryParse(student['class_work_score'].toString())?.toStringAsFixed(2).replaceAll('.00', '') ?? student['class_work_score'].toString())
               : '';
           final examVal = student['exam_score'] != null
-              ? (student['exam_score'] as num).toStringAsFixed(2).replaceAll('.00', '')
+              ? (num.tryParse(student['exam_score'].toString())?.toStringAsFixed(2).replaceAll('.00', '') ?? student['exam_score'].toString())
               : '';
 
           _classWorkControllers[sId] = TextEditingController(text: classWorkVal);
@@ -295,7 +296,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
     int passed = 0;
 
     for (var s in _students) {
-      final sId = s['student_id'] as int;
+      final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
       final cw = double.tryParse(_classWorkControllers[sId]?.text ?? '') ?? 0.0;
       final ex = double.tryParse(_examControllers[sId]?.text ?? '') ?? 0.0;
 
@@ -349,7 +350,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
   Map<int, int> _getLiveRanks() {
     final List<Map<String, dynamic>> list = [];
     for (var s in _students) {
-      final sId = s['student_id'] as int;
+      final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
       final cw = double.tryParse(_classWorkControllers[sId]?.text ?? '') ?? 0.0;
       final ex = double.tryParse(_examControllers[sId]?.text ?? '') ?? 0.0;
 
@@ -379,7 +380,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
       final List<Map<String, dynamic>> gradesToSave = [];
 
       for (var s in _students) {
-        final sId = s['student_id'] as int;
+        final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
         final classWorkStr = _classWorkControllers[sId]?.text ?? '';
         final examStr = _examControllers[sId]?.text ?? '';
 

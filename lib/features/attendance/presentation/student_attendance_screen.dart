@@ -1067,7 +1067,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
                               final s = filtered[index];
-                              final sId = s['id'] as int;
+                              final sId = (s['id'] as num?)?.toInt() ?? int.tryParse(s['id']?.toString() ?? '') ?? 0;
                               final sName = s['nom_etudiant'] ?? s['nomEtudiant'] ?? 'Élève';
                               final numAdm = s['num_admission'] ?? s['numAdmission'] ?? '';
                               final isPresent = _statuses[sId] == 'Présent';

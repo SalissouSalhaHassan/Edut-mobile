@@ -347,10 +347,10 @@ class AcademicsRepository {
       gridRes = _cleanMap(cachedList.first);
       final List<dynamic> data = gridRes['data'] is List ? (gridRes['data'] as List) : [];
       final Map<int, Map<String, dynamic>> gradesMap = {
-        for (var g in grades) (g['student_id'] as num).toInt(): g
+        for (var g in grades) ((g['student_id'] as num?)?.toInt() ?? int.tryParse(g['student_id']?.toString() ?? '') ?? 0): g
       };
       final updatedData = data.map((item) {
-        final sId = (item['student_id'] as num).toInt();
+        final sId = (item['student_id'] as num?)?.toInt() ?? int.tryParse(item['student_id']?.toString() ?? '') ?? 0;
         final g = gradesMap[sId];
         if (g != null) {
           final Map<String, dynamic> updatedItem = _cleanMap(item as Map);
@@ -448,14 +448,24 @@ class AcademicsRepository {
         return _cleanMap(cachedList.first);
       }
 
-      // Offline Fallback: Build devoir grid from cached students list
+      // Offline Fallback: Build devoir grid from cached students list (filtered by class if available)
       final cachedStudents = cacheManager.getDataList(
         boxName: OfflineStoreManager.boxStudents,
         key: "students_list",
       );
       if (cachedStudents.isNotEmpty) {
-        final gridData = cachedStudents.map((s) => {
-          'student_id': s['id'] ?? 0,
+        final classStudents = cachedStudents.where((s) {
+          final sClassId = s['class_id'] ?? s['classId'];
+          if (sClassId != null && (sClassId == classId || sClassId.toString() == classId.toString())) {
+            return true;
+          }
+          return false;
+        }).toList();
+
+        final sourceList = classStudents.isNotEmpty ? classStudents : cachedStudents;
+
+        final gridData = sourceList.map((s) => {
+          'student_id': (s['id'] as num?)?.toInt() ?? int.tryParse(s['id']?.toString() ?? '') ?? 0,
           'num_admission': s['num_admission'] ?? 'EDUT-00',
           'nom_etudiant': s['nom_etudiant'] ?? 'Élève',
           'photo_path': s['photo_path'],
@@ -537,10 +547,10 @@ class AcademicsRepository {
       gridRes = _cleanMap(cachedList.first);
       final List<dynamic> data = gridRes['data'] is List ? (gridRes['data'] as List) : [];
       final Map<int, Map<String, dynamic>> devMap = {
-        for (var d in devoirsList) (d['student_id'] as num).toInt(): d
+        for (var d in devoirsList) ((d['student_id'] as num?)?.toInt() ?? int.tryParse(d['student_id']?.toString() ?? '') ?? 0): d
       };
       final updatedData = data.map((item) {
-        final sId = (item['student_id'] as num).toInt();
+        final sId = (item['student_id'] as num?)?.toInt() ?? int.tryParse(item['student_id']?.toString() ?? '') ?? 0;
         final d = devMap[sId];
         if (d != null) {
           final Map<String, dynamic> updatedItem = _cleanMap(item as Map);

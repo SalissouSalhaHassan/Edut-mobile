@@ -78,7 +78,8 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final profile = await locator<PermissionService>().getCurrentProfile(forceRefresh: true);
+    final isOnline = locator<SyncEngine>().isOnlineNotifier.value;
+    final profile = await locator<PermissionService>().getCurrentProfile(forceRefresh: isOnline);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -87,19 +88,30 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
 
     try {
       final sessionManager = locator<SessionManager>();
-      final employeeIdStr = await sessionManager.getEmployeeId();
-      final employeeId = int.tryParse(employeeIdStr ?? '');
       
-      int schoolId = 1;
-      if (employeeId != null) {
-        final client = SupabaseClientManager().client;
-        final List<dynamic> empInfo = await client
-            .from('employees')
-            .select('school_id')
-            .eq('id', employeeId);
-        if (empInfo.isNotEmpty && empInfo.first['school_id'] != null) {
-          schoolId = empInfo.first['school_id'] as int;
-          _schoolId = schoolId;
+      // 1. Retrieve schoolId directly from local session (offline-safe)
+      final schoolIdStr = await sessionManager.getSchoolId();
+      int schoolId = int.tryParse(schoolIdStr ?? '') ?? 1;
+      _schoolId = schoolId;
+
+      // 2. Only query Supabase DB if schoolId is missing/default to 1 AND online
+      if (schoolId == 1 && isOnline) {
+        final employeeIdStr = await sessionManager.getEmployeeId();
+        final employeeId = int.tryParse(employeeIdStr ?? '');
+        if (employeeId != null) {
+          try {
+            final client = SupabaseClientManager().client;
+            final List<dynamic> empInfo = await client
+                .from('employees')
+                .select('school_id')
+                .eq('id', employeeId);
+            if (empInfo.isNotEmpty && empInfo.first['school_id'] != null) {
+              schoolId = (empInfo.first['school_id'] as num).toInt();
+              _schoolId = schoolId;
+            }
+          } catch (e) {
+            debugPrint("⚠️ Could not query schoolId from Supabase: $e");
+          }
         }
       }
 
@@ -166,13 +178,14 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         _devoirControllers.clear();
 
         for (var student in _students) {
-          final sId = student['student_id'] as int;
-          final List<dynamic> devoirsList = student['devoirs'] as List<dynamic>;
+          final sId = (student['student_id'] as num?)?.toInt() ?? int.tryParse(student['student_id']?.toString() ?? '') ?? 0;
+          final List<dynamic> devoirsList = student['devoirs'] is List ? (student['devoirs'] as List<dynamic>) : [];
 
           final List<TextEditingController> controllers = [];
           for (int i = 0; i < 5; i++) {
-            final devVal = (devoirsList[i] != null)
-                ? (devoirsList[i] as num).toStringAsFixed(2).replaceAll('.00', '')
+            final devRaw = i < devoirsList.length ? devoirsList[i] : null;
+            final devVal = (devRaw != null && devRaw.toString().trim().isNotEmpty)
+                ? (num.tryParse(devRaw.toString())?.toStringAsFixed(2).replaceAll('.00', '') ?? devRaw.toString())
                 : '';
             controllers.add(TextEditingController(text: devVal));
           }
@@ -207,7 +220,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
         final matchesSearch = query.isEmpty || name.contains(query) || code.contains(query);
         if (!matchesSearch) return false;
 
-        final sId = s['student_id'] as int;
+        final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
         final controllers = _devoirControllers[sId];
         final hasGrade = controllers?.any((c) => c.text.trim().isNotEmpty) ?? false;
         final avg = _getLiveAverage(sId);
@@ -246,7 +259,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
     int passCount = 0;
 
     for (var s in _students) {
-      final sId = s['student_id'] as int;
+      final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
       final controllers = _devoirControllers[sId];
       final hasGrade = controllers?.any((c) => c.text.trim().isNotEmpty) ?? false;
 
@@ -290,8 +303,8 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       final List<Map<String, dynamic>> devoirsToSave = [];
 
       for (var s in _students) {
-        final sId = s['student_id'] as int;
-        final controllers = _devoirControllers[sId]!;
+        final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
+        final controllers = _devoirControllers[sId] ?? [];
 
         final List<double?> devoirsList = controllers.map((c) {
           final val = double.tryParse(c.text);
@@ -368,7 +381,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
       final tableData = _students.asMap().entries.map((entry) {
         final idx = entry.key + 1;
         final s = entry.value;
-        final sId = s['student_id'] as int;
+        final sId = (s['student_id'] as num?)?.toInt() ?? int.tryParse(s['student_id']?.toString() ?? '') ?? 0;
         final matricule = s['num_admission'] as String? ?? '-';
         final name = s['nom_etudiant'] as String? ?? 'Sans Nom';
 
@@ -1120,7 +1133,7 @@ class _GestionDevoirsScreenState extends State<GestionDevoirsScreen> {
                         itemCount: _filteredStudents.length,
                         itemBuilder: (context, index) {
                           final student = _filteredStudents[index];
-                          final sId = student['student_id'] as int;
+                          final sId = (student['student_id'] as num?)?.toInt() ?? int.tryParse(student['student_id']?.toString() ?? '') ?? 0;
                           final matricule = student['num_admission'] as String? ?? '-';
                           final name = student['nom_etudiant'] as String? ?? 'Sans Nom';
 
