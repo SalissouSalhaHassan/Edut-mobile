@@ -487,6 +487,7 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         sessionId: _selectedSessionId!,
         period: _selectedPeriodName,
         targetAction: targetAction,
+        schoolId: _schoolId,
         observation: observation,
       );
 
@@ -494,8 +495,8 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
         if (mounted) {
           final isOffline = res['isOffline'] == true || !locator<SyncEngine>().isOnlineNotifier.value;
           final msg = isOffline
-              ? (res['message'] ?? '📋 Soumission enregistrée localement (Mode Hors-ligne). Synchronisation automatique dès le retour du réseau 📶')
-              : (res['message'] ?? 'Statut mis à jour avec succès.');
+              ? (res['message'] ?? '📋 Action enregistrée localement (Mode Hors-ligne). Synchronisation automatique dès la reconnexion.')
+              : (res['message'] ?? 'Statut du circuit d\'approbation mis à jour avec succès.');
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1092,7 +1093,11 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                     child: Text(
                       _lockReason ?? (!_canManageAcademics 
                           ? 'Mode lecture seule (Droits d\'édition désactivés).'
-                          : 'Période verrouillée : La date limite de saisie des notes est dépassée.'),
+                          : (_workflowStatus == 'SAISIE_TERMINEE'
+                              ? 'Notes soumises au Censeur pour contrôle pédagogique (Saisie verrouillée).'
+                              : (_workflowStatus == 'CONTROLE_PEDAGOGIQUE' || _workflowStatus == 'VALIDATION_CONSEIL' || _workflowStatus == 'VERROUILLE' || _workflowStatus == 'PUBLIE'
+                                  ? 'Grille scellée et validée par l\'administration.'
+                                  : 'Période verrouillée : La date limite de saisie des notes est dépassée.'))),
                       style: TextStyle(
                         color: Colors.amber.shade900,
                         fontWeight: FontWeight.bold,
@@ -1100,14 +1105,15 @@ class _SaisieNotesScreenState extends State<SaisieNotesScreen> {
                       ),
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: _showExtensionDialog,
-                    icon: const Icon(Icons.send_rounded, size: 14, color: AppColors.primary),
-                    label: const Text(
-                      "Dérogation",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  if (_lockReason != null || (_workflowStatus == 'BROUILLON' || _workflowStatus == 'CORRECTION_DEMANDEE'))
+                    TextButton.icon(
+                      onPressed: _showExtensionDialog,
+                      icon: const Icon(Icons.send_rounded, size: 14, color: AppColors.primary),
+                      label: const Text(
+                        "Dérogation",
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

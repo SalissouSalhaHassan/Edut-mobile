@@ -389,6 +389,7 @@ class SyncEngine {
           period: data['period']?.toString() ?? '',
           targetAction: data['targetAction']?.toString() ?? '',
           observation: data['observation'] as String?,
+          schoolId: (data['schoolId'] as num?)?.toInt() ?? int.tryParse(data['schoolId']?.toString() ?? ''),
           isFromSync: true,
         );
         

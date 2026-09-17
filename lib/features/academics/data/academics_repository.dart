@@ -736,6 +736,7 @@ class AcademicsRepository {
     required int sessionId,
     required String period,
     required String targetAction,
+    int? schoolId,
     String? observation,
     bool isFromSync = false,
   }) async {
@@ -771,6 +772,7 @@ class AcademicsRepository {
             'period': period,
             'targetAction': targetAction,
             'observation': observation,
+            'schoolId': schoolId,
           },
         );
       }
@@ -789,6 +791,7 @@ class AcademicsRepository {
             'period': period,
             'targetAction': targetAction,
             'observation': observation,
+            'schoolId': schoolId,
           },
         },
       );
@@ -808,29 +811,30 @@ class AcademicsRepository {
       return response;
     } catch (e) {
       debugPrint("Error updating grade workflow status online: $e.");
-      if (!isFromSync) {
-        debugPrint("Queueing for offline sync.");
-        await cacheManager.saveDataList(
-          boxName: OfflineStoreManager.boxStudentResults,
-          key: cacheKey,
-          data: [_cleanMap(localResult)],
-        );
-        await queueManager.enqueue(
-          table: 'grade_workflow',
-          action: 'update_workflow_status',
-          data: {
-            'classId': classId,
-            'subjectId': subjectId,
-            'sessionId': sessionId,
-            'period': period,
-            'targetAction': targetAction,
-            'observation': observation,
-          },
-        );
-        return localResult;
-      } else {
+      if (isFromSync) {
         return {'success': false, 'error': e.toString(), 'isOffline': true};
       }
+
+      debugPrint("Queueing for offline sync.");
+      await cacheManager.saveDataList(
+        boxName: OfflineStoreManager.boxStudentResults,
+        key: cacheKey,
+        data: [_cleanMap(localResult)],
+      );
+      await queueManager.enqueue(
+        table: 'grade_workflow',
+        action: 'update_workflow_status',
+        data: {
+          'classId': classId,
+          'subjectId': subjectId,
+          'sessionId': sessionId,
+          'period': period,
+          'targetAction': targetAction,
+          'observation': observation,
+          'schoolId': schoolId,
+        },
+      );
+      return localResult;
     }
   }
 }
