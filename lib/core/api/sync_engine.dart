@@ -59,8 +59,7 @@ class SyncEngine {
     final results = await _connectivity.checkConnectivity();
     _updateConnectionStatus(results);
     if (isOnlineNotifier.value) {
-      triggerSync();
-      preloadAllOfflineData();
+      _syncAndHydrateSequentially();
     }
   }
 
@@ -70,10 +69,18 @@ class SyncEngine {
     
     // Trigger sync when transitioning from offline to online
     if (isOnlineNotifier.value && wasOffline) {
-      debugPrint("🔌 Connection Restored! Refreshing auth session and starting synchronization...");
+      debugPrint("🔌 Connection Restored! Refreshing auth session and starting sequential synchronization...");
+      _syncAndHydrateSequentially();
+    }
+  }
+
+  Future<void> _syncAndHydrateSequentially() async {
+    try {
       await _ensureFreshAuthToken();
-      triggerSync();
-      preloadAllOfflineData();
+      await triggerSync();
+      await preloadAllOfflineData();
+    } catch (e) {
+      debugPrint("⚠️ SyncEngine: Sequential sync/hydration error: $e");
     }
   }
 
@@ -393,20 +400,21 @@ class SyncEngine {
         final data = op.data;
         
         final res = await repo.recordPayment(
-          feeId: data['feeId'] as int,
-          schoolId: data['schoolId'] as int,
-          amount: (data['amount'] as num).toDouble(),
-          reduction: (data['reduction'] as num).toDouble(),
-          paymentMode: data['paymentMode'] as String,
-          reference: data['reference'] as String,
-          monthConcerned: data['monthConcerned'] as String,
-          recordedBy: data['recordedBy'] as String,
-          currentPaid: (data['currentPaid'] as num).toDouble(),
-          currentReduction: (data['currentReduction'] as num).toDouble(),
-          totalExpected: (data['totalExpected'] as num).toDouble(),
+          feeId: (data['feeId'] as num?)?.toInt() ?? int.tryParse(data['feeId']?.toString() ?? '') ?? 0,
+          schoolId: (data['schoolId'] as num?)?.toInt() ?? int.tryParse(data['schoolId']?.toString() ?? '') ?? 0,
+          amount: (data['amount'] as num?)?.toDouble() ?? double.tryParse(data['amount']?.toString() ?? '') ?? 0.0,
+          reduction: (data['reduction'] as num?)?.toDouble() ?? double.tryParse(data['reduction']?.toString() ?? '') ?? 0.0,
+          paymentMode: data['paymentMode']?.toString() ?? 'Espèces',
+          reference: data['reference']?.toString() ?? '',
+          monthConcerned: data['monthConcerned']?.toString() ?? '',
+          recordedBy: data['recordedBy']?.toString() ?? '',
+          currentPaid: (data['currentPaid'] as num?)?.toDouble() ?? double.tryParse(data['currentPaid']?.toString() ?? '') ?? 0.0,
+          currentReduction: (data['currentReduction'] as num?)?.toDouble() ?? double.tryParse(data['currentReduction']?.toString() ?? '') ?? 0.0,
+          totalExpected: (data['totalExpected'] as num?)?.toDouble() ?? double.tryParse(data['totalExpected']?.toString() ?? '') ?? 0.0,
+          isFromSync: true,
         );
         
-        return res['success'] == true;
+        return res['success'] == true && res['isOffline'] != true;
       } 
       
       // Handle direct HTTP API requests queued offline

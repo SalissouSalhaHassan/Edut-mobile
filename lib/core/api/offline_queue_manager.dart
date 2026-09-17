@@ -163,6 +163,7 @@ class OfflineQueueManager {
         op.retryCount += 1;
         op.lastError = error;
         await box.put(id, op.toMap());
+        _updatePendingCount();
         debugPrint("🔁 Retry #${op.retryCount} for Operation -> ID: $id");
       }
     } catch (e) {

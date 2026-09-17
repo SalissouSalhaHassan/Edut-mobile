@@ -319,6 +319,7 @@ class FinanceRepository {
     required double currentPaid,
     required double currentReduction,
     required double totalExpected,
+    bool isFromSync = false,
   }) async {
     final syncEngine = locator<SyncEngine>();
     final queueManager = locator<OfflineQueueManager>();
@@ -341,6 +342,14 @@ class FinanceRepository {
     final int offlinePaymentId = DateTime.now().millisecondsSinceEpoch;
 
     if (!syncEngine.isOnlineNotifier.value) {
+      if (isFromSync) {
+        return {
+          'success': false,
+          'error': 'Connexion indisponible pour le moment.',
+          'isOffline': true,
+        };
+      }
+
       debugPrint("Offline Mode: Queueing fee payment locally with ref: $receiptRef");
       await queueManager.enqueue(
         table: 'fee_payments',
@@ -458,6 +467,15 @@ class FinanceRepository {
         };
       }
     } catch (e) {
+      if (isFromSync) {
+        debugPrint("SyncEngine: Error during sync replay of payment $receiptRef: $e");
+        return {
+          'success': false,
+          'error': e.toString(),
+          'isOffline': true,
+        };
+      }
+
       debugPrint("Error recording payment online: $e. Falling back to offline local queue.");
       await queueManager.enqueue(
         table: 'fee_payments',
